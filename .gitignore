@@ -1,0 +1,29 @@
+# In VS Code, create a new file called .gitignore
+# Add this content:
+
+# Node
+node_modules/
+dist/
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Java
+target/
+*.class
+
+# Database
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/

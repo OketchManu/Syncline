@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syncline WebSocket Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .messages {
+            margin-top: 30px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background: #fafafa;
+        }
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+            background: white;
+        }
+        .message.system { border-left-color: #28a745; }
+        .message.task-created { border-left-color: #17a2b8; }
+        .message.task-updated { border-left-color: #ffc107; }
+        .message.task-deleted { border-left-color: #dc3545; }
+        .message.user-online { border-left-color: #28a745; }
+        .message.user-offline { border-left-color: #6c757d; }
+        .timestamp {
+            font-size: 11px;
+            color: #999;
+        }
+        .message-type {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Syncline WebSocket Test</h1>
+        <p>Test real-time updates for Syncline</p>
+
+        <div id="status" class="status disconnected">
+            ⚠️ Disconnected
+        </div>
+
+        <div class="input-group">
+            <label for="token">Access Token (from login):</label>
+            <input type="text" id="token" placeholder="Paste your JWT token here">
+        </div>
+
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        <button onclick="sendPing()" id="pingBtn" disabled>Send Ping</button>
+        <button onclick="clearMessages()">Clear Messages</button>
+
+        <h3>📨 Real-Time Messages:</h3>
+        <div id="messages" class="messages">
+            <p style="color: #999;">Connect to start receiving messages...</p>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const messagesDiv = document.getElementById('messages');
+        const statusDiv = document.getElementById('status');
+        const tokenInput = document.getElementById('token');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const pingBtn = document.getElementById('pingBtn');
+
+        function connect() {
+            const token = tokenInput.value.trim();
+            
+            if (!token) {
+                alert('Please enter your access token first');
+                return;
+            }
+
+            setStatus('connecting', '⏳ Connecting...');
+            connectBtn.disabled = true;
+
+            try {
+                ws = new WebSocket(`ws://localhost:3001/ws?token=${token}`);
+
+                ws.onopen = () => {
+                    setStatus('connected', '✅ Connected');
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    pingBtn.disabled = false;
+                    addMessage('Connected to WebSocket server', 'system');
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    addMessage('WebSocket error occurred', 'error');
+                };
+
+                ws.onclose = () => {
+                    setStatus('disconnected', '⚠️ Disconnected');
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    pingBtn.disabled = true;
+                    addMessage('Disconnected from server', 'system');
+                    ws = null;
+                };
+            } catch (error) {
+                setStatus('disconnected', '❌ Connection failed');
+                connectBtn.disabled = false;
+                alert('Connection failed: ' + error.message);
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function sendPing() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+                addMessage('Sent ping to server', 'system');
+            }
+        }
+
+        function handleMessage(data) {
+            const type = data.type;
+            let className = '';
+            let message = '';
+
+            switch(type) {
+                case 'connection':
+                    className = 'system';
+                    message = `Welcome! ${data.message}`;
+                    break;
+                case 'pong':
+                    className = 'system';
+                    message = 'Received pong from server';
+                    break;
+                case 'task:created':
+                    className = 'task-created';
+                    message = `📝 New task created: "${data.task.title}" by ${data.creator.fullName || data.creator.email}`;
+                    break;
+                case 'task:updated':
+                    className = 'task-updated';
+                    message = `✏️ Task updated: "${data.task.title}" by ${data.updater.fullName || data.updater.email}`;
+                    break;
+                case 'task:status_changed':
+                    className = 'task-updated';
+                    message = `🔄 Task status changed: "${data.title}" (${data.oldStatus} → ${data.newStatus})`;
+                    break;
+                case 'task:deleted':
+                    className = 'task-deleted';
+                    message = `🗑️ Task deleted (ID: ${data.taskId}) by ${data.deleter.fullName || data.deleter.email}`;
+                    break;
+                case 'task:flagged':
+                    className = 'task-updated';
+                    message = `🚩 Task flagged: "${data.task.title}" - Reason: ${data.reason}`;
+                    break;
+                case 'user:online':
+                    className = 'user-online';
+                    message = `🟢 ${data.email} is now online`;
+                    break;
+                case 'user:offline':
+                    className = 'user-offline';
+                    message = `⚫ ${data.email} went offline`;
+                    break;
+                default:
+                    message = `Unknown event: ${type}`;
+            }
+
+            addMessage(message, className, data);
+        }
+
+        function addMessage(text, className = '', data = null) {
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${className}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageEl.innerHTML = `
+                <div class="message-type">${text}</div>
+                <div class="timestamp">${timestamp}</div>
+            `;
+
+            if (data) {
+                const detailsEl = document.createElement('details');
+                detailsEl.style.marginTop = '5px';
+                detailsEl.innerHTML = `
+                    <summary style="cursor: pointer; color: #666;">View raw data</summary>
+                    <pre style="background: #f0f0f0; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 11px;">${JSON.stringify(data, null, 2)}</pre>
+                `;
+                messageEl.appendChild(detailsEl);
+            }
+
+            messagesDiv.appendChild(messageEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function setStatus(className, text) {
+            statusDiv.className = `status ${className}`;
+            statusDiv.textContent = text;
+        }
+
+        function clearMessages() {
+            messagesDiv.innerHTML = '<p style="color: #999;">Messages cleared...</p>';
+        }
+
+        // Auto-fill token from URL if provided
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        if (tokenFromUrl) {
+            tokenInput.value = tokenFromUrl;
+        }
+    </script>
+</body>
+</html>

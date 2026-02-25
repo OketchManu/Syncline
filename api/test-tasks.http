@@ -1,0 +1,121 @@
+### Syncline API Tests
+
+@baseUrl = http://localhost:3001
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjgsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsInJvbGUiOiJtZW1iZXIiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzY5NTQxNzc2LCJleHAiOjE3NzAxNDY1NzZ9.OBwy8eNw4I1BM12oJvOh17tytPUUnPNwInBDs8XGnoM
+
+### Health Check
+GET {{baseUrl}}/health
+
+### API Info
+GET {{baseUrl}}/api
+
+### ========================================
+### AUTHENTICATION
+### ========================================
+
+### Register New User
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "password123",
+  "fullName": "John Doe"
+}
+
+### Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "password123"
+}
+
+### Get Current User (Protected - need token)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+### Refresh Token
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+}
+
+### Logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### ========================================
+### TEST WITH SAMPLE DATA
+### ========================================
+
+### Login as default admin (if exists in schema)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@syncline.local",
+  "password": "admin123"
+}
+
+### ========================================
+### TASKS (Need valid token from login)
+### ========================================
+
+### Get all tasks
+GET {{baseUrl}}/api/tasks
+Authorization: Bearer {{accessToken}}
+
+### Get task statistics
+GET {{baseUrl}}/api/tasks/stats
+Authorization: Bearer {{accessToken}}
+
+### Get my tasks
+GET {{baseUrl}}/api/tasks/my
+Authorization: Bearer {{accessToken}}
+
+### Get overdue tasks
+GET {{baseUrl}}/api/tasks/overdue
+Authorization: Bearer {{accessToken}}
+
+### Create a new task
+POST {{baseUrl}}/api/tasks
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Build authentication system",
+  "description": "Implement JWT-based authentication with login and register",
+  "status": "in_progress",
+  "priority": "high",
+  "deadline": "2026-02-15T23:59:59"
+}
+
+### Get specific task (replace 1 with actual task ID)
+GET {{baseUrl}}/api/tasks/1
+Authorization: Bearer {{accessToken}}
+
+### Update task status
+PUT {{baseUrl}}/api/tasks/1
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+### Flag a task as delayed
+PATCH {{baseUrl}}/api/tasks/1/flag
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Waiting for design approval"
+}
+
+### Unflag a task
+PATCH {{baseUrl}}/api/tasks/1/unflag
+Authorization: Bearer {{accessToken}}

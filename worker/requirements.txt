@@ -1,0 +1,14 @@
+# worker/requirements.txt
+# Python Worker Dependencies
+
+# HTTP requests (for notifier API calls)
+requests==2.31.0
+
+# Database (SQLite is built-in to Python, but this helps with type hints)
+# No additional packages needed for SQLite
+
+# Optional: If you want better scheduling later
+# apscheduler==3.10.4
+
+# Optional: For better .env parsing
+# python-dotenv==1.0.0
