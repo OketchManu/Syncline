@@ -1,0 +1,19 @@
+# worker/.dockerignore
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+.git
+.gitignore
+README.md
+.vscode
+.idea
+*.md
+.pytest_cache/
+.coverage
+htmlcov/

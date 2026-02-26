@@ -1,0 +1,15 @@
+# notifier/.dockerignore
+target/
+.mvn/
+mvnw
+mvnw.cmd
+.git
+.gitignore
+README.md
+.vscode
+.idea
+*.md
+.settings/
+.project
+.classpath
+*.iml

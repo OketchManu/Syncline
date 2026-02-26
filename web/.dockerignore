@@ -1,0 +1,17 @@
+# web/.dockerignore
+node_modules
+npm-debug.log
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.git
+.gitignore
+README.md
+.vscode
+.idea
+*.md
+build
+coverage
+.DS_Store
