@@ -1,17 +1,20 @@
-# worker/src/config/database.py
-# SQLite database connection for the Python worker
-
+﻿# worker/src/config/database.py
 import sqlite3
 import os
 from pathlib import Path
 
 def get_db_path():
-    """Get the database path, resolving relative to this file"""
-    # Get the worker/src/config directory
-    config_dir = Path(__file__).parent
-    # Go up to worker/src, then worker, then syncline root, then into database
-    db_path = config_dir / '..' / '..' / '..' / 'database' / 'syncline.db'
-    return str(db_path.resolve())
+    """Get the database path from environment or use default"""
+    # Check environment variable first (for Docker)
+    db_path = os.getenv('DATABASE_PATH', '/data/syncline.db')
+    
+    # If path doesn't exist and we're not in Docker, try relative path
+    if not os.path.exists(db_path):
+        config_dir = Path(__file__).parent
+        db_path = config_dir / '..' / '..' / '..' / 'database' / 'syncline.db'
+        db_path = str(db_path.resolve())
+    
+    return db_path
 
 def get_connection():
     """Create a database connection"""
@@ -21,7 +24,7 @@ def get_connection():
         raise FileNotFoundError(f"Database not found at: {db_path}")
     
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+    conn.row_factory = sqlite3.Row
     return conn
 
 def test_connection():
@@ -44,7 +47,6 @@ def query(sql, params=()):
         cursor = conn.cursor()
         cursor.execute(sql, params)
         rows = cursor.fetchall()
-        # Convert sqlite3.Row objects to regular dictionaries
         return [dict(row) for row in rows]
     finally:
         conn.close()
