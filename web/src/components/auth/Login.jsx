@@ -162,21 +162,6 @@ const Login = () => {
                         </button>
                     </form>
 
-                    {/* Demo credentials */}
-                    <div style={styles.demoBox}>
-                        <p style={styles.demoTitle}>🎯 Quick Demo</p>
-                        <button
-                            type="button"
-                            style={styles.demoBtn}
-                            onClick={() => {
-                                setEmail('test@example.com');
-                                setPassword('password123');
-                            }}
-                        >
-                            Fill Demo Credentials
-                        </button>
-                    </div>
-
                     {/* Footer */}
                     <div style={styles.footer}>
                         <p style={styles.footerText}>
