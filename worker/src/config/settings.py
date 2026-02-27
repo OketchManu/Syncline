@@ -33,7 +33,7 @@ def load_env():
         print("    Using default configuration...")
         # Set defaults
         env_vars = {
-            'DATABASE_PATH': '../../database/syncline.db',
+            'DATABASE_PATH': '../../data/syncline.db',
             'NOTIFIER_URL': 'http://localhost:8080',
             'API_URL': 'http://localhost:3001'
         }
@@ -43,7 +43,7 @@ def load_env():
 def get_database_path():
     """Get the absolute path to the database file"""
     env = load_env()
-    db_path = env.get('DATABASE_PATH', '../../database/syncline.db')
+    db_path = env.get('DATABASE_PATH', '../../data/syncline.db')
     
     # Resolve relative path from this file's location
     config_dir = Path(__file__).parent
