@@ -100,14 +100,36 @@ export const taskAPI = {
 
 // User endpoints
 export const userAPI = {
-    getAll: () => 
+    getAll: () =>
         api.get('/users'),
-    
-    getById: (id) => 
+
+    getById: (id) =>
         api.get(`/users/${id}`),
-    
-    getOnline: () => 
-        api.get('/users/online')
+
+    getOnline: () =>
+        api.get('/users/online'),
+
+    // Update name and/or avatar photo.
+    // Accepts either a plain object { fullName, removeAvatar, device }
+    // or a FormData instance when a new avatar file is being uploaded.
+    updateProfile: (data) => {
+        if (data instanceof FormData) {
+            return api.put('/users/me', data, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+        }
+        return api.put('/users/me', data);
+    },
+
+    // Change password. Expects { currentPassword, newPassword, device }.
+    changePassword: (data) =>
+        api.put('/users/me/password', data),
+
+    // Permanently delete the authenticated user's account.
+    // Passes { device } in the request body so the server can log which
+    // device triggered the deletion and notify other sessions via WS.
+    deleteAccount: (data) =>
+        api.delete('/users/me', { data }),
 };
 
 export default api;

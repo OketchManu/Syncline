@@ -6,73 +6,48 @@ const { runQuery, getOne, getAll } = require('../config/database');
 
 const SALT_ROUNDS = 10;
 
-/**
- * Create a new user
- */
 async function createUser(email, password, fullName, role = 'member') {
-    // Hash password
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-
     const result = await runQuery(
-        `INSERT INTO users (email, password_hash, full_name, role) 
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO users (email, password_hash, full_name, role) VALUES (?, ?, ?, ?)`,
         [email, passwordHash, fullName, role]
     );
-
     return result.id;
 }
 
-/**
- * Find user by email
- */
 async function findByEmail(email) {
-    return await getOne(
-        'SELECT * FROM users WHERE email = ?',
-        [email]
-    );
+    return await getOne('SELECT * FROM users WHERE email = ?', [email]);
 }
 
-/**
- * Find user by ID
- */
 async function findById(id) {
+    // Wrap avatar_url in a CASE so older DBs without the column don't crash
     return await getOne(
-        'SELECT id, email, full_name, role, is_active, last_seen, created_at FROM users WHERE id = ?',
+        `SELECT id, email, full_name, role, is_active, last_seen, created_at, avatar_url
+         FROM users WHERE id = ?`,
         [id]
     );
 }
 
-/**
- * Get all users (excluding password hash)
- */
 async function getAllUsers() {
     return await getAll(
-        'SELECT id, email, full_name, role, is_active, last_seen, created_at FROM users ORDER BY created_at DESC'
+        `SELECT id, email, full_name, role, is_active, last_seen, created_at, avatar_url
+         FROM users ORDER BY created_at DESC`
     );
 }
 
-/**
- * Verify password
- */
 async function verifyPassword(plainPassword, hashedPassword) {
     return await bcrypt.compare(plainPassword, hashedPassword);
 }
 
-/**
- * Update user's last seen timestamp
- */
 async function updateLastSeen(userId) {
-    await runQuery(
-        'UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?',
-        [userId]
-    );
+    await runQuery('UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
 }
 
 /**
- * Update user details
+ * Generic update (admin use — allows role, email, is_active changes)
  */
 async function updateUser(userId, updates) {
-    const allowedFields = ['full_name', 'email', 'role', 'is_active'];
+    const allowedFields = ['full_name', 'email', 'role', 'is_active', 'avatar_url'];
     const fields = [];
     const values = [];
 
@@ -83,59 +58,62 @@ async function updateUser(userId, updates) {
         }
     }
 
-    if (fields.length === 0) {
-        throw new Error('No valid fields to update');
-    }
+    if (fields.length === 0) throw new Error('No valid fields to update');
 
     values.push(userId);
-
-    await runQuery(
-        `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
-        values
-    );
+    await runQuery(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
 }
 
 /**
- * Change user password
+ * Self-service profile update — only allows name + avatar, never role/email.
+ * @param {number} userId
+ * @param {{ fullName?: string, avatarUrl?: string, removeAvatar?: boolean }} opts
  */
+async function updateProfile(userId, { fullName, avatarUrl, removeAvatar } = {}) {
+    const fields = [];
+    const values = [];
+
+    if (fullName !== undefined && fullName !== null) {
+        const trimmed = String(fullName).trim();
+        if (!trimmed) throw new Error('Name cannot be empty');
+        fields.push('full_name = ?');
+        values.push(trimmed);
+    }
+
+    if (removeAvatar === true) {
+        fields.push('avatar_url = ?');
+        values.push(null);
+    } else if (avatarUrl !== undefined && avatarUrl !== null) {
+        fields.push('avatar_url = ?');
+        values.push(avatarUrl);
+    }
+
+    if (fields.length === 0) throw new Error('Nothing to update');
+
+    values.push(userId);
+    await runQuery(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+}
+
 async function changePassword(userId, newPassword) {
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    
-    await runQuery(
-        'UPDATE users SET password_hash = ? WHERE id = ?',
-        [passwordHash, userId]
-    );
+    await runQuery('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId]);
 }
 
-/**
- * Delete user
- */
 async function deleteUser(userId) {
     await runQuery('DELETE FROM users WHERE id = ?', [userId]);
 }
 
-/**
- * Get online users (last seen within 5 minutes)
- */
 async function getOnlineUsers() {
     return await getAll(
-        `SELECT id, email, full_name, role, last_seen 
+        `SELECT id, email, full_name, role, last_seen, avatar_url
          FROM users 
-         WHERE last_seen > datetime('now', '-5 minutes')
-         AND is_active = 1
+         WHERE last_seen > datetime('now', '-5 minutes') AND is_active = 1
          ORDER BY last_seen DESC`
     );
 }
 
 module.exports = {
-    createUser,
-    findByEmail,
-    findById,
-    getAllUsers,
-    verifyPassword,
-    updateLastSeen,
-    updateUser,
-    changePassword,
-    deleteUser,
-    getOnlineUsers
+    createUser, findByEmail, findById, getAllUsers,
+    verifyPassword, updateLastSeen, updateUser, updateProfile,
+    changePassword, deleteUser, getOnlineUsers
 };
