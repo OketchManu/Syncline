@@ -29,7 +29,6 @@ export const AuthProvider = ({ children }) => {
             if (token && savedUser) {
                 try {
                     setUser(JSON.parse(savedUser));
-                    // Connect to WebSocket
                     wsService.connect(token);
                 } catch (error) {
                     console.error('Failed to restore session:', error);
@@ -48,14 +47,11 @@ export const AuthProvider = ({ children }) => {
             const response = await authAPI.login(email, password);
             const { user, accessToken, refreshToken } = response.data;
 
-            // Save to localStorage
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
             localStorage.setItem('user', JSON.stringify(user));
 
             setUser(user);
-
-            // Connect to WebSocket
             wsService.connect(accessToken);
 
             return { success: true };
@@ -72,14 +68,11 @@ export const AuthProvider = ({ children }) => {
             const response = await authAPI.register(email, password, fullName);
             const { user, accessToken, refreshToken } = response.data;
 
-            // Save to localStorage
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
             localStorage.setItem('user', JSON.stringify(user));
 
             setUser(user);
-
-            // Connect to WebSocket
             wsService.connect(accessToken);
 
             return { success: true };
@@ -91,16 +84,27 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
-        // Disconnect WebSocket
         wsService.disconnect();
-
-        // Clear localStorage
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-
         setUser(null);
         setError(null);
+    };
+
+    /**
+     * Update the user in state AND localStorage so changes are reflected
+     * immediately everywhere in the app and survive a page refresh.
+     * Call this after any successful profile update from the API.
+     */
+    const updateUser = (updatedUser) => {
+        // Merge with existing user so partial updates (e.g. only name changed)
+        // don't wipe out other fields like role or email
+        setUser(prev => {
+            const merged = { ...prev, ...updatedUser };
+            localStorage.setItem('user', JSON.stringify(merged));
+            return merged;
+        });
     };
 
     const value = {
@@ -110,6 +114,7 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
+        updateUser,
         isAuthenticated: !!user
     };
 
