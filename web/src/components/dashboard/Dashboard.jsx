@@ -28,6 +28,18 @@ const getDeviceInfo = () => {
     return `${browser} on ${os}`;
 };
 
+// Converts a stored avatar value to a displayable URL.
+// - Already a full URL (http/https) → use as-is
+// - Already a data: URL (base64 preview) → use as-is
+// - Relative path from server (/uploads/...) → prepend API origin
+// - null / undefined → return null (show initials instead)
+const API_ORIGIN = 'http://localhost:3001';
+const resolveAvatar = (avatar) => {
+    if (!avatar) return null;
+    if (avatar.startsWith('http') || avatar.startsWith('data:')) return avatar;
+    return `${API_ORIGIN}${avatar}`;
+};
+
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const ThemeContext = createContext();
 const themes = {
@@ -142,7 +154,7 @@ const DeleteConfirmModal = ({ t, task, onConfirm, onCancel, loading }) => (
 const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) => {
     const [tab, setTab] = useState('profile');
     const [fullName, setFullName] = useState(user?.fullName || '');
-    const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
+    const [avatarPreview, setAvatarPreview] = useState(resolveAvatar(user?.avatar));
     const [avatarFile, setAvatarFile] = useState(null); // raw File object for upload
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
@@ -532,12 +544,19 @@ const Dashboard = () => {
 
     const updateTaskStatus = async (taskId, newStatus) => {
         if (!isOnline) { addNotification('Offline', 'Cannot update tasks while offline', 'warning'); return; }
+
+        // Optimistic update — change the UI immediately
+        const previousTasks = tasks;
+        setTasks(prev => prev.map(tk => tk.id === taskId ? { ...tk, status: newStatus } : tk));
         setUpdatingStatus(taskId);
+
         try {
             await taskAPI.update(taskId, { status: newStatus });
             addActivity(`Status changed to ${newStatus}`);
         } catch (err) {
             console.error(err);
+            // Roll back to previous state if server call failed
+            setTasks(previousTasks);
             addNotification('Error', 'Failed to update task status', 'error');
         } finally { setUpdatingStatus(null); }
     };
@@ -712,7 +731,7 @@ const Dashboard = () => {
                             style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '5px 10px 5px 5px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '11px', cursor: 'pointer', transition: 'all 0.2s' }}>
                             <div style={{ width: '30px', height: '30px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
                                 {user?.avatar
-                                    ? <img src={user.avatar} alt="av" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ? <img src={resolveAvatar(user.avatar)} alt="av" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>
                                         {(user?.fullName || user?.email || '?').charAt(0).toUpperCase()}
                                       </div>
@@ -876,7 +895,7 @@ const TaskCard = ({ task, t, onStatusChange, onDelete, onEdit, updatingStatus, i
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '600', color: t.textPrimary, margin: 0, lineHeight: '1.3', flex: 1 }}>{task.title}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
-                    {task.flagged && <Flag size={13} color="#ef4444" fill="#ef4444" />}
+                    {!!task.flagged && <Flag size={13} color="#ef4444" fill="#ef4444" />}
                     {/* Edit */}
                     <button onClick={onEdit} disabled={!isOnline}
                         style={{ background: 'none', border: 'none', color: t.textMuted, cursor: isOnline ? 'pointer' : 'not-allowed', padding: '5px', display: 'flex', borderRadius: '6px', opacity: isOnline ? 1 : 0.35, transition: 'color 0.15s' }}
