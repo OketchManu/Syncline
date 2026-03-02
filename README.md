@@ -1,440 +1,401 @@
-# Syncline - Distributed Task Management System
+# Syncline
 
-> A real-time, full-stack task coordination platform demonstrating modern distributed systems architecture with microservices, WebSocket communication, and cross-language integration.
+A real-time collaborative task management system built with a modern multi-service architecture. Syncline features live updates via WebSocket, offline-capable PWA support, JWT authentication, and a polyglot backend spanning Node.js, Python, and Java.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)
-![React](https://img.shields.io/badge/React-18.x-blue.svg)
-![Python](https://img.shields.io/badge/Python-3.11-yellow.svg)
-![Java](https://img.shields.io/badge/Java-17-orange.svg)
+---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Architecture](#architecture)
-- [Features](#features)
 - [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [System Components](#system-components)
-- [API Documentation](#api-documentation)
-- [Deployment](#deployment)
 - [Project Structure](#project-structure)
-- [Learning Outcomes](#learning-outcomes)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [API Reference](#api-reference)
+- [WebSocket Events](#websocket-events)
+- [Database Schema](#database-schema)
+- [Environment Variables](#environment-variables)
+- [Running Tests](#running-tests)
+- [Roadmap](#roadmap)
 
-## 🎯 Overview
+---
 
-Syncline is a production-grade task management system built to demonstrate enterprise-level distributed systems architecture. It showcases real-time collaboration, background job processing, cross-service communication, and modern full-stack development practices.
+## Overview
 
-**Key Highlights:**
-- 🚀 **Real-time Updates** - WebSocket-powered instant synchronization
-- 🔄 **Distributed Architecture** - 4 microservices working in harmony
-- 🌐 **Cross-Language Integration** - JavaScript, Python, and Java services
-- 📊 **Automated Workflows** - Background jobs for deadline monitoring
-- 🎨 **Modern UI/UX** - Futuristic dark-themed interface
-- 🔐 **Secure Authentication** - JWT-based auth with bcrypt password hashing
+Syncline is a team task management platform designed for real-time collaboration. Users can create, assign, update, and flag tasks — and every action is broadcast instantly to all connected clients via WebSocket. The system is built to support offline usage with automatic sync when connectivity is restored.
 
-## 🏗️ Architecture
+Key capabilities:
+- **Real-time updates** — task changes are broadcast to all connected users instantly
+- **JWT authentication** — secure access and refresh token system
+- **Role-based access control** — `admin`, `manager`, and `member` roles
+- **Task flagging & overdue detection** — automated and manual task monitoring
+- **Offline sync** — IndexedDB-backed local storage with conflict resolution (PWA)
+- **Activity feed** — live log of all team actions
+
+---
+
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLIENT LAYER                             │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │          React Frontend (Port 3000)                       │  │
-│  │  • Modern UI with Tailwind CSS                            │  │
-│  │  • Real-time WebSocket client                             │  │
-│  │  • JWT authentication                                     │  │
-│  │  • Responsive dashboard                                   │  │
-│  └────────────────────┬─────────────────────────────────────┘  │
-└─────────────────────────┼─────────────────────────────────────┘
-                          │
-                          │ HTTP/WebSocket
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      APPLICATION LAYER                           │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │      Node.js API Server (Port 3001)                       │  │
-│  │  • RESTful API endpoints                                  │  │
-│  │  • WebSocket server                                       │  │
-│  │  • JWT token management                                   │  │
-│  │  • SQLite database integration                            │  │
-│  └──────┬───────────────────────────────────┬───────────────┘  │
-│         │                                    │                   │
-│         │ Database Access                    │ Real-time Events  │
-│         ▼                                    ▼                   │
-│  ┌─────────────┐                    ┌──────────────────────┐   │
-│  │   SQLite    │◄───────────────────┤  Python Worker       │   │
-│  │  Database   │   Read/Write       │  (Background Jobs)   │   │
-│  │             │                    │  • Deadline checker   │   │
-│  │  • users    │                    │  • Task auto-flagging │   │
-│  │  • tasks    │                    │  • Runs every 30s     │   │
-│  │  • activities│                   └──────────┬───────────┘   │
-│  │  • notifications│                           │                │
-│  └─────────────┘                               │ HTTP           │
-│                                                 ▼                │
-│                                         ┌──────────────────┐    │
-│                                         │ Java Notifier    │    │
-│                                         │ (Port 8080)      │    │
-│                                         │ • Email alerts   │    │
-│                                         │ • Logging        │    │
-│                                         │ • Spring Boot    │    │
-│                                         └──────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                    Client (React PWA)                │
+│    IndexedDB • Service Worker • Sync Manager         │
+└───────────────────────┬─────────────────────────────┘
+                        │ HTTP + WebSocket
+┌───────────────────────▼─────────────────────────────┐
+│              Node.js API  (port 3001)                │
+│      Express • JWT • WebSocket (ws)                  │
+│      REST Endpoints + Real-time Broadcast            │
+└──────────┬────────────────────────┬──────────────────┘
+           │                        │
+┌──────────▼──────────┐  ┌─────────▼─────────────────┐
+│   Python Worker     │  │     Java Notifier          │
+│  APScheduler jobs   │  │  Email / Webhook / SMS     │
+│  Overdue detection  │  │  Enterprise notifications  │
+└──────────┬──────────┘  └────────────────────────────┘
+           │
+┌──────────▼──────────┐
+│   SQLite / PostgreSQL│
+│   (syncline.db)     │
+└─────────────────────┘
 ```
 
-### Data Flow
+---
 
-1. **User Action** → React Frontend sends HTTP request
-2. **API Processing** → Node.js validates, processes, updates database
-3. **Real-time Broadcast** → WebSocket pushes updates to all connected clients
-4. **Background Jobs** → Python worker periodically checks for overdue tasks
-5. **Notifications** → Worker sends alerts to Java notifier service
-6. **Instant UI Update** → All clients receive updates without page refresh
+## Tech Stack
 
-## ✨ Features
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, React Router v6, Axios, Recharts, Lucide React |
+| API Server | Node.js 20+, Express 5, `ws`, `jsonwebtoken`, `bcrypt` |
+| Database | SQLite (dev) / PostgreSQL (prod) |
+| Background Worker | Python 3.10+, APScheduler |
+| Notification Service | Java 17+, Spring Boot (Maven) |
+| Real-time | WebSocket (`ws` library) |
+| Auth | JWT (access + refresh tokens) |
 
-### Core Functionality
-- ✅ **Task Management** - Create, read, update, delete tasks
-- ✅ **Real-time Collaboration** - See changes instantly across all devices
-- ✅ **User Authentication** - Secure registration and login with JWT
-- ✅ **Task Assignment** - Assign tasks to team members
-- ✅ **Priority Levels** - Low, Medium, High, Urgent
-- ✅ **Status Tracking** - Pending, In Progress, Completed, Blocked
-- ✅ **Deadline Management** - Set and track task deadlines
-- ✅ **Task Filtering** - Filter by status, priority, assignee, flagged state
-- ✅ **Search Functionality** - Quick search across all tasks
-- ✅ **Activity Feed** - Live feed of all system activities
+---
 
-### Advanced Features
-- 🤖 **Automated Deadline Detection** - Python worker flags overdue tasks
-- 🚩 **Stuck Task Detection** - Auto-flags tasks with no updates for 48+ hours
-- 📊 **Task Statistics** - Dashboard with real-time metrics
-- 🔔 **Notification System** - Java-powered notification service
-- 🎨 **Modern UI** - Futuristic dark theme with glassmorphism
-- 📱 **Responsive Design** - Works on desktop, tablet, and mobile
-- 🔐 **Secure** - bcrypt password hashing, JWT tokens
+## Project Structure
 
-## 🛠️ Tech Stack
+```
+syncline/
+├── api/                        # Node.js REST + WebSocket server
+│   ├── src/
+│   │   ├── config/
+│   │   │   ├── database.js     # SQLite connection & helpers
+│   │   │   ├── jwt.js          # Token generation & verification
+│   │   │   └── websocket.js    # WebSocket server initialisation
+│   │   ├── middleware/
+│   │   │   └── auth.js         # JWT auth middleware & role guards
+│   │   ├── models/
+│   │   │   ├── User.js         # User DB operations
+│   │   │   └── Task.js         # Task DB operations
+│   │   ├── routes/
+│   │   │   ├── auth.routes.js  # /api/auth endpoints
+│   │   │   └── task.routes.js  # /api/tasks endpoints
+│   │   ├── websocket/
+│   │   │   └── events.js       # WebSocket event handlers
+│   │   └── server.js           # App entry point
+│   ├── .env
+│   ├── package.json
+│   └── websocket-test.html     # Browser WebSocket tester
+│
+├── web/                        # React PWA frontend
+│   └── src/
+│       ├── components/
+│       │   ├── auth/           # Login, Register
+│       │   ├── dashboard/      # Dashboard, Stats, Charts
+│       │   ├── tasks/          # TaskList, TaskCard, TaskForm
+│       │   ├── activity/       # ActivityFeed
+│       │   ├── users/          # OnlineUsers
+│       │   └── common/         # Header, Sidebar, SyncIndicator
+│       ├── context/
+│       │   └── AuthContext.jsx
+│       ├── services/
+│       │   ├── api.js          # Axios API client
+│       │   └── websocket.js    # WebSocket client service
+│       └── App.js
+│
+├── worker/                     # Python background jobs
+│   └── src/
+│       ├── config/
+│       ├── tasks/              # Scheduled job definitions
+│       ├── services/
+│       └── utils/
+│
+├── notifier/                   # Java notification service
+│   └── src/main/java/com/syncline/notifier/
+│
+└── database/
+    ├── migrations/
+    └── schema.sql
+```
 
-### Frontend
-- **React 18** - UI library
-- **React Router** - Client-side routing
-- **Axios** - HTTP client
-- **WebSocket API** - Real-time communication
-- **Tailwind CSS** - Utility-first styling
-- **Lucide React** - Modern icon library
+---
 
-### Backend (Node.js)
-- **Node.js 20** - Runtime environment
-- **Express.js** - Web framework
-- **ws** - WebSocket library
-- **jsonwebtoken** - JWT authentication
-- **bcryptjs** - Password hashing
-- **SQLite3** - Embedded database
-- **dotenv** - Environment configuration
+## Prerequisites
 
-### Background Worker (Python)
-- **Python 3.11** - Programming language
-- **sqlite3** - Database access
-- **requests** - HTTP client
+Install the following before running Syncline locally:
 
-### Notification Service (Java)
-- **Java 17** - Programming language
-- **Spring Boot 3.2** - Application framework
-- **Spring Web** - REST API
-- **Maven** - Build tool
+| Tool | Version | Download |
+|---|---|---|
+| Node.js | 20 LTS or 22 LTS | https://nodejs.org |
+| Python | 3.10+ | https://www.python.org |
+| Java JDK | 17 or 21 | https://adoptium.net |
+| Git | Latest | https://git-scm.com |
 
-### Database
-- **SQLite** - Lightweight relational database
-- Tables: users, tasks, activities, notifications, comments, sync_conflicts
+> **Windows users:** Run PowerShell as Administrator and execute `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` before using npm.
 
-## 🚀 Getting Started
+---
 
-### Prerequisites
+## Getting Started
 
-Ensure you have the following installed:
-- **Node.js** 20.x or higher ([Download](https://nodejs.org/))
-- **Python** 3.11 or higher ([Download](https://www.python.org/))
-- **Java** 17 or higher ([Download](https://adoptium.net/))
-- **Git** ([Download](https://git-scm.com/))
+### 1. Clone the repository
 
-### Quick Start (4 Terminals)
+```bash
+git clone https://github.com/your-username/syncline.git
+cd syncline
+```
 
-#### Terminal 1: API Server
+### 2. Start the API server
+
 ```bash
 cd api
 npm install
 npm run dev
 ```
-Server starts on **http://localhost:3001**
 
-#### Terminal 2: Frontend
+The API will be available at `http://localhost:3001`.  
+The WebSocket endpoint will be available at `ws://localhost:3001/ws`.
+
+On startup you should see:
+
+```
+✅ Connected to SQLite database
+✅ Database initialized successfully
+✅ WebSocket server initialized on /ws
+🚀 HTTP Server: http://localhost:3001
+⚡ WebSocket: ws://localhost:3001/ws
+```
+
+### 3. Start the React frontend
+
+Open a second terminal:
+
 ```bash
 cd web
 npm install
 npm start
 ```
-Browser opens at **http://localhost:3000**
 
-#### Terminal 3: Python Worker
+The app opens automatically at `http://localhost:3000`.
+
+### 4. Start the Python worker (optional)
+
 ```bash
 cd worker
-
-# Create virtual environment
 python -m venv venv
 
-# Activate (Windows)
-.\venv\Scripts\Activate.ps1
+# Windows
+venv\Scripts\activate
 
-# Activate (Mac/Linux)
+# macOS/Linux
 source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Run worker
-python src/scheduler.py
+python src/main.py
 ```
 
-#### Terminal 4: Java Notifier
-```bash
-cd notifier
+---
 
-# Using Maven wrapper (Windows)
-.\mvnw.cmd spring-boot:run
+## API Reference
 
-# Using Maven wrapper (Mac/Linux)
-./mvnw spring-boot:run
+All protected routes require the header:
 
-# Or with Maven installed
-mvn spring-boot:run
 ```
-Service starts on **http://localhost:8080**
-
-### Verify Installation
-
-Once all services are running:
-
-1. **API Health Check**
-   ```bash
-   curl http://localhost:3001/health
-   ```
-
-2. **Notifier Health Check**
-   ```bash
-   curl http://localhost:8080/health
-   ```
-
-3. **Open Frontend**
-   - Navigate to http://localhost:3000
-   - Register a new account
-   - Start creating tasks!
-
-## 📦 System Components
-
-### 1. Node.js API (`/api`)
-
-**Purpose:** Core backend service handling all business logic
-
-**Key Features:**
-- RESTful API with Express.js
-- JWT authentication middleware
-- WebSocket server for real-time updates
-- SQLite database integration
-- CORS configuration for frontend communication
-
-**Main Endpoints:**
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/tasks` - Get all tasks (with filters)
-- `POST /api/tasks` - Create new task
-- `PATCH /api/tasks/:id` - Update task
-- `DELETE /api/tasks/:id` - Delete task
-- `GET /api/tasks/stats` - Get task statistics
-- `WS /ws` - WebSocket connection
-
-### 2. React Frontend (`/web`)
-
-**Purpose:** User interface and real-time client
-
-**Key Features:**
-- Modern React 18 with hooks
-- JWT authentication with automatic token refresh
-- Real-time task updates via WebSocket
-- Responsive design with Tailwind CSS
-- Form validation and error handling
-- Live activity feed
-
-**Main Components:**
-- Login/Register pages
-- Dashboard with task management
-- Task creation modal
-- Real-time activity sidebar
-- Search and filter controls
-
-### 3. Python Worker (`/worker`)
-
-**Purpose:** Background job processor for automated tasks
-
-**Jobs:**
-- **Deadline Checker** (runs every 30s)
-  - Finds tasks past their deadline
-  - Flags them as overdue
-  - Sends notifications to Java service
-  
-- **Task Flagger** (runs every 60s)
-  - Detects tasks with no updates for 48+ hours
-  - Automatically flags them as stuck
-  - Alerts assignees
-
-**Key Features:**
-- Graceful error handling
-- Avoids duplicate flagging
-- Handles missing assignees
-- Logs all activities
-
-### 4. Java Notifier (`/notifier`)
-
-**Purpose:** Enterprise notification service
-
-**Key Features:**
-- RESTful notification API
-- Spring Boot framework
-- Formatted console logging
-- Extensible for email/SMS/Slack
-- Health check endpoint
-
-**Endpoints:**
-- `POST /notify` - Send notification
-- `POST /test` - Send test notification
-- `GET /health` - Health check
-- `GET /stats` - Service statistics
-
-## 📚 API Documentation
-
-### Authentication
-
-All protected endpoints require a Bearer token:
-```
-Authorization: Bearer <your-jwt-token>
+Authorization: Bearer <accessToken>
 ```
 
-### Task Object Schema
+### Auth
 
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/register` | Register a new user |
+| POST | `/api/auth/login` | Login and receive tokens |
+| POST | `/api/auth/refresh` | Refresh access token |
+| GET | `/api/auth/me` | Get current user profile |
+| POST | `/api/auth/logout` | Invalidate session |
+
+**Register request body:**
 ```json
 {
-  "id": 1,
-  "title": "Complete project documentation",
-  "description": "Write comprehensive README",
-  "status": "in_progress",
-  "priority": "high",
-  "assignee_id": 1,
-  "created_by": 1,
-  "deadline": "2026-03-01T17:00:00",
-  "flagged": 0,
-  "flag_reason": null,
-  "version": 1,
-  "created_at": "2026-02-27T10:00:00",
-  "updated_at": "2026-02-27T10:00:00"
+  "email": "user@example.com",
+  "password": "password123",
+  "fullName": "Jane Doe"
 }
 ```
 
-### WebSocket Events
-
-**Server → Client:**
-- `task:created` - New task created
-- `task:updated` - Task modified
-- `task:status_changed` - Status updated
-- `task:deleted` - Task removed
-- `task:flagged` - Task flagged by worker
-- `pong` - Response to ping
-
-## 🐳 Deployment
-
-### Docker (Optional)
-
-```bash
-# Build and start all services
-docker-compose up --build
-
-# Run in background
-docker-compose up -d
-
-# Stop all services
-docker-compose down
+**Login response:**
+```json
+{
+  "message": "Login successful",
+  "user": { "id": 1, "email": "...", "role": "member" },
+  "accessToken": "eyJ...",
+  "refreshToken": "eyJ..."
+}
 ```
 
-### Environment Variables
+### Tasks
 
-#### API (`api/.env`)
+| Method | Endpoint | Description | Roles |
+|---|---|---|---|
+| GET | `/api/tasks` | Get all tasks (filterable) | All |
+| GET | `/api/tasks/my` | Get tasks assigned to me | All |
+| GET | `/api/tasks/stats` | Get task statistics | All |
+| GET | `/api/tasks/overdue` | Get overdue tasks | All |
+| GET | `/api/tasks/:id` | Get a single task | All |
+| POST | `/api/tasks` | Create a task | All |
+| PUT | `/api/tasks/:id` | Update a task | All |
+| PATCH | `/api/tasks/:id/flag` | Flag a task | All |
+| PATCH | `/api/tasks/:id/unflag` | Unflag a task | All |
+| DELETE | `/api/tasks/:id` | Delete a task | admin, manager |
+
+**Query parameters for GET `/api/tasks`:**
+
+| Parameter | Values |
+|---|---|
+| `status` | `pending`, `in_progress`, `completed`, `blocked` |
+| `priority` | `low`, `medium`, `high`, `urgent` |
+| `assigneeId` | User ID |
+| `flagged` | `true` / `false` |
+
+**Create task request body:**
+```json
+{
+  "title": "Design login screen",
+  "description": "Create mockups in Figma",
+  "status": "in_progress",
+  "priority": "high",
+  "assigneeId": 3,
+  "deadline": "2026-03-15T23:59:59"
+}
+```
+
+---
+
+## WebSocket Events
+
+Connect to `ws://localhost:3001/ws` and authenticate immediately after connection:
+
+```json
+{ "type": "auth", "token": "<accessToken>" }
+```
+
+### Events received from server
+
+| Event type | Triggered when |
+|---|---|
+| `task:created` | A new task is created |
+| `task:updated` | A task is modified |
+| `task:deleted` | A task is deleted |
+| `task:flagged` | A task is flagged |
+| `task:unflagged` | A task flag is removed |
+| `user:connected` | A user comes online |
+| `user:disconnected` | A user goes offline |
+| `pong` | Response to a client ping |
+
+**Example event payload:**
+```json
+{
+  "type": "task:created",
+  "task": { "id": 12, "title": "...", "status": "pending", ... },
+  "user": { "id": 8, "fullName": "Jane Doe" },
+  "timestamp": "2026-03-02T10:00:00.000Z"
+}
+```
+
+### Sending a ping
+
+```json
+{ "type": "ping" }
+```
+
+---
+
+## Database Schema
+
+Core tables (SQLite / PostgreSQL):
+
+| Table | Description |
+|---|---|
+| `users` | Registered users with roles and online status |
+| `tasks` | Tasks with status, priority, versioning, and flag support |
+| `activities` | Audit log of all task and user actions |
+| `notifications` | Queued notifications for the Java notifier service |
+| `refresh_tokens` | Stored refresh tokens for session management |
+| `sync_queue` | Offline changes awaiting server sync |
+
+The full schema is in `database/schema.sql`.
+
+---
+
+## Environment Variables
+
+### `api/.env`
+
 ```env
 PORT=3001
 DATABASE_URL=../database/syncline.db
-JWT_SECRET=change-this-to-a-secure-secret-in-production
-NODE_ENV=production
+JWT_SECRET=your-secret-key-change-this-in-production
+NODE_ENV=development
 ```
 
-#### Worker (`worker/.env`)
+### `worker/.env`
+
 ```env
-DATABASE_PATH=../database/syncline.db
+DATABASE_URL=../database/syncline.db
 NOTIFIER_URL=http://localhost:8080
-API_URL=http://localhost:3001
 ```
 
-## 📝 Project Structure
+---
 
-```
-syncline/
-├── api/                    # Node.js backend
-│   ├── src/
-│   │   ├── config/        # Database, JWT, WebSocket
-│   │   ├── middleware/    # Authentication
-│   │   ├── models/        # User, Task models
-│   │   ├── routes/        # API routes
-│   │   ├── websocket/     # WebSocket handlers
-│   │   └── server.js      # Entry point
-│   └── package.json
-├── web/                    # React frontend
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── context/       # Auth context
-│   │   ├── services/      # API & WebSocket
-│   │   └── App.js
-│   └── package.json
-├── worker/                 # Python background jobs
-│   ├── src/
-│   │   ├── config/        # Settings, Database
-│   │   ├── tasks/         # Job definitions
-│   │   └── scheduler.py   # Main scheduler
-│   └── requirements.txt
-├── notifier/              # Java notification service
-│   ├── src/main/java/    # Spring Boot app
-│   └── pom.xml
-├── database/
-│   ├── schema.sql        # Database schema
-│   └── syncline.db       # SQLite database
-└── README.md             # This file
+## Running Tests
+
+API manual tests are available in `api/test.http` (requires the VS Code **REST Client** extension) and `api/websocket-test.html` for WebSocket testing in the browser.
+
+To run a quick smoke test via PowerShell:
+
+```powershell
+# Login
+$body = '{"email":"test@example.com","password":"password123"}'
+$res = Invoke-RestMethod -Uri "http://localhost:3001/api/auth/login" -Method POST -Body $body -ContentType "application/json"
+$token = $res.accessToken
+
+# Get tasks
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Uri "http://localhost:3001/api/tasks" -Method GET -Headers $headers
 ```
 
-## 🎓 Learning Outcomes
+---
 
-This project demonstrates:
+## Roadmap
 
-- **Distributed Systems** - Microservices architecture
-- **Real-time Web** - WebSocket implementation
-- **Full-Stack Development** - Frontend, backend, database
-- **Multi-Language Integration** - JavaScript, Python, Java
-- **Authentication & Security** - JWT, bcrypt, middleware
-- **Background Processing** - Scheduled jobs and automation
-- **RESTful API Design** - Standard HTTP methods
-- **Database Design** - Relational schema with indexing
-- **Modern Frontend** - React hooks, context API
-- **DevOps Practices** - Environment configuration, logging
+- [x] JWT authentication (register, login, refresh, logout)
+- [x] Task CRUD with filtering and statistics
+- [x] WebSocket real-time broadcast
+- [x] Role-based access control
+- [x] Task flagging and overdue detection
+- [ ] Activity logging and live feed
+- [ ] User management routes
+- [ ] Python worker — automated overdue flagging
+- [ ] Java notifier — email and webhook notifications
+- [ ] React PWA frontend with offline sync
+- [ ] Conflict resolution UI
+- [ ] Docker Compose setup for full-stack deployment
 
-## 📄 License
-
-This project is licensed under the MIT License.
+---
 
 ## 👤 Author
 
@@ -446,3 +407,9 @@ This project is licensed under the MIT License.
 **⭐ Star this repository if you found it helpful!**
 
 Built with ❤️ to demonstrate distributed systems architecture and full-stack development skills.
+
+---
+
+## License
+
+MIT
