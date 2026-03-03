@@ -154,7 +154,10 @@ const DeleteConfirmModal = ({ t, task, onConfirm, onCancel, loading }) => (
 const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) => {
     const [tab, setTab] = useState('profile');
     const [fullName, setFullName] = useState(user?.fullName || '');
-    const [avatarPreview, setAvatarPreview] = useState(resolveAvatar(user?.avatar));
+    // FIX 2: Fall back to avatar_url if avatar is not set
+    const [avatarPreview, setAvatarPreview] = useState(
+        resolveAvatar(user?.avatar || user?.avatar_url)
+    );
     const [avatarFile, setAvatarFile] = useState(null); // raw File object for upload
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
@@ -428,15 +431,24 @@ const Dashboard = () => {
         setNotifications(prev => [{ id: Date.now(), title, message, type, read: false }, ...prev].slice(0, 20));
     }, []);
 
+    // FIX 1: Backward-compatible task filter — shows personal tasks AND company tasks
     const fetchTasks = useCallback(async () => {
         try {
             const res = await taskAPI.getAll();
-            const userTasks = res.data.tasks.filter(task =>
-                task.created_by === userIdRef.current || task.assignee_id === userIdRef.current
-            );
+            const userTasks = res.data.tasks.filter(task => {
+                // Personal tasks — user created or is assigned (works without a company)
+                const isPersonalTask = task.created_by === userIdRef.current ||
+                                       task.assignee_id === userIdRef.current;
+
+                // Company tasks — only when the user actually belongs to a company
+                const isCompanyTask = user.company_id &&
+                                      task.company_id === user.company_id;
+
+                return isPersonalTask || isCompanyTask;
+            });
             setTasks(userTasks);
         } catch (err) { console.error('Fetch tasks error:', err); }
-    }, []);
+    }, [user.company_id]); // added dependency
 
     // Online/offline
     useEffect(() => {
@@ -726,12 +738,12 @@ const Dashboard = () => {
                             )}
                         </div>
 
-                        {/* User button → opens profile */}
+                        {/* FIX 3: User button — fall back to avatar_url if avatar is not set */}
                         <button onClick={() => setShowProfile(true)}
                             style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '5px 10px 5px 5px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '11px', cursor: 'pointer', transition: 'all 0.2s' }}>
                             <div style={{ width: '30px', height: '30px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
-                                {user?.avatar
-                                    ? <img src={resolveAvatar(user.avatar)} alt="av" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                {(user?.avatar || user?.avatar_url)
+                                    ? <img src={resolveAvatar(user.avatar || user.avatar_url)} alt="av" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>
                                         {(user?.fullName || user?.email || '?').charAt(0).toUpperCase()}
                                       </div>

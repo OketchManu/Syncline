@@ -193,9 +193,20 @@ function isUserConnected(userId) {
     return false;
 }
 
+function broadcastToCompany(companyId, event, data) {
+    if (!wss) return;
+    
+    wss.clients.forEach(client => {
+        if (client.readyState === 1 && client.user?.company_id === companyId) {
+            client.send(JSON.stringify({ event, data }));
+        }
+    });
+}
+
 module.exports = {
     initializeWebSocket,
     broadcast,
+    broadcastToCompany,
     sendToUser,
     sendToClient,
     getConnectedUsers,

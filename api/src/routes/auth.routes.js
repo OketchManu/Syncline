@@ -7,6 +7,21 @@ const { generateAccessToken, generateRefreshToken, verifyToken } = require('../c
 const { createUser, findByEmail, verifyPassword, findById } = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 
+// ── Helper: consistent user shape everywhere ──────────────────────────────────
+function sanitizeUser(user) {
+    if (!user) return null;
+    return {
+        id:        user.id,
+        email:     user.email,
+        fullName:  user.full_name,
+        role:      user.role,
+        isActive:  user.is_active,
+        avatar:    user.avatar_url || null,   // ← always included
+        lastSeen:  user.last_seen,
+        createdAt: user.created_at,
+    };
+}
+
 /**
  * POST /api/auth/register
  * Register a new user
@@ -15,52 +30,43 @@ router.post('/register', async (req, res) => {
     try {
         const { email, password, fullName } = req.body;
 
-        // Validation
         if (!email || !password || !fullName) {
-            return res.status(400).json({ 
-                error: 'Email, password, and full name are required' 
+            return res.status(400).json({
+                error: 'Email, password, and full name are required'
             });
         }
 
         if (password.length < 6) {
-            return res.status(400).json({ 
-                error: 'Password must be at least 6 characters long' 
+            return res.status(400).json({
+                error: 'Password must be at least 6 characters long'
             });
         }
 
-        // Check if user already exists
         const existingUser = await findByEmail(email);
         if (existingUser) {
-            return res.status(409).json({ 
-                error: 'User with this email already exists' 
+            return res.status(409).json({
+                error: 'User with this email already exists'
             });
         }
 
-        // Create user
         const userId = await createUser(email, password, fullName, 'member');
 
-        // Generate tokens
-        const accessToken = generateAccessToken(userId, email, 'member');
+        // Fetch the full row so sanitizeUser can map all fields correctly
+        const newUser = await findById(userId);
+
+        const accessToken  = generateAccessToken(userId, email, 'member');
         const refreshToken = generateRefreshToken(userId);
 
         res.status(201).json({
             message: 'User registered successfully',
-            user: {
-                id: userId,
-                email,
-                fullName,
-                role: 'member'
-            },
+            user: sanitizeUser(newUser),
             accessToken,
             refreshToken
         });
 
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ 
-            error: 'Registration failed',
-            details: error.message 
-        });
+        res.status(500).json({ error: 'Registration failed', details: error.message });
     }
 });
 
@@ -72,58 +78,37 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Validation
         if (!email || !password) {
-            return res.status(400).json({ 
-                error: 'Email and password are required' 
-            });
+            return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        // Find user
         const user = await findByEmail(email);
         if (!user) {
-            return res.status(401).json({ 
-                error: 'Invalid email or password' 
-            });
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        // Check if account is active
         if (!user.is_active) {
-            return res.status(403).json({ 
-                error: 'Account is deactivated' 
-            });
+            return res.status(403).json({ error: 'Account is deactivated' });
         }
 
-        // Verify password
         const isValidPassword = await verifyPassword(password, user.password_hash);
         if (!isValidPassword) {
-            return res.status(401).json({ 
-                error: 'Invalid email or password' 
-            });
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        // Generate tokens
-        const accessToken = generateAccessToken(user.id, user.email, user.role);
+        const accessToken  = generateAccessToken(user.id, user.email, user.role);
         const refreshToken = generateRefreshToken(user.id);
 
         res.json({
             message: 'Login successful',
-            user: {
-                id: user.id,
-                email: user.email,
-                fullName: user.full_name,
-                role: user.role
-            },
+            user: sanitizeUser(user),   // ← now includes avatar
             accessToken,
             refreshToken
         });
 
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ 
-            error: 'Login failed',
-            details: error.message 
-        });
+        res.status(500).json({ error: 'Login failed', details: error.message });
     }
 });
 
@@ -136,45 +121,29 @@ router.post('/refresh', async (req, res) => {
         const { refreshToken } = req.body;
 
         if (!refreshToken) {
-            return res.status(400).json({ 
-                error: 'Refresh token is required' 
-            });
+            return res.status(400).json({ error: 'Refresh token is required' });
         }
 
-        // Verify refresh token
         const decoded = verifyToken(refreshToken);
 
         if (decoded.type !== 'refresh') {
-            return res.status(403).json({ 
-                error: 'Invalid token type' 
-            });
+            return res.status(403).json({ error: 'Invalid token type' });
         }
 
-        // Get user
         const user = await findById(decoded.userId);
         if (!user || !user.is_active) {
-            return res.status(403).json({ 
-                error: 'Invalid refresh token' 
-            });
+            return res.status(403).json({ error: 'Invalid refresh token' });
         }
 
-        // Generate new access token
         const newAccessToken = generateAccessToken(user.id, user.email, user.role);
 
-        res.json({
-            accessToken: newAccessToken
-        });
+        res.json({ accessToken: newAccessToken });
 
     } catch (error) {
         if (error.message === 'Token expired') {
-            return res.status(401).json({ 
-                error: 'Refresh token expired. Please login again.' 
-            });
+            return res.status(401).json({ error: 'Refresh token expired. Please login again.' });
         }
-        res.status(403).json({ 
-            error: 'Invalid refresh token',
-            details: error.message 
-        });
+        res.status(403).json({ error: 'Invalid refresh token', details: error.message });
     }
 });
 
@@ -185,42 +154,24 @@ router.post('/refresh', async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
     try {
         const user = await findById(req.user.id);
-        
+
         if (!user) {
-            return res.status(404).json({ 
-                error: 'User not found' 
-            });
+            return res.status(404).json({ error: 'User not found' });
         }
 
-        res.json({
-            user: {
-                id: user.id,
-                email: user.email,
-                fullName: user.full_name,
-                role: user.role,
-                lastSeen: user.last_seen,
-                createdAt: user.created_at
-            }
-        });
+        res.json({ user: sanitizeUser(user) });   // ← now includes avatar
 
     } catch (error) {
         console.error('Get user error:', error);
-        res.status(500).json({ 
-            error: 'Failed to get user info',
-            details: error.message 
-        });
+        res.status(500).json({ error: 'Failed to get user info', details: error.message });
     }
 });
 
 /**
  * POST /api/auth/logout
- * Logout user (protected route)
- * Note: JWT tokens can't be invalidated server-side, so client should delete token
  */
 router.post('/logout', authenticateToken, (req, res) => {
-    res.json({
-        message: 'Logged out successfully. Please delete your token on the client side.'
-    });
+    res.json({ message: 'Logged out successfully. Please delete your token on the client side.' });
 });
 
 module.exports = router;
