@@ -1,0 +1,7 @@
+﻿{
+  "name": "database-migration",
+  "private": true,
+  "dependencies": {
+    "sqlite3": "^5.1.6"
+  }
+}

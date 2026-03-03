@@ -5,6 +5,8 @@ const http = require('http');
 const cors = require('cors');
 const { initializeDatabase } = require('./config/database');
 const { initializeWebSocket } = require('./config/websocket');
+const companyRoutes = require('./routes/company.routes');
+const taskReportsRoutes = require('./routes/task-reports.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,6 +15,10 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/company', companyRoutes);
+app.use('/api/tasks', taskReportsRoutes);  // This extends /api/tasks with new endpoints
+
+console.log('✅ Company management routes loaded');
 
 // ── Static file serving for uploaded avatars ──────────────────────────────────
 // Creates /uploads/avatars/ if it doesn't exist, then serves it publicly.
