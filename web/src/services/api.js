@@ -110,8 +110,6 @@ export const userAPI = {
         api.get('/users/online'),
 
     // Update name and/or avatar photo.
-    // Accepts either a plain object { fullName, removeAvatar, device }
-    // or a FormData instance when a new avatar file is being uploaded.
     updateProfile: (data) => {
         if (data instanceof FormData) {
             return api.put('/users/me', data, {
@@ -121,15 +119,108 @@ export const userAPI = {
         return api.put('/users/me', data);
     },
 
-    // Change password. Expects { currentPassword, newPassword, device }.
+    // Change password
     changePassword: (data) =>
         api.put('/users/me/password', data),
 
-    // Permanently delete the authenticated user's account.
-    // Passes { device } in the request body so the server can log which
-    // device triggered the deletion and notify other sessions via WS.
+    // Delete account
     deleteAccount: (data) =>
         api.delete('/users/me', { data }),
+};
+
+// ═══════════════════════════════════════════════════════════════
+// COMPANY MANAGEMENT ENDPOINTS (NEW)
+// ═══════════════════════════════════════════════════════════════
+
+export const companyAPI = {
+    // Company registration & details
+    register: (data) => 
+        api.post('/company/register', data),
+    
+    getDetails: () => 
+        api.get('/company/details'),
+    
+    updateDetails: (data) => 
+        api.patch('/company/details', data),
+    
+    // Team management
+    getTeam: (filters = {}) => 
+        api.get('/company/team', { params: filters }),
+    
+    inviteMember: (data) => 
+        api.post('/company/team/invite', data),
+    
+    updateMemberRole: (userId, role) => 
+        api.patch(`/company/team/${userId}/role`, { role }),
+    
+    updateMemberStatus: (userId, isActive) => 
+        api.patch(`/company/team/${userId}/status`, { is_active: isActive }),
+    
+    removeMember: (userId) => 
+        api.delete(`/company/team/${userId}`),
+    
+    // Departments
+    getDepartments: () => 
+        api.get('/company/departments'),
+    
+    createDepartment: (data) => 
+        api.post('/company/departments', data),
+    
+    updateDepartment: (deptId, data) => 
+        api.patch(`/company/departments/${deptId}`, data),
+    
+    deleteDepartment: (deptId) => 
+        api.delete(`/company/departments/${deptId}`),
+    
+    // Analytics & Performance
+    getAnalytics: (period = 30) => 
+        api.get('/company/analytics', { params: { period } }),
+    
+    getPerformance: (departmentId = null) => 
+        api.get('/company/performance', { params: { department_id: departmentId } })
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TASK ASSIGNMENT & REPORTS ENDPOINTS (NEW)
+// ═══════════════════════════════════════════════════════════════
+
+export const taskReportsAPI = {
+    // Task assignment
+    assignTask: (taskId, data) => 
+        api.post(`/tasks/${taskId}/assign`, data),
+    
+    getAssignments: (taskId) => 
+        api.get(`/tasks/${taskId}/assignments`),
+    
+    // Progress tracking
+    submitProgress: (taskId, data) => 
+        api.post(`/tasks/${taskId}/progress`, data),
+    
+    getProgress: (taskId) => 
+        api.get(`/tasks/${taskId}/progress`),
+    
+    // Report management
+    requestReport: (taskId, data) => 
+        api.post(`/tasks/${taskId}/request-report`, data),
+    
+    getMyReportRequests: () => 
+        api.get('/tasks/my-report-requests'),
+    
+    submitReport: (taskId, data) => 
+        api.post(`/tasks/${taskId}/reports`, data),
+    
+    getReports: (taskId) => 
+        api.get(`/tasks/${taskId}/reports`),
+    
+    getMyReports: () => 
+        api.get('/tasks/my-reports'),
+    
+    reviewReport: (reportId, data) => 
+        api.patch(`/reports/${reportId}/review`, data),
+    
+    // User overview
+    getUserOverview: (userId) => 
+        api.get(`/tasks/user/${userId}/overview`)
 };
 
 export default api;
