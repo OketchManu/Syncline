@@ -5,6 +5,13 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Dashboard from './components/dashboard/Dashboard';
+
+// Company Management Components
+import CompanyOnboarding from './components/company/CompanyOnboarding';
+import TeamManagement from './components/company/TeamManagement';
+import ProgressMonitor from './components/company/ProgressMonitor';
+import ReportManagement from './components/company/ReportManagement';
+
 import './App.css';
 
 // Protected Route Component
@@ -42,6 +49,7 @@ const PublicRoute = ({ children }) => {
 function AppRoutes() {
     return (
         <Routes>
+            {/* Public Routes */}
             <Route 
                 path="/login" 
                 element={
@@ -58,6 +66,8 @@ function AppRoutes() {
                     </PublicRoute>
                 } 
             />
+
+            {/* Protected Routes */}
             <Route 
                 path="/dashboard" 
                 element={
@@ -66,6 +76,42 @@ function AppRoutes() {
                     </ProtectedRoute>
                 } 
             />
+
+            {/* Company Management Routes */}
+            <Route 
+                path="/company/setup" 
+                element={
+                    <ProtectedRoute>
+                        <CompanyOnboarding />
+                    </ProtectedRoute>
+                } 
+            />
+            <Route 
+                path="/company/team" 
+                element={
+                    <ProtectedRoute>
+                        <TeamManagement />
+                    </ProtectedRoute>
+                } 
+            />
+            <Route 
+                path="/company/progress" 
+                element={
+                    <ProtectedRoute>
+                        <ProgressMonitor />
+                    </ProtectedRoute>
+                } 
+            />
+            <Route 
+                path="/company/reports" 
+                element={
+                    <ProtectedRoute>
+                        <ReportManagement />
+                    </ProtectedRoute>
+                } 
+            />
+
+            {/* Fallback Routes */}
             <Route 
                 path="/" 
                 element={<Navigate to="/dashboard" />} 
