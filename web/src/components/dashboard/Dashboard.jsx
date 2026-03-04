@@ -7,9 +7,9 @@ import {
     Plus, Search, CheckCircle2, Clock, AlertCircle, Flag, Zap, LogOut,
     Activity, ListTodo, Sun, Moon, Trash2, Bell, X, Edit2, WifiOff, Wifi,
     User, Camera, Shield, Smartphone, Save, Eye, EyeOff, ChevronRight,
-    AlertTriangle
+    AlertTriangle, Building2, Users, TrendingUp, FileText, LayoutDashboard,
+    Menu, ChevronLeft
 } from 'lucide-react';
-
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getDeviceInfo = () => {
@@ -28,11 +28,6 @@ const getDeviceInfo = () => {
     return `${browser} on ${os}`;
 };
 
-// Converts a stored avatar value to a displayable URL.
-// - Already a full URL (http/https) → use as-is
-// - Already a data: URL (base64 preview) → use as-is
-// - Relative path from server (/uploads/...) → prepend API origin
-// - null / undefined → return null (show initials instead)
 const API_ORIGIN = 'http://localhost:3001';
 const resolveAvatar = (avatar) => {
     if (!avatar) return null;
@@ -63,6 +58,9 @@ const themes = {
         onlineBg: 'rgba(16,185,129,0.15)', onlineText: '#6ee7b7',
         dangerBg: 'rgba(239,68,68,0.12)', dangerBorder: 'rgba(239,68,68,0.3)', dangerText: '#fca5a5',
         dangerBtn: '#dc2626',
+        sidebarBg: '#1e293b',
+        sidebarHover: 'rgba(99,102,241,0.1)',
+        sidebarActive: 'rgba(99,102,241,0.2)',
     },
     light: {
         bg: '#f1f5f9', surfacePrimary: '#ffffff', surfaceSecondary: 'rgba(255,255,255,0.97)',
@@ -84,6 +82,9 @@ const themes = {
         onlineBg: 'rgba(16,185,129,0.08)', onlineText: '#059669',
         dangerBg: 'rgba(239,68,68,0.06)', dangerBorder: 'rgba(239,68,68,0.25)', dangerText: '#dc2626',
         dangerBtn: '#dc2626',
+        sidebarBg: '#ffffff',
+        sidebarHover: 'rgba(99,102,241,0.05)',
+        sidebarActive: 'rgba(99,102,241,0.1)',
     }
 };
 
@@ -118,8 +119,6 @@ const TextInput = ({ t, label, ...props }) => (
 const DeleteConfirmModal = ({ t, task, onConfirm, onCancel, loading }) => (
     <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => !loading && onCancel()}>
         <div style={{ background: t.modalBg, border: `1px solid ${t.dangerBorder}`, borderRadius: '18px', padding: '28px', width: '90%', maxWidth: '420px', boxShadow: '0 30px 70px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-
-            {/* Icon + heading */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Trash2 size={22} color={t.dangerText} />
@@ -129,13 +128,11 @@ const DeleteConfirmModal = ({ t, task, onConfirm, onCancel, loading }) => (
                     <p style={{ margin: '2px 0 0', fontSize: '12px', color: t.textMuted }}>This action cannot be undone</p>
                 </div>
             </div>
-
             <p style={{ fontSize: '14px', color: t.textSecondary, margin: '0 0 24px', lineHeight: '1.6' }}>
                 Are you sure you want to permanently delete{' '}
                 <strong style={{ color: t.textPrimary }}>"{task.title}"</strong>?
                 All associated data will be removed.
             </p>
-
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button onClick={onCancel} disabled={loading}
                     style={{ padding: '10px 20px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
@@ -154,11 +151,8 @@ const DeleteConfirmModal = ({ t, task, onConfirm, onCancel, loading }) => (
 const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) => {
     const [tab, setTab] = useState('profile');
     const [fullName, setFullName] = useState(user?.fullName || '');
-    // FIX 2: Fall back to avatar_url if avatar is not set
-    const [avatarPreview, setAvatarPreview] = useState(
-        resolveAvatar(user?.avatar || user?.avatar_url)
-    );
-    const [avatarFile, setAvatarFile] = useState(null); // raw File object for upload
+    const [avatarPreview, setAvatarPreview] = useState(resolveAvatar(user?.avatar || user?.avatar_url));
+    const [avatarFile, setAvatarFile] = useState(null);
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
     const [confirmPw, setConfirmPw] = useState('');
@@ -187,12 +181,7 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     const saveProfile = async () => {
         if (!isOnline) { setStatus({ type: 'error', msg: 'You are offline.' }); return; }
         setLoading(true); setStatus(null);
-        // Pass the raw File if a new one was picked; null if removed; undefined to keep existing
-        const avatarPayload = avatarFile
-            ? avatarFile                          // new upload → File object
-            : avatarPreview === null
-                ? null                            // user clicked Remove
-                : undefined;                      // unchanged — keep server copy
+        const avatarPayload = avatarFile ? avatarFile : avatarPreview === null ? null : undefined;
         const err = await onSave({ fullName, avatar: avatarPayload }, 'profile', device);
         setLoading(false);
         setStatus(err ? { type: 'error', msg: err } : { type: 'success', msg: 'Profile updated successfully!' });
@@ -225,8 +214,6 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     return (
         <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }} onClick={onClose}>
             <div style={{ background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '20px', width: '90%', maxWidth: '540px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-
-                {/* Header */}
                 <div style={{ padding: '22px 24px 0', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
                         <div>
@@ -249,14 +236,11 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
                     </div>
                 </div>
 
-                {/* Scrollable body */}
                 <div style={{ padding: '22px 24px', overflowY: 'auto', flex: 1 }}>
                     {status && <div style={{ marginBottom: '16px' }}><StatusAlert t={t} type={status.type}>{status.type === 'success' ? '✅' : '⚠️'} {status.msg}</StatusAlert></div>}
 
-                    {/* ── Profile ── */}
                     {tab === 'profile' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                            {/* Avatar card */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '18px', padding: '18px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '14px' }}>
                                 <div style={{ position: 'relative', flexShrink: 0 }}>
                                     <div style={{ width: '78px', height: '78px', borderRadius: '50%', overflow: 'hidden', border: `3px solid ${t.accentBorder}` }}>
@@ -296,14 +280,12 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
                         </div>
                     )}
 
-                    {/* ── Security ── */}
                     {tab === 'security' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <StatusAlert t={t} type="warning">
                                 <Shield size={14} /> Changing your password will notify all signed-in devices.
                             </StatusAlert>
 
-                            {/* Current password */}
                             <div>
                                 <FieldLabel t={t}>Current Password</FieldLabel>
                                 <div style={{ position: 'relative' }}>
@@ -315,7 +297,6 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
                                 </div>
                             </div>
 
-                            {/* New password */}
                             <div>
                                 <FieldLabel t={t}>New Password</FieldLabel>
                                 <div style={{ position: 'relative' }}>
@@ -350,7 +331,6 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
                         </div>
                     )}
 
-                    {/* ── Danger Zone ── */}
                     {tab === 'danger' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <StatusAlert t={t} type="error">
@@ -396,11 +376,185 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     );
 };
 
+// ─── Navigation Sidebar ───────────────────────────────────────────────────────
+const NavigationSidebar = ({ t, currentView, onNavigate, sidebarCollapsed, onToggleSidebar, user }) => {
+    const navItems = [
+        { id: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard', badge: null },
+        { id: 'company-setup', icon: <Building2 size={18} />, label: 'Company Setup', badge: user?.company_id ? null : 'NEW' },
+        { id: 'team', icon: <Users size={18} />, label: 'Team Management', badge: null },
+        { id: 'progress', icon: <TrendingUp size={18} />, label: 'Progress Monitor', badge: null },
+        { id: 'reports', icon: <FileText size={18} />, label: 'Reports', badge: null },
+    ];
+
+    return (
+        <div style={{ 
+            width: sidebarCollapsed ? '70px' : '240px',
+            background: t.sidebarBg,
+            borderRight: `1px solid ${t.border}`,
+            height: 'calc(100vh - 60px)',
+            position: 'sticky',
+            top: '60px',
+            transition: 'width 0.3s',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: sidebarCollapsed ? '16px 8px' : '16px',
+        }}>
+            {/* Toggle button */}
+            <button 
+                onClick={onToggleSidebar}
+                style={{
+                    padding: '8px',
+                    background: t.inputBg,
+                    border: `1px solid ${t.border}`,
+                    borderRadius: '8px',
+                    color: t.textMuted,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '16px',
+                }}
+            >
+                {sidebarCollapsed ? <Menu size={18} /> : <ChevronLeft size={18} />}
+            </button>
+
+            {/* Navigation items */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                {navItems.map(item => (
+                    <button
+                        key={item.id}
+                        onClick={() => onNavigate(item.id)}
+                        style={{
+                            padding: sidebarCollapsed ? '12px' : '12px 16px',
+                            background: currentView === item.id ? t.sidebarActive : 'transparent',
+                            border: 'none',
+                            borderRadius: '10px',
+                            color: currentView === item.id ? '#6366f1' : t.textSecondary,
+                            fontSize: '14px',
+                            fontWeight: currentView === item.id ? '600' : '400',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                            transition: 'all 0.2s',
+                            position: 'relative',
+                        }}
+                        onMouseEnter={(e) => {
+                            if (currentView !== item.id) {
+                                e.currentTarget.style.background = t.sidebarHover;
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (currentView !== item.id) {
+                                e.currentTarget.style.background = 'transparent';
+                            }
+                        }}
+                    >
+                        {item.icon}
+                        {!sidebarCollapsed && <span>{item.label}</span>}
+                        {!sidebarCollapsed && item.badge && (
+                            <span style={{
+                                marginLeft: 'auto',
+                                padding: '2px 6px',
+                                background: '#6366f1',
+                                color: '#fff',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                borderRadius: '10px',
+                            }}>
+                                {item.badge}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ─── Dashboard Main Content ───────────────────────────────────────────────────
+const DashboardContent = ({ t, tasks, filteredTasks, filter, setFilter, searchQuery, setSearchQuery, isOnline, showCreateModal, setShowCreateModal, updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus, recentActivity, wsConnected }) => {
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 296px', gap: '16px', padding: '16px 28px 44px', maxWidth: '1400px', margin: '0 auto', flex: 1 }}>
+            {/* Tasks panel */}
+            <div style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '15px', padding: '22px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: '600', color: t.textPrimary, margin: 0 }}>Your Tasks</h2>
+                    <button onClick={() => isOnline && setShowCreateModal(true)} disabled={!isOnline}
+                        style={{ padding: '8px 16px', background: isOnline ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : t.inputBg, border: 'none', borderRadius: '9px', color: isOnline ? '#fff' : t.textMuted, fontSize: '13px', fontWeight: '600', cursor: isOnline ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '6px', opacity: isOnline ? 1 : 0.6, boxShadow: isOnline ? '0 3px 12px rgba(99,102,241,0.3)' : 'none' }}>
+                        <Plus size={15} /><span>New Task</span>
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', marginBottom: '10px' }}>
+                    <Search size={15} color={t.textMuted} />
+                    <input type="text" placeholder="Search your tasks…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
+                    {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}><X size={13} /></button>}
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    {['all', 'pending', 'in_progress', 'completed', 'blocked'].map(s => (
+                        <button key={s} onClick={() => setFilter(s)}
+                            style={{ padding: '5px 12px', background: filter === s ? t.accentBg : t.inputBg, border: `1px solid ${filter === s ? t.accentBorder : t.border}`, borderRadius: '18px', color: filter === s ? t.accentText : t.textSecondary, fontSize: '11px', fontWeight: filter === s ? '600' : '400', cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s' }}>
+                            {s.replace('_', ' ')}
+                        </button>
+                    ))}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto' }}>
+                    {filteredTasks.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '52px 20px' }}>
+                            <ListTodo size={40} color={t.textMuted} />
+                            <p style={{ color: t.textMuted, margin: '10px 0', fontSize: '14px' }}>{searchQuery || filter !== 'all' ? 'No matching tasks' : 'No tasks yet'}</p>
+                            {!searchQuery && filter === 'all' && isOnline && (
+                                <button onClick={() => setShowCreateModal(true)} style={{ padding: '8px 16px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '8px', color: t.accentText, fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>Create your first task</button>
+                            )}
+                        </div>
+                    ) : filteredTasks.map(task => (
+                        <TaskCard key={task.id} task={task} t={t}
+                            onStatusChange={updateTaskStatus}
+                            onDelete={() => setDeleteTarget(task)}
+                            onEdit={() => setEditTask(task)}
+                            updatingStatus={updatingStatus} isOnline={isOnline} />
+                    ))}
+                </div>
+            </div>
+
+            {/* Sidebar */}
+            <div style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '15px', padding: '22px', height: 'fit-content', position: 'sticky', top: '76px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <Activity size={17} color="#6366f1" />
+                    <h3 style={{ fontSize: '14px', fontWeight: '600', color: t.textPrimary, margin: 0 }}>Live Activity</h3>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: wsConnected && isOnline ? '#10b981' : '#ef4444', marginLeft: 'auto' }} />
+                </div>
+                <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
+                    {recentActivity.length === 0
+                        ? <p style={{ fontSize: '12px', color: t.textMuted, textAlign: 'center', padding: '28px 0', lineHeight: '1.5', margin: 0 }}>Activity will appear here in real-time</p>
+                        : recentActivity.map(a => (
+                            <div key={a.id} style={{ display: 'flex', gap: '9px', marginBottom: '12px' }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#6366f1', marginTop: '6px', flexShrink: 0 }} />
+                                <div>
+                                    <p style={{ fontSize: '12px', color: t.text, margin: '0 0 2px', lineHeight: '1.4' }}>{a.message}</p>
+                                    <p style={{ fontSize: '10px', color: t.textMuted, margin: 0 }}>{new Date(a.timestamp).toLocaleTimeString()}</p>
+                                </div>
+                            </div>
+                        ))
+                    }
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
     const { user, logout, updateUser } = useAuth();
     const [dark, setDark] = useState(true);
     const t = dark ? themes.dark : themes.light;
+
+    const [currentView, setCurrentView] = useState('dashboard');
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -411,9 +565,7 @@ const Dashboard = () => {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
-    const [wsConnected, setWsConnected] = useState(
-        () => wsService?.connected ?? wsService?.socket?.readyState === 1 ?? false
-    );
+    const [wsConnected, setWsConnected] = useState(() => wsService?.connected ?? wsService?.socket?.readyState === 1 ?? false);
     const [recentActivity, setRecentActivity] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -431,26 +583,18 @@ const Dashboard = () => {
         setNotifications(prev => [{ id: Date.now(), title, message, type, read: false }, ...prev].slice(0, 20));
     }, []);
 
-    // FIX 1: Backward-compatible task filter — shows personal tasks AND company tasks
     const fetchTasks = useCallback(async () => {
         try {
             const res = await taskAPI.getAll();
             const userTasks = res.data.tasks.filter(task => {
-                // Personal tasks — user created or is assigned (works without a company)
-                const isPersonalTask = task.created_by === userIdRef.current ||
-                                       task.assignee_id === userIdRef.current;
-
-                // Company tasks — only when the user actually belongs to a company
-                const isCompanyTask = user.company_id &&
-                                      task.company_id === user.company_id;
-
+                const isPersonalTask = task.created_by === userIdRef.current || task.assignee_id === userIdRef.current;
+                const isCompanyTask = user.company_id && task.company_id === user.company_id;
                 return isPersonalTask || isCompanyTask;
             });
             setTasks(userTasks);
         } catch (err) { console.error('Fetch tasks error:', err); }
-    }, [user.company_id]); // added dependency
+    }, [user.company_id]);
 
-    // Online/offline
     useEffect(() => {
         const goOnline  = () => { setIsOnline(true);  addActivity('🟢 Connection restored'); addNotification('Back Online', 'Your connection has been restored', 'info'); };
         const goOffline = () => { setIsOnline(false); addActivity('🔴 Lost connection');      addNotification('Offline', 'You are offline. Some features are limited.', 'warning'); };
@@ -459,7 +603,6 @@ const Dashboard = () => {
         return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
     }, [addActivity, addNotification]);
 
-    // Mount: load + WS subscriptions
     useEffect(() => {
         const load = async () => { setLoading(true); await fetchTasks(); setLoading(false); };
         load();
@@ -510,7 +653,6 @@ const Dashboard = () => {
                 addNotification('Task Flagged', `"${data.task.title}": ${data.reason}`, 'warning');
             }
         };
-        // Cross-device account change notifications
         const onProfileUpdated = (data) => {
             if (data.userId === userIdRef.current && data.device !== getDeviceInfo()) {
                 addNotification('Profile Updated', `Your profile was changed from ${data.device}`, 'info');
@@ -544,8 +686,7 @@ const Dashboard = () => {
             wsService.off('user:profile_updated', onProfileUpdated);
             wsService.off('user:password_changed', onPasswordChanged);
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [addActivity, addNotification, fetchTasks]);
 
     const filteredTasks = tasks.filter(task => {
         const matchesFilter = filter === 'all' || task.status === filter;
@@ -556,24 +697,19 @@ const Dashboard = () => {
 
     const updateTaskStatus = async (taskId, newStatus) => {
         if (!isOnline) { addNotification('Offline', 'Cannot update tasks while offline', 'warning'); return; }
-
-        // Optimistic update — change the UI immediately
         const previousTasks = tasks;
         setTasks(prev => prev.map(tk => tk.id === taskId ? { ...tk, status: newStatus } : tk));
         setUpdatingStatus(taskId);
-
         try {
             await taskAPI.update(taskId, { status: newStatus });
             addActivity(`Status changed to ${newStatus}`);
         } catch (err) {
             console.error(err);
-            // Roll back to previous state if server call failed
             setTasks(previousTasks);
             addNotification('Error', 'Failed to update task status', 'error');
         } finally { setUpdatingStatus(null); }
     };
 
-    // Delete task — triggered by confirm modal
     const confirmDeleteTask = async () => {
         if (!deleteTarget) return;
         if (!isOnline) {
@@ -595,36 +731,27 @@ const Dashboard = () => {
         } finally { setDeleteLoading(false); }
     };
 
-    // Profile/account save — uses FormData so the server receives a real file upload
     const handleProfileSave = async (data, type, device) => {
         try {
             if (type === 'profile') {
                 let updatedUser;
-
                 if (data.avatar instanceof File) {
-                    // New image selected — send as multipart/form-data
                     const form = new FormData();
                     form.append('avatar', data.avatar, data.avatar.name);
                     form.append('fullName', data.fullName || '');
                     form.append('device', device);
                     const res = await userAPI.updateProfile(form);
                     updatedUser = res.data?.user ?? res.data;
-
                 } else if (data.avatar === null) {
-                    // User explicitly removed their photo
                     const res = await userAPI.updateProfile({ fullName: data.fullName, removeAvatar: true, device });
                     updatedUser = res.data?.user ?? res.data;
-
                 } else {
-                    // Name change only, no avatar change
                     const res = await userAPI.updateProfile({ fullName: data.fullName, device });
                     updatedUser = res.data?.user ?? res.data;
                 }
-
                 if (updatedUser && updateUser) updateUser(updatedUser);
                 addActivity(`You updated your profile from ${device}`);
                 addNotification('Profile Updated', `Changes saved · ${device}`, 'info');
-
             } else if (type === 'password') {
                 await userAPI.changePassword({
                     currentPassword: data.currentPassword,
@@ -634,35 +761,27 @@ const Dashboard = () => {
                 addActivity(`Password changed from ${device}`);
                 addNotification('Password Changed', `Your password was updated · ${device}`, 'info');
             }
-            return null; // no error
+            return null;
         } catch (err) {
             console.error(`Profile save (${type}) error:`, err);
-            const msg =
-                err.response?.data?.message ||
-                err.response?.data?.error   ||
-                err.message                 ||
-                `Failed to update ${type}`;
+            const msg = err.response?.data?.message || err.response?.data?.error || err.message || `Failed to update ${type}`;
             return msg;
         }
     };
 
-    // Delete account — wipes all local state/storage then calls logout
     const handleDeleteAccount = async (device) => {
         try {
-            // Tell the server to delete the account
             await userAPI.deleteAccount({ device });
         } catch (err) {
-            // If the server returns 404/410 the account may already be gone — treat as success
             const status = err.response?.status;
             if (status && status !== 404 && status !== 410) {
                 addNotification('Error', err.response?.data?.error || 'Could not delete account. Contact support.', 'error');
-                return; // abort — don't log the user out if the server rejected the request
+                return;
             }
         }
-        // Clear every scrap of local data then force a full page reload to the login screen
         try { localStorage.clear(); } catch (_) {}
         try { sessionStorage.clear(); } catch (_) {}
-        logout(); // invalidates auth context
+        logout();
     };
 
     const unreadCount = notifications.filter(n => !n.read).length;
@@ -681,7 +800,7 @@ const Dashboard = () => {
 
     return (
         <ThemeContext.Provider value={{ t, dark }}>
-            <div style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Segoe UI', system-ui, sans-serif", transition: 'background 0.3s, color 0.3s' }}>
+            <div style={{ minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Segoe UI', system-ui, sans-serif", transition: 'background 0.3s, color 0.3s', display: 'flex', flexDirection: 'column' }}>
                 <style>{`
                     @keyframes spin { to { transform: rotate(360deg); } }
                     select option { background: ${t.selectOptionBg} !important; color: ${t.selectOptionText} !important; }
@@ -690,7 +809,7 @@ const Dashboard = () => {
                 `}</style>
 
                 {/* ── Header ── */}
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 28px', background: t.surfaceSecondary, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${t.border}`, position: 'sticky', top: 0, zIndex: 100 }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 28px', background: t.surfaceSecondary, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${t.border}`, position: 'sticky', top: 0, zIndex: 100, height: '60px', boxSizing: 'border-box' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Zap size={23} color="#6366f1" />
@@ -710,7 +829,6 @@ const Dashboard = () => {
                             {dark ? <Sun size={16} /> : <Moon size={16} />}
                         </button>
 
-                        {/* Notifications */}
                         <div style={{ position: 'relative' }}>
                             <button onClick={() => setShowNotifications(!showNotifications)} style={{ padding: '7px', background: t.toggleBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, cursor: 'pointer', display: 'flex' }}>
                                 <Bell size={16} />
@@ -738,7 +856,6 @@ const Dashboard = () => {
                             )}
                         </div>
 
-                        {/* FIX 3: User button — fall back to avatar_url if avatar is not set */}
                         <button onClick={() => setShowProfile(true)}
                             style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '5px 10px 5px 5px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '11px', cursor: 'pointer', transition: 'all 0.2s' }}>
                             <div style={{ width: '30px', height: '30px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
@@ -762,7 +879,6 @@ const Dashboard = () => {
                     </div>
                 </header>
 
-                {/* Offline banner */}
                 {!isOnline && (
                     <div style={{ padding: '10px 28px', background: t.offlineBg, borderBottom: `1px solid ${t.overdueBorder}`, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                         <WifiOff size={14} color={t.offlineText} />
@@ -770,96 +886,75 @@ const Dashboard = () => {
                     </div>
                 )}
 
-                {/* Stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '13px', padding: '20px 28px 0', maxWidth: '1400px', margin: '0 auto' }}>
-                    {[
-                        { icon: <ListTodo size={20} />,    value: tasks.length,                                                                                              label: 'Your Tasks',  color: '#6366f1' },
-                        { icon: <Clock size={20} />,       value: tasks.filter(tk => tk.status === 'in_progress').length,                                                    label: 'In Progress', color: '#f59e0b' },
-                        { icon: <CheckCircle2 size={20} />,value: tasks.filter(tk => tk.status === 'completed').length,                                                      label: 'Completed',   color: '#10b981' },
-                        { icon: <AlertCircle size={20} />, value: tasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length, label: 'Overdue',     color: '#ef4444' },
-                    ].map((s, i) => (
-                        <div key={i} style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '13px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '13px' }}>
-                            <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: `${s.color}18`, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.icon}</div>
-                            <div>
-                                <div style={{ fontSize: '24px', fontWeight: '700', color: t.textPrimary, lineHeight: 1 }}>{s.value}</div>
-                                <div style={{ fontSize: '11px', color: t.textMuted, marginTop: '2px' }}>{s.label}</div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                {/* Main Layout with Sidebar */}
+                <div style={{ display: 'flex', flex: 1 }}>
+                    <NavigationSidebar 
+                        t={t} 
+                        currentView={currentView} 
+                        onNavigate={setCurrentView}
+                        sidebarCollapsed={sidebarCollapsed}
+                        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+                        user={user}
+                    />
 
-                {/* Main */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 296px', gap: '16px', padding: '16px 28px 44px', maxWidth: '1400px', margin: '0 auto' }}>
-
-                    {/* Tasks panel */}
-                    <div style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '15px', padding: '22px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h2 style={{ fontSize: '16px', fontWeight: '600', color: t.textPrimary, margin: 0 }}>Your Tasks</h2>
-                            <button onClick={() => isOnline && setShowCreateModal(true)} disabled={!isOnline}
-                                style={{ padding: '8px 16px', background: isOnline ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : t.inputBg, border: 'none', borderRadius: '9px', color: isOnline ? '#fff' : t.textMuted, fontSize: '13px', fontWeight: '600', cursor: isOnline ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '6px', opacity: isOnline ? 1 : 0.6, boxShadow: isOnline ? '0 3px 12px rgba(99,102,241,0.3)' : 'none' }}>
-                                <Plus size={15} /><span>New Task</span>
-                            </button>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', marginBottom: '10px' }}>
-                            <Search size={15} color={t.textMuted} />
-                            <input type="text" placeholder="Search your tasks…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
-                            {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}><X size={13} /></button>}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                            {['all', 'pending', 'in_progress', 'completed', 'blocked'].map(s => (
-                                <button key={s} onClick={() => setFilter(s)}
-                                    style={{ padding: '5px 12px', background: filter === s ? t.accentBg : t.inputBg, border: `1px solid ${filter === s ? t.accentBorder : t.border}`, borderRadius: '18px', color: filter === s ? t.accentText : t.textSecondary, fontSize: '11px', fontWeight: filter === s ? '600' : '400', cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s' }}>
-                                    {s.replace('_', ' ')}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto' }}>
-                            {filteredTasks.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '52px 20px' }}>
-                                    <ListTodo size={40} color={t.textMuted} />
-                                    <p style={{ color: t.textMuted, margin: '10px 0', fontSize: '14px' }}>{searchQuery || filter !== 'all' ? 'No matching tasks' : 'No tasks yet'}</p>
-                                    {!searchQuery && filter === 'all' && isOnline && (
-                                        <button onClick={() => setShowCreateModal(true)} style={{ padding: '8px 16px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '8px', color: t.accentText, fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>Create your first task</button>
-                                    )}
-                                </div>
-                            ) : filteredTasks.map(task => (
-                                <TaskCard key={task.id} task={task} t={t}
-                                    onStatusChange={updateTaskStatus}
-                                    onDelete={() => setDeleteTarget(task)}
-                                    onEdit={() => setEditTask(task)}
-                                    updatingStatus={updatingStatus} isOnline={isOnline} />
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Sidebar */}
-                    <div style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '15px', padding: '22px', height: 'fit-content', position: 'sticky', top: '68px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <Activity size={17} color="#6366f1" />
-                            <h3 style={{ fontSize: '14px', fontWeight: '600', color: t.textPrimary, margin: 0 }}>Live Activity</h3>
-                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: wsConnected && isOnline ? '#10b981' : '#ef4444', marginLeft: 'auto' }} />
-                        </div>
-                        <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
-                            {recentActivity.length === 0
-                                ? <p style={{ fontSize: '12px', color: t.textMuted, textAlign: 'center', padding: '28px 0', lineHeight: '1.5', margin: 0 }}>Activity will appear here in real-time</p>
-                                : recentActivity.map(a => (
-                                    <div key={a.id} style={{ display: 'flex', gap: '9px', marginBottom: '12px' }}>
-                                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#6366f1', marginTop: '6px', flexShrink: 0 }} />
-                                        <div>
-                                            <p style={{ fontSize: '12px', color: t.text, margin: '0 0 2px', lineHeight: '1.4' }}>{a.message}</p>
-                                            <p style={{ fontSize: '10px', color: t.textMuted, margin: 0 }}>{new Date(a.timestamp).toLocaleTimeString()}</p>
-                                        </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        {/* Stats */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '13px', padding: '20px 28px 0', maxWidth: '1400px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+                            {[
+                                { icon: <ListTodo size={20} />,    value: tasks.length,                                                                                              label: 'Your Tasks',  color: '#6366f1' },
+                                { icon: <Clock size={20} />,       value: tasks.filter(tk => tk.status === 'in_progress').length,                                                    label: 'In Progress', color: '#f59e0b' },
+                                { icon: <CheckCircle2 size={20} />,value: tasks.filter(tk => tk.status === 'completed').length,                                                      label: 'Completed',   color: '#10b981' },
+                                { icon: <AlertCircle size={20} />, value: tasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length, label: 'Overdue',     color: '#ef4444' },
+                            ].map((s, i) => (
+                                <div key={i} style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '13px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '13px' }}>
+                                    <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: `${s.color}18`, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.icon}</div>
+                                    <div>
+                                        <div style={{ fontSize: '24px', fontWeight: '700', color: t.textPrimary, lineHeight: 1 }}>{s.value}</div>
+                                        <div style={{ fontSize: '11px', color: t.textMuted, marginTop: '2px' }}>{s.label}</div>
                                     </div>
-                                ))
-                            }
+                                </div>
+                            ))}
                         </div>
+
+                        {/* Content Area - Different views */}
+                        {currentView === 'dashboard' && (
+                            <DashboardContent 
+                                t={t}
+                                tasks={tasks}
+                                filteredTasks={filteredTasks}
+                                filter={filter}
+                                setFilter={setFilter}
+                                searchQuery={searchQuery}
+                                setSearchQuery={setSearchQuery}
+                                isOnline={isOnline}
+                                showCreateModal={showCreateModal}
+                                setShowCreateModal={setShowCreateModal}
+                                updateTaskStatus={updateTaskStatus}
+                                setDeleteTarget={setDeleteTarget}
+                                setEditTask={setEditTask}
+                                updatingStatus={updatingStatus}
+                                recentActivity={recentActivity}
+                                wsConnected={wsConnected}
+                            />
+                        )}
+
+                        {currentView !== 'dashboard' && (
+                            <div style={{ padding: '40px 28px', textAlign: 'center' }}>
+                                <h2 style={{ fontSize: '24px', color: t.textPrimary }}>
+                                    {currentView === 'company-setup' && '🏢 Company Setup'}
+                                    {currentView === 'team' && '👥 Team Management'}
+                                    {currentView === 'progress' && '📈 Progress Monitor'}
+                                    {currentView === 'reports' && '📄 Reports'}
+                                </h2>
+                                <p style={{ fontSize: '16px', color: t.textMuted, marginTop: '12px' }}>
+                                    This feature is under construction. Check back soon!
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* ── Modals ── */}
+                {/* Modals */}
                 {showCreateModal && (
                     <TaskModal t={t} title="Create New Task" onClose={() => setShowCreateModal(false)} isOnline={isOnline}
                         onSave={async (data) => {
@@ -908,13 +1003,11 @@ const TaskCard = ({ task, t, onStatusChange, onDelete, onEdit, updatingStatus, i
                 <h3 style={{ fontSize: '14px', fontWeight: '600', color: t.textPrimary, margin: 0, lineHeight: '1.3', flex: 1 }}>{task.title}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
                     {!!task.flagged && <Flag size={13} color="#ef4444" fill="#ef4444" />}
-                    {/* Edit */}
                     <button onClick={onEdit} disabled={!isOnline}
                         style={{ background: 'none', border: 'none', color: t.textMuted, cursor: isOnline ? 'pointer' : 'not-allowed', padding: '5px', display: 'flex', borderRadius: '6px', opacity: isOnline ? 1 : 0.35, transition: 'color 0.15s' }}
                         title={isOnline ? 'Edit task' : 'Offline'}>
                         <Edit2 size={13} />
                     </button>
-                    {/* Delete — red tint so it's clearly destructive */}
                     <button onClick={onDelete} disabled={!isOnline}
                         style={{ background: 'none', border: 'none', color: isOnline ? '#ef4444' : t.textMuted, cursor: isOnline ? 'pointer' : 'not-allowed', padding: '5px', display: 'flex', borderRadius: '6px', opacity: isOnline ? 1 : 0.35, transition: 'opacity 0.15s' }}
                         title={isOnline ? 'Delete task' : 'Offline'}>
