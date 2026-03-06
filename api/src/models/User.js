@@ -1,16 +1,17 @@
 // api/src/models/User.js
-// User database operations
+// User database operations - COMPLETE VERSION
 
 const bcrypt = require('bcrypt');
 const { runQuery, getOne, getAll } = require('../config/database');
 
 const SALT_ROUNDS = 10;
 
-async function createUser(email, password, fullName, role = 'member') {
+// ✅ UPDATED to include accountType
+async function createUser(email, password, fullName, role = 'member', accountType = 'individual') {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     const result = await runQuery(
-        `INSERT INTO users (email, password_hash, full_name, role) VALUES (?, ?, ?, ?)`,
-        [email, passwordHash, fullName, role]
+        `INSERT INTO users (email, password_hash, full_name, role, account_type) VALUES (?, ?, ?, ?, ?)`,
+        [email, passwordHash, fullName, role, accountType]
     );
     return result.id;
 }
@@ -20,9 +21,8 @@ async function findByEmail(email) {
 }
 
 async function findById(id) {
-    // Wrap avatar_url in a CASE so older DBs without the column don't crash
     return await getOne(
-        `SELECT id, email, full_name, role, is_active, last_seen, created_at, avatar_url
+        `SELECT id, email, full_name, role, account_type, company_id, is_active, last_seen, created_at, avatar_url
          FROM users WHERE id = ?`,
         [id]
     );
@@ -30,7 +30,7 @@ async function findById(id) {
 
 async function getAllUsers() {
     return await getAll(
-        `SELECT id, email, full_name, role, is_active, last_seen, created_at, avatar_url
+        `SELECT id, email, full_name, role, account_type, company_id, is_active, last_seen, created_at, avatar_url
          FROM users ORDER BY created_at DESC`
     );
 }
@@ -47,7 +47,7 @@ async function updateLastSeen(userId) {
  * Generic update (admin use — allows role, email, is_active changes)
  */
 async function updateUser(userId, updates) {
-    const allowedFields = ['full_name', 'email', 'role', 'is_active', 'avatar_url'];
+    const allowedFields = ['full_name', 'email', 'role', 'is_active', 'avatar_url', 'account_type', 'company_id'];
     const fields = [];
     const values = [];
 
@@ -105,7 +105,7 @@ async function deleteUser(userId) {
 
 async function getOnlineUsers() {
     return await getAll(
-        `SELECT id, email, full_name, role, last_seen, avatar_url
+        `SELECT id, email, full_name, role, account_type, last_seen, avatar_url
          FROM users 
          WHERE last_seen > datetime('now', '-5 minutes') AND is_active = 1
          ORDER BY last_seen DESC`
@@ -113,7 +113,15 @@ async function getOnlineUsers() {
 }
 
 module.exports = {
-    createUser, findByEmail, findById, getAllUsers,
-    verifyPassword, updateLastSeen, updateUser, updateProfile,
-    changePassword, deleteUser, getOnlineUsers
+    createUser, 
+    findByEmail, 
+    findById, 
+    getAllUsers,
+    verifyPassword, 
+    updateLastSeen, 
+    updateUser, 
+    updateProfile,
+    changePassword, 
+    deleteUser, 
+    getOnlineUsers
 };

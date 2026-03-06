@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     deadline TIMESTAMP,
     flagged BOOLEAN DEFAULT 0,
     flag_reason TEXT,
-    version INTEGER DEFAULT 1,  -- For optimistic locking and sync conflict detection
+    version INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL,
@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    action VARCHAR(100) NOT NULL,  -- 'created_task', 'updated_task', 'completed_task', etc.
-    entity_type VARCHAR(50) NOT NULL,  -- 'task', 'user', etc.
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
     entity_id INTEGER NOT NULL,
-    details TEXT,  -- JSON string with additional info
+    details TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS activities (
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    type VARCHAR(50) NOT NULL,  -- 'deadline_missed', 'task_assigned', 'task_completed', etc.
+    type VARCHAR(50) NOT NULL,
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     task_id INTEGER,
@@ -66,16 +66,16 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
     user_id INTEGER NOT NULL,
     client_version INTEGER NOT NULL,
     server_version INTEGER NOT NULL,
-    client_data TEXT NOT NULL,  -- JSON string with client's version of data
+    client_data TEXT NOT NULL,
     resolved BOOLEAN DEFAULT 0,
-    resolution TEXT,  -- 'server_wins', 'client_wins', 'merged'
+    resolution TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     resolved_at TIMESTAMP,
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Comments table (optional but useful)
+-- Comments table
 CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id INTEGER NOT NULL,
@@ -92,60 +92,54 @@ CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_deadline ON tasks(deadline);
 CREATE INDEX IF NOT EXISTS idx_tasks_flagged ON tasks(flagged);
+
 CREATE INDEX IF NOT EXISTS idx_activities_user ON activities(user_id);
 CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_resolved ON sync_conflicts(resolved);
 
 -- Triggers to auto-update updated_at timestamp
-CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
+CREATE TRIGGER IF NOT EXISTS update_users_timestamp
 AFTER UPDATE ON users
 BEGIN
     UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS update_tasks_timestamp 
+CREATE TRIGGER IF NOT EXISTS update_tasks_timestamp
 AFTER UPDATE ON tasks
 BEGIN
     UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS update_comments_timestamp 
+CREATE TRIGGER IF NOT EXISTS update_comments_timestamp
 AFTER UPDATE ON comments
 BEGIN
     UPDATE comments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
--- Trigger to increment version on task update (for conflict detection)
-CREATE TRIGGER IF NOT EXISTS increment_task_version 
+-- Trigger to increment version on task update
+CREATE TRIGGER IF NOT EXISTS increment_task_version
 AFTER UPDATE ON tasks
-WHEN OLD.version = NEW.version  -- Only increment if version wasn't manually changed
+WHEN OLD.version = NEW.version
 BEGIN
     UPDATE tasks SET version = version + 1 WHERE id = NEW.id;
 END;
 
 -- Insert default admin user (password: 'admin123')
-INSERT OR IGNORE INTO users (id, email, password_hash, full_name, role) 
-VALUES (1, 'admin@syncline.local', '$2b$12$PJOLbks10V4oXv28lMJ7NOF1YludXE48S9TtzWMZDZyeR3NXl22d2', 'Admin User', 'admin');
+INSERT OR IGNORE INTO users (id, email, password_hash, full_name, role)
+VALUES (
+    1,
+    'admin@syncline.local',
+    '$2b$12$PJOLbks10V4oXv28lMJ7NOF1YludXE48S9TtzWMZDZyeR3NXl22d2',
+    'Admin User',
+    'admin'
+);
 
--- Insert sample data for testing (password: 'password123')
-INSERT OR IGNORE INTO users (email, password_hash, full_name, role) 
-VALUES 
+-- Insert sample users for testing (password: 'password123')
+INSERT OR IGNORE INTO users (email, password_hash, full_name, role)
+VALUES
     ('manager@syncline.local', '$2b$12$zDWZ61gHkgSXKYaqtxyL9.Anon3hBsfvpUUyBCVSizv/gVdOpVovi', 'Manager User', 'manager'),
     ('member@syncline.local', '$2b$12$zDWZ61gHkgSXKYaqtxyL9.Anon3hBsfvpUUyBCVSizv/gVdOpVovi', 'Team Member', 'member');
-
-INSERT OR IGNORE INTO tasks (title, description, status, priority, assignee_id, created_by, deadline) 
-VALUES 
-    ('Setup development environment', 'Install all necessary tools and dependencies', 'completed', 'high', 3, 1, datetime('now', '+7 days')),
-    ('Design database schema', 'Create tables and relationships', 'in_progress', 'high', 2, 1, datetime('now', '+3 days')),
-    ('Implement user authentication', 'JWT-based auth system', 'pending', 'high', 3, 1, datetime('now', '+5 days')),
-    ('Create task management API', 'REST endpoints for CRUD operations', 'pending', 'medium', 3, 2, datetime('now', '+10 days')),
-    ('Build real-time WebSocket server', 'Live updates for all connected clients', 'pending', 'medium', 3, 2, datetime('now', '+14 days'));
-
--- Insert sample activities
-INSERT OR IGNORE INTO activities (user_id, action, entity_type, entity_id, details)
-VALUES
-    (1, 'created_task', 'task', 1, '{"task_title": "Setup development environment"}'),
-    (1, 'created_task', 'task', 2, '{"task_title": "Design database schema"}'),
-    (3, 'updated_task', 'task', 1, '{"status": "completed"}');

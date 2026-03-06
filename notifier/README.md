@@ -88,7 +88,7 @@ sudo apt install maven
 
 ```bash
 cd notifier
-mvn spring-boot:run
+.\mvnw spring-boot:run
 ```
 
 The service will start on **http://localhost:8080**

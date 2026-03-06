@@ -1,126 +1,162 @@
 // web/src/context/AuthContext.jsx
-// Authentication context for managing user state
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
-import wsService from '../services/websocket';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import axios from 'axios';
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {
-        throw new Error('useAuth must be used within AuthProvider');
+        throw new Error('useAuth must be used within an AuthProvider');
     }
     return context;
 };
 
+// ─── Normalise user object from API ──────────────────────────────────────────
+// The API returns snake_case (account_type, org_id) but the frontend uses
+// camelCase (accountType, orgId). This function converts both and ensures
+// accountType is always 'company' or 'personal' (never 'individual').
+const normaliseUser = (raw) => {
+    if (!raw) return null;
+
+    // Resolve account type — API may return snake_case or camelCase
+    const rawType = raw.accountType || raw.account_type || 'personal';
+
+    // 'individual' was an old value — treat it as 'personal'
+    const accountType = rawType === 'company' ? 'company' : 'personal';
+
+    return {
+        ...raw,
+        accountType,
+        account_type: accountType,          // keep both for safety
+        orgId:        raw.orgId      ?? raw.org_id      ?? null,
+        org_id:       raw.org_id     ?? raw.orgId       ?? null,
+        companyId:    raw.companyId  ?? raw.company_id  ?? null,
+        company_id:   raw.company_id ?? raw.companyId   ?? null,
+    };
+};
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const [user,    setUser]    = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
 
-    // Check for existing session on mount
+    const API_URL = 'http://localhost:3001/api';
+
+    // ── Restore session on mount ──────────────────────────────────────────────
     useEffect(() => {
-        const initAuth = async () => {
+        const checkAuth = async () => {
             const token = localStorage.getItem('accessToken');
-            const savedUser = localStorage.getItem('user');
-
-            if (token && savedUser) {
+            if (token) {
                 try {
-                    setUser(JSON.parse(savedUser));
-                    wsService.connect(token);
+                    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                    const response = await axios.get(`${API_URL}/auth/me`);
+                    setUser(normaliseUser(response.data.user));
                 } catch (error) {
-                    console.error('Failed to restore session:', error);
-                    logout();
+                    console.error('Auth check failed:', error);
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
+                    delete axios.defaults.headers.common['Authorization'];
                 }
             }
             setLoading(false);
         };
 
-        initAuth();
+        checkAuth();
     }, []);
 
+    // ── Login ─────────────────────────────────────────────────────────────────
     const login = async (email, password) => {
         try {
-            setError(null);
-            const response = await authAPI.login(email, password);
-            const { user, accessToken, refreshToken } = response.data;
+            const response = await axios.post(`${API_URL}/auth/login`, {
+                email,
+                password,
+            });
+
+            const { accessToken, refreshToken, user: userData } = response.data;
 
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
-            localStorage.setItem('user', JSON.stringify(user));
+            axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
-            setUser(user);
-            wsService.connect(accessToken);
+            setUser(normaliseUser(userData));
 
             return { success: true };
         } catch (error) {
-            const message = error.response?.data?.error || 'Login failed';
-            setError(message);
-            return { success: false, error: message };
+            console.error('Login error:', error);
+            return {
+                success: false,
+                error: error.response?.data?.error ||
+                       error.response?.data?.message ||
+                       'Login failed. Please try again.',
+            };
         }
     };
 
-    const register = async (email, password, fullName) => {
+    // ── Register ──────────────────────────────────────────────────────────────
+    const register = async (email, password, fullName, accountType = 'personal', companyName = null) => {
         try {
-            setError(null);
-            const response = await authAPI.register(email, password, fullName);
-            const { user, accessToken, refreshToken } = response.data;
+            const response = await axios.post(`${API_URL}/auth/register`, {
+                email,
+                password,
+                fullName,
+                // Always send 'company' or 'personal' — never 'individual'
+                accountType: accountType === 'company' ? 'company' : 'personal',
+                companyName,
+            });
+
+            const { accessToken, refreshToken, user: userData } = response.data;
 
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
-            localStorage.setItem('user', JSON.stringify(user));
+            axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
-            setUser(user);
-            wsService.connect(accessToken);
+            setUser(normaliseUser(userData));
 
             return { success: true };
         } catch (error) {
-            const message = error.response?.data?.error || 'Registration failed';
-            setError(message);
-            return { success: false, error: message };
+            console.error('Registration error:', error);
+            return {
+                success: false,
+                error: error.response?.data?.error ||
+                       error.response?.data?.message ||
+                       'Registration failed. Please try again.',
+            };
         }
     };
 
+    // ── Logout ────────────────────────────────────────────────────────────────
     const logout = () => {
-        wsService.disconnect();
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
+        delete axios.defaults.headers.common['Authorization'];
         setUser(null);
-        setError(null);
     };
 
-    /**
-     * Update the user in state AND localStorage so changes are reflected
-     * immediately everywhere in the app and survive a page refresh.
-     * Call this after any successful profile update from the API.
-     */
-    const updateUser = (updatedUser) => {
-        // Merge with existing user so partial updates (e.g. only name changed)
-        // don't wipe out other fields like role or email
-        setUser(prev => {
-            const merged = { ...prev, ...updatedUser };
-            localStorage.setItem('user', JSON.stringify(merged));
-            return merged;
-        });
+    // ── Update user (e.g. after profile save) ─────────────────────────────────
+    const updateUser = (userData) => {
+        setUser(prev => normaliseUser({ ...prev, ...userData }));
     };
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    const hasCompanyFeatures = () => user?.accountType === 'company';
+    const isCompanyOwner     = () => user?.accountType === 'company' && user?.role === 'owner';
 
     const value = {
         user,
-        loading,
-        error,
         login,
         register,
         logout,
         updateUser,
-        isAuthenticated: !!user
+        hasCompanyFeatures,
+        isCompanyOwner,
+        loading,
+        isAuthenticated: !!user,
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {children}
+            {!loading && children}
         </AuthContext.Provider>
     );
 };
