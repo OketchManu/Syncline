@@ -47,8 +47,15 @@ export const authAPI = {
     login: (email, password) => 
         api.post('/auth/login', { email, password }),
     
-    register: (email, password, fullName) => 
-        api.post('/auth/register', { email, password, fullName }),
+    // ✅ UPDATED to include accountType and companyName
+    register: (email, password, fullName, accountType = 'individual', companyName = null) => 
+        api.post('/auth/register', { 
+            email, 
+            password, 
+            fullName,
+            accountType,
+            companyName 
+        }),
     
     refreshToken: (refreshToken) => 
         api.post('/auth/refresh', { refreshToken }),
@@ -129,7 +136,7 @@ export const userAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// COMPANY MANAGEMENT ENDPOINTS (NEW)
+// COMPANY MANAGEMENT ENDPOINTS
 // ═══════════════════════════════════════════════════════════════
 
 export const companyAPI = {
@@ -181,7 +188,7 @@ export const companyAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// TASK ASSIGNMENT & REPORTS ENDPOINTS (NEW)
+// TASK ASSIGNMENT & REPORTS ENDPOINTS
 // ═══════════════════════════════════════════════════════════════
 
 export const taskReportsAPI = {
