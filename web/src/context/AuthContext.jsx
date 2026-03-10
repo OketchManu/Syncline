@@ -94,7 +94,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     // ── Register ──────────────────────────────────────────────────────────────
-    const register = async (email, password, fullName, accountType = 'personal', companyName = null) => {
+    // ── CHANGED: added extraCompanyFields param to carry industry/description/website
+    const register = async (email, password, fullName, accountType = 'personal', companyName = null, extraCompanyFields = null) => {
         try {
             const response = await axios.post(`${API_URL}/auth/register`, {
                 email,
@@ -103,6 +104,8 @@ export const AuthProvider = ({ children }) => {
                 // Always send 'company' or 'personal' — never 'individual'
                 accountType: accountType === 'company' ? 'company' : 'personal',
                 companyName,
+                // Spread extra fields (industry, description, website) if provided
+                ...(extraCompanyFields || {}),
             });
 
             const { accessToken, refreshToken, user: userData } = response.data;

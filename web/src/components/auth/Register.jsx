@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Chrome, Github, Zap, CheckCircle2, Building2, UserCircle, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Chrome, Github, Zap, CheckCircle2, Building2, UserCircle, ArrowLeft, Globe, FileText } from 'lucide-react';
 
 const Register = () => {
     const [step, setStep] = useState(1); // 1: account type, 2: details
@@ -11,11 +11,22 @@ const Register = () => {
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
     const [companyName, setCompanyName] = useState('');
+    // ── NEW: extra company fields ──────────────────────────────────────────────
+    const [industry, setIndustry] = useState('');
+    const [description, setDescription] = useState('');
+    const [website, setWebsite] = useState('');
+    // ──────────────────────────────────────────────────────────────────────────
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { register } = useAuth();
     const navigate = useNavigate();
+
+    const INDUSTRIES = [
+        'Technology','Healthcare','Finance','Education','Retail',
+        'Manufacturing','Consulting','Media & Entertainment','Real Estate',
+        'Logistics','Legal','Non-profit','Other',
+    ];
 
     const getPasswordStrength = () => {
         if (password.length === 0) return { strength: 0, label: '', color: '#64748b' };
@@ -58,13 +69,16 @@ const Register = () => {
 
         setLoading(true);
         
+        // ── CHANGED: pass extra company fields as 6th argument ─────────────────
         const result = await register(
             email,
             password,
             fullName,
             accountType,
-            accountType === 'company' ? companyName : null
+            accountType === 'company' ? companyName : null,
+            accountType === 'company' ? { industry, description, website } : null
         );
+        // ───────────────────────────────────────────────────────────────────────
         
         if (result.success) {
             navigate('/dashboard');
@@ -285,21 +299,79 @@ const Register = () => {
                             {/* Register form */}
                             <form onSubmit={handleSubmit} style={styles.form}>
                                 {accountType === 'company' && (
-                                    <div style={styles.inputGroup}>
-                                        <label style={styles.label}>Company Name *</label>
-                                        <div style={styles.inputWrapper}>
-                                            <Building2 size={20} style={styles.inputIcon} />
-                                            <input
-                                                type="text"
-                                                value={companyName}
-                                                onChange={(e) => setCompanyName(e.target.value)}
-                                                placeholder="Acme Inc."
-                                                style={styles.input}
-                                                required
-                                                disabled={loading}
-                                            />
+                                    <>
+                                        {/* Company Name */}
+                                        <div style={styles.inputGroup}>
+                                            <label style={styles.label}>Company Name *</label>
+                                            <div style={styles.inputWrapper}>
+                                                <Building2 size={20} style={styles.inputIcon} />
+                                                <input
+                                                    type="text"
+                                                    value={companyName}
+                                                    onChange={(e) => setCompanyName(e.target.value)}
+                                                    placeholder="Acme Inc."
+                                                    style={styles.input}
+                                                    required
+                                                    disabled={loading}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+
+                                        {/* ── NEW: Industry ─────────────────────────────────────────── */}
+                                        <div style={styles.inputGroup}>
+                                            <label style={styles.label}>Industry</label>
+                                            <div style={styles.inputWrapper}>
+                                                <select
+                                                    value={industry}
+                                                    onChange={(e) => setIndustry(e.target.value)}
+                                                    disabled={loading}
+                                                    style={{ ...styles.input, paddingLeft: '16px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', color: industry ? '#fff' : '#64748b' }}
+                                                >
+                                                    <option value="">Select industry…</option>
+                                                    {INDUSTRIES.map(i => (
+                                                        <option key={i} value={i} style={{ background: '#0a0e27', color: '#fff' }}>{i}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* ── NEW: Website ──────────────────────────────────────────── */}
+                                        <div style={styles.inputGroup}>
+                                            <label style={styles.label}>
+                                                Website <span style={{ color: '#64748b', fontWeight: 400, fontSize: 12 }}>(optional)</span>
+                                            </label>
+                                            <div style={styles.inputWrapper}>
+                                                <Globe size={20} style={styles.inputIcon} />
+                                                <input
+                                                    type="url"
+                                                    value={website}
+                                                    onChange={(e) => setWebsite(e.target.value)}
+                                                    placeholder="https://yourcompany.com"
+                                                    style={styles.input}
+                                                    disabled={loading}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* ── NEW: Description ──────────────────────────────────────── */}
+                                        <div style={styles.inputGroup}>
+                                            <label style={styles.label}>
+                                                Description <span style={{ color: '#64748b', fontWeight: 400, fontSize: 12 }}>(optional)</span>
+                                            </label>
+                                            <div style={styles.inputWrapper}>
+                                                <FileText size={20} style={{ ...styles.inputIcon, top: '14px', position: 'absolute' }} />
+                                                <textarea
+                                                    value={description}
+                                                    onChange={(e) => setDescription(e.target.value)}
+                                                    placeholder="What does your company do?"
+                                                    disabled={loading}
+                                                    rows={3}
+                                                    style={{ ...styles.input, paddingTop: '12px', resize: 'vertical', minHeight: '80px' }}
+                                                />
+                                            </div>
+                                        </div>
+                                        {/* ─────────────────────────────────────────────────────────── */}
+                                    </>
                                 )}
 
                                 <div style={styles.inputGroup}>
@@ -733,7 +805,9 @@ const styles = {
         fontSize: '15px',
         color: '#fff',
         outline: 'none',
-        transition: 'all 0.3s'
+        transition: 'all 0.3s',
+        boxSizing: 'border-box',
+        fontFamily: 'inherit'
     },
     eyeBtn: {
         position: 'absolute',

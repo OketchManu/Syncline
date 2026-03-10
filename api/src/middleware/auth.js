@@ -1,11 +1,11 @@
+// api/src/middleware/auth.js
 const jwt = require('jsonwebtoken');
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader) {
+    if (!authHeader)
         return res.status(401).json({ error: 'Access token required' });
-    }
 
     const token = authHeader.split(' ')[1];
 
@@ -13,9 +13,10 @@ function authenticateToken(req, res, next) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         req.user = {
-            id: decoded.userId,
-            email: decoded.email,
-            role: decoded.role
+            id:         decoded.userId,
+            email:      decoded.email,
+            role:       decoded.role,
+            company_id: decoded.company_id || null
         };
 
         next();
@@ -26,19 +27,14 @@ function authenticateToken(req, res, next) {
 
 function requireRole(...allowedRoles) {
     return (req, res, next) => {
-        if (!req.user) {
+        if (!req.user)
             return res.status(401).json({ error: 'Unauthorized' });
-        }
 
-        if (!allowedRoles.includes(req.user.role)) {
+        if (!allowedRoles.includes(req.user.role))
             return res.status(403).json({ error: 'Forbidden: insufficient role' });
-        }
 
         next();
     };
 }
 
-module.exports = {
-    authenticateToken,
-    requireRole
-};
+module.exports = { authenticateToken, requireRole };
