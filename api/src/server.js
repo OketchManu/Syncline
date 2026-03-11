@@ -115,7 +115,7 @@ const taskReportsRoutes = require('./routes/task-reports.routes');
 
 // Mount routes — /api/tasks/reports must come before /api/tasks to avoid conflict
 app.use('/api/auth',          authRoutes);
-app.use('/api/tasks/reports', taskReportsRoutes);
+app.use('/api/task-reports', taskReportsRoutes);
 app.use('/api/tasks',         taskRoutes);
 app.use('/api/users',         userRoutes);
 app.use('/api/company',       companyRoutes);
