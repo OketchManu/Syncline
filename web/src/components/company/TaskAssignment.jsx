@@ -61,17 +61,37 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
         const loadData = async () => {
             setMembersLoading(true);
             try {
+                // ← FIXED: assignments endpoint is /task-reports/:id/assignments (not /tasks/:id/assignments)
+                // Also falls back gracefully: if no assignments yet, pre-selects task.assignee_id
                 const [mRes, aRes] = await Promise.all([
                     fetch(`${API_BASE}/company/team?active=true`, { headers: authHeaders() }),
-                    task?.id ? fetch(`${API_BASE}/tasks/${task.id}/assignments`, { headers: authHeaders() }) : Promise.resolve(null),
+                    task?.id
+                        ? fetch(`${API_BASE}/task-reports/${task.id}/assignments`, { headers: authHeaders() })
+                        : Promise.resolve(null),
                 ]);
                 if (mRes.ok) { const d = await mRes.json(); setMembers(d.members || []); }
-                if (aRes?.ok) { const d = await aRes.json(); setSelectedUsers((d.assignments || []).map(a => a.user_id)); }
-            } catch (err) { console.error(err); }
+                if (aRes?.ok) {
+                    const d = await aRes.json();
+                    const ids = (d.assignments || []).map(a => a.user_id);
+                    // ← ADDED: if no assignments yet, fall back to task.assignee_id so the current assignee shows pre-selected
+                    if (ids.length > 0) {
+                        setSelectedUsers(ids);
+                    } else if (task?.assignee_id) {
+                        setSelectedUsers([task.assignee_id]);
+                    }
+                } else if (task?.assignee_id) {
+                    // assignments endpoint unavailable — fall back gracefully
+                    setSelectedUsers([task.assignee_id]);
+                }
+            } catch (err) {
+                console.error(err);
+                // ← ADDED: graceful fallback when assignments endpoint fails
+                if (task?.assignee_id) setSelectedUsers([task.assignee_id]);
+            }
             setMembersLoading(false);
         };
         loadData();
-    }, [task?.id, authHeaders]);
+    }, [task?.id, task?.assignee_id, authHeaders]);
 
     const toggleUser = (userId) =>
         setSelectedUsers(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
@@ -80,7 +100,8 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
         if (selectedUsers.length === 0) { setError('Please select at least one team member'); return; }
         setLoading(true); setError(''); setSuccess('');
         try {
-            const res = await fetch(`${API_BASE}/tasks/${task.id}/assign`, {
+            // ← FIXED: POST to /task-reports/:id/assign (not /tasks/:id/assign)
+            const res = await fetch(`${API_BASE}/task-reports/${task.id}/assign`, {
                 method: 'POST',
                 headers: authHeaders(),
                 body: JSON.stringify({ user_ids: selectedUsers, require_report: requireReport }),

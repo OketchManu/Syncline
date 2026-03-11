@@ -114,8 +114,9 @@ const Spinner = ({ size = 16, color = "#6366f1" }) => (
 
 const Avatar = ({ name, avatar, size = 36, tk }) => {
   const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
-  return avatar
-    ? <img src={avatar} alt={name} style={{ width: size, height: size, borderRadius: size / 2.5, objectFit: "cover", flexShrink: 0 }} />
+  const avatarSrc = avatar?.startsWith("http") ? avatar : avatar ? `http://localhost:3001${avatar}` : null;
+  return avatarSrc
+    ? <img src={avatarSrc} alt={name} style={{ width: size, height: size, borderRadius: size / 2.5, objectFit: "cover", flexShrink: 0 }} />
     : (
       <div style={{
         width: size, height: size, borderRadius: size / 2.5, flexShrink: 0,
