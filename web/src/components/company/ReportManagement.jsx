@@ -5,11 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import {
     FileText, Plus, X, Send, CheckCircle2, AlertCircle, Clock,
     Search, RefreshCw, Download, 
-    Calendar, User, Bell, Trash2, Edit2,
-    AlertTriangle, ClipboardList, MessageSquare
+    Calendar,Bell, Trash2, Edit2,
+    AlertTriangle, ClipboardList, MessageSquare, Building2
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE   = 'http://localhost:3001/api';
+const API_ORIGIN = 'http://localhost:3001'; // ← ADDED: for resolving relative avatar URLs
 
 const themes = {
     dark: {
@@ -24,6 +25,7 @@ const themes = {
         successBg: 'rgba(16,185,129,0.1)', successBorder: 'rgba(16,185,129,0.3)', successText: '#6ee7b7',
         warnBg: 'rgba(245,158,11,0.1)', warnBorder: 'rgba(245,158,11,0.3)', warnText: '#fcd34d',
         dangerBg: 'rgba(239,68,68,0.12)', dangerBorder: 'rgba(239,68,68,0.3)', dangerText: '#fca5a5', dangerBtn: '#dc2626',
+        infoBg: 'rgba(99,102,241,0.1)', infoBorder: 'rgba(99,102,241,0.25)', infoText: '#a5b4fc', // ← ADDED info colours
     },
     light: {
         bg: '#f1f5f9', surfacePrimary: '#ffffff', modalBg: '#ffffff',
@@ -37,6 +39,7 @@ const themes = {
         successBg: 'rgba(16,185,129,0.07)', successBorder: 'rgba(16,185,129,0.25)', successText: '#059669',
         warnBg: 'rgba(245,158,11,0.07)', warnBorder: 'rgba(245,158,11,0.25)', warnText: '#b45309',
         dangerBg: 'rgba(239,68,68,0.06)', dangerBorder: 'rgba(239,68,68,0.25)', dangerText: '#dc2626', dangerBtn: '#dc2626',
+        infoBg: 'rgba(99,102,241,0.07)', infoBorder: 'rgba(99,102,241,0.2)', infoText: '#4f46e5', // ← ADDED info colours
     }
 };
 
@@ -44,10 +47,14 @@ const Spinner = ({ size = 16, color = '#6366f1' }) => (
     <div style={{ width: size, height: size, border: `2px solid ${color}30`, borderTop: `2px solid ${color}`, borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
 );
 
-
-
+// ← CHANGED: added 'info' type so the personal-user banner works
 const StatusAlert = ({ t, type, children }) => {
-    const s = { error: { bg: t.errorBg, border: t.errorBorder, color: t.errorText }, success: { bg: t.successBg, border: t.successBorder, color: t.successText }, warning: { bg: t.warnBg, border: t.warnBorder, color: t.warnText } }[type] || {};
+    const s = {
+        error:   { bg: t.errorBg,   border: t.errorBorder,   color: t.errorText   },
+        success: { bg: t.successBg, border: t.successBorder, color: t.successText },
+        warning: { bg: t.warnBg,    border: t.warnBorder,    color: t.warnText    },
+        info:    { bg: t.infoBg,    border: t.infoBorder,    color: t.infoText    },
+    }[type] || {};
     return <div style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color, padding: '10px 14px', borderRadius: '9px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>{children}</div>;
 };
 
@@ -153,6 +160,11 @@ const ReportDetailModal = ({ t, report, onClose, onApprove, onReject, canReview 
 
     const statusCfg = statusConfig[report.status] || statusConfig.pending;
 
+    // ← ADDED: resolve relative avatar path for the author shown in the detail header
+    const avatarSrc = report.author_avatar
+        ? (report.author_avatar.startsWith('http') ? report.author_avatar : `${API_ORIGIN}${report.author_avatar}`)
+        : null;
+
     const doAction = async (action) => {
         setLoading(true);
         await (action === 'approve' ? onApprove : onReject)(report.id, feedback);
@@ -169,10 +181,18 @@ const ReportDetailModal = ({ t, report, onClose, onApprove, onReject, canReview 
                             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: t.textPrimary }}>{report.title}</h2>
                             <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: statusCfg.bg, color: statusCfg.color }}>{statusCfg.label}</span>
                         </div>
-                        <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: t.textMuted }}>
+                        {/* ← CHANGED: added avatar mini-image next to author name */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: t.textMuted }}>
+                            <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: t.accentBg, border: `1px solid ${t.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: t.accentText, flexShrink: 0 }}>
+                                {avatarSrc
+                                    ? <img src={avatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    : (report.author_name || '?').charAt(0).toUpperCase()}
+                            </div>
                             <span>by {report.author_name || report.author?.fullName || 'Unknown'}</span>
-                            <span>{new Date(report.created_at || report.createdAt).toLocaleDateString()}</span>
-                            {report.hours_spent && <span>⏱ {report.hours_spent}h</span>}
+                            <span>·</span>
+                            {/* ← FIXED: was report.created_at only — now also checks submitted_at */}
+                            <span>{new Date(report.submitted_at || report.created_at || report.createdAt).toLocaleDateString()}</span>
+                            {report.hours_spent && <><span>·</span><span>⏱ {report.hours_spent}h</span></>}
                         </div>
                     </div>
                     <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex' }}><X size={15} /></button>
@@ -241,9 +261,16 @@ const ReportDetailModal = ({ t, report, onClose, onApprove, onReject, canReview 
 };
 
 // ─── Report Card ──────────────────────────────────────────────────────────────
-const ReportCard = ({ t, report, onView, onDelete, canDelete }) => {
-    const cfg = statusConfig[report.status] || statusConfig.pending;
-    const date = new Date(report.created_at || report.createdAt);
+// ← ADDED: showAuthor prop — admins see who submitted, personal users don't need it
+// ← ADDED: avatar resolved with API_ORIGIN prefix
+// ← FIXED: date now reads submitted_at first (matches backend column name)
+const ReportCard = ({ t, report, onView, onDelete, canDelete, showAuthor }) => {
+    const cfg  = statusConfig[report.status] || statusConfig.pending;
+    const date = new Date(report.submitted_at || report.created_at || report.createdAt);
+
+    const avatarSrc = report.author_avatar
+        ? (report.author_avatar.startsWith('http') ? report.author_avatar : `${API_ORIGIN}${report.author_avatar}`)
+        : null;
 
     return (
         <div style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px 18px', transition: 'border-color 0.15s', cursor: 'pointer' }}
@@ -253,8 +280,18 @@ const ReportCard = ({ t, report, onView, onDelete, canDelete }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{report.title}</h3>
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '12px', color: t.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{report.author_name || 'Unknown'}</span>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {/* ← CHANGED: only render author chip when showAuthor=true (admins), with tiny avatar */}
+                        {showAuthor && (
+                            <span style={{ fontSize: '12px', color: t.textMuted, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <div style={{ width: 18, height: 18, borderRadius: '50%', overflow: 'hidden', background: t.accentBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: t.accentText, flexShrink: 0 }}>
+                                    {avatarSrc
+                                        ? <img src={avatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        : (report.author_name || '?').charAt(0).toUpperCase()}
+                                </div>
+                                {report.author_name || 'Unknown'}
+                            </span>
+                        )}
                         <span style={{ fontSize: '12px', color: t.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />{date.toLocaleDateString()}</span>
                         {report.hours_spent && <span style={{ fontSize: '12px', color: t.textMuted }}>⏱ {report.hours_spent}h</span>}
                     </div>
@@ -283,18 +320,22 @@ const ReportManagement = ({ dark = true }) => {
     const { user } = useAuth();
     const t = dark ? themes.dark : themes.light;
 
-    const [reports,    setReports]    = useState([]);
-    const [tasks,      setTasks]      = useState([]);
-    const [loading,    setLoading]    = useState(true);
-    const [toast,      setToast]      = useState(null);
-    const [showSubmit, setShowSubmit] = useState(false);
-    const [viewReport, setViewReport] = useState(null);
+    const [reports,      setReports]      = useState([]);
+    const [tasks,        setTasks]        = useState([]);
+    const [loading,      setLoading]      = useState(true);
+    const [toast,        setToast]        = useState(null);
+    const [showSubmit,   setShowSubmit]   = useState(false);
+    const [viewReport,   setViewReport]   = useState(null);
     const [deleteReport, setDeleteReport] = useState(null);
-    const [search,     setSearch]     = useState('');
+    const [search,       setSearch]       = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [tab,        setTab]        = useState('all'); // all | mine | review
+    const [tab,          setTab]          = useState('all'); // all | mine | review
 
-    const canReview = ['owner', 'admin', 'manager'].includes(user?.role);
+    // ← CHANGED: canReview requires BOTH company account AND manager role
+    // A personal account who joined a company is NOT a reviewer
+    const isCompanyAccount = user?.account_type === 'company' || user?.accountType === 'company';
+    const canReview = isCompanyAccount && ['owner', 'admin', 'manager'].includes(user?.role);
+
     const authHeaders = useCallback(() => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('accessToken')}` }), []);
 
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
@@ -316,11 +357,12 @@ const ReportManagement = ({ dark = true }) => {
 
     const handleSubmit = async (data) => {
         try {
-            const res = await fetch(`${API_BASE}/task-reports`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(data) });
+            const res  = await fetch(`${API_BASE}/task-reports`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(data) });
             const resp = await res.json();
             if (!res.ok) return resp.error || 'Failed to submit report';
             await fetchReports();
-            showToast(data.status === 'draft' ? 'Draft saved' : 'Report submitted successfully!');
+            // ← CHANGED: toast tells personal/member users their report is visible to admins
+            showToast(data.status === 'draft' ? 'Draft saved' : 'Report submitted — your company admin can now see it');
             return null;
         } catch (err) { return err.message; }
     };
@@ -355,7 +397,7 @@ const ReportManagement = ({ dark = true }) => {
     };
 
     const exportCSV = () => {
-        const rows = [['Title', 'Author', 'Status', 'Hours', 'Submitted', 'Task'], ...reports.map(r => [r.title, r.author_name || '', r.status, r.hours_spent || '', new Date(r.created_at || r.createdAt).toLocaleDateString(), r.task_title || ''])];
+        const rows = [['Title', 'Author', 'Status', 'Hours', 'Submitted', 'Task'], ...reports.map(r => [r.title, r.author_name || '', r.status, r.hours_spent || '', new Date(r.submitted_at || r.created_at || r.createdAt).toLocaleDateString(), r.task_title || ''])];
         const csv  = rows.map(r => r.join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const url  = URL.createObjectURL(blob);
@@ -373,10 +415,10 @@ const ReportManagement = ({ dark = true }) => {
     });
 
     // Stats
-    const totalReports   = reports.length;
-    const pendingReports = reports.filter(r => r.status === 'pending').length;
+    const totalReports    = reports.length;
+    const pendingReports  = reports.filter(r => r.status === 'pending').length;
     const approvedReports = reports.filter(r => r.status === 'approved').length;
-    const draftReports   = reports.filter(r => r.status === 'draft').length;
+    const draftReports    = reports.filter(r => r.status === 'draft').length;
 
     if (loading) return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '14px' }}>
@@ -399,10 +441,15 @@ const ReportManagement = ({ dark = true }) => {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                 <div>
+                    {/* ← CHANGED: title/subtitle adapt to role */}
                     <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: t.textPrimary, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <FileText size={22} color="#6366f1" /> Report Management
+                        <FileText size={22} color="#6366f1" /> {canReview ? 'Team Reports' : 'My Reports'}
                     </h1>
-                    <p style={{ margin: '5px 0 0', fontSize: '13px', color: t.textMuted }}>Submit, review, and track task completion reports</p>
+                    <p style={{ margin: '5px 0 0', fontSize: '13px', color: t.textMuted }}>
+                        {canReview
+                            ? 'View, approve and give feedback on reports submitted by your team'
+                            : 'Submit reports on your work — visible to your company admins'}
+                    </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={exportCSV} style={{ padding: '9px 14px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><Download size={13} /> Export</button>
@@ -412,13 +459,23 @@ const ReportManagement = ({ dark = true }) => {
                 </div>
             </div>
 
+            {/* ← ADDED: info banner for personal/member users so they know their reports go to the company */}
+            {!canReview && user?.company_id && (
+                <div style={{ marginBottom: '18px' }}>
+                    <StatusAlert t={t} type="info">
+                        <Building2 size={14} style={{ flexShrink: 0 }} />
+                        Reports you submit are visible to your company admins. You can only see your own reports here.
+                    </StatusAlert>
+                </div>
+            )}
+
             {/* Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
                 {[
-                    { icon: <FileText size={18} />,     value: totalReports,   label: 'Total Reports',   color: '#6366f1' },
-                    { icon: <Clock size={18} />,        value: pendingReports, label: 'Pending Review',  color: '#f59e0b' },
-                    { icon: <CheckCircle2 size={18} />, value: approvedReports,label: 'Approved',        color: '#10b981' },
-                    { icon: <Edit2 size={18} />,        value: draftReports,   label: 'Drafts',          color: '#64748b' },
+                    { icon: <FileText size={18} />,     value: totalReports,   label: 'Total Reports',  color: '#6366f1' },
+                    { icon: <Clock size={18} />,        value: pendingReports, label: 'Pending Review', color: '#f59e0b' },
+                    { icon: <CheckCircle2 size={18} />, value: approvedReports,label: 'Approved',       color: '#10b981' },
+                    { icon: <Edit2 size={18} />,        value: draftReports,   label: 'Drafts',         color: '#64748b' },
                 ].map((s, i) => (
                     <div key={i} style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '13px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: `${s.color}18`, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{s.icon}</div>
@@ -430,7 +487,7 @@ const ReportManagement = ({ dark = true }) => {
                 ))}
             </div>
 
-            {/* Pending nudge for admins */}
+            {/* Pending nudge for admins — unchanged */}
             {canReview && pendingReports > 0 && (
                 <div style={{ marginBottom: '16px' }}>
                     <StatusAlert t={t} type="warning">
@@ -481,7 +538,8 @@ const ReportManagement = ({ dark = true }) => {
                         <div style={{ textAlign: 'center', padding: '52px 20px' }}>
                             <FileText size={38} color={t.textMuted} />
                             <p style={{ color: t.textMuted, margin: '12px 0 0', fontSize: '14px' }}>
-                                {search || statusFilter !== 'all' ? 'No reports match your filters' : 'No reports yet'}
+                                {/* ← CHANGED: empty state message adapts to role */}
+                                {search || statusFilter !== 'all' ? 'No reports match your filters' : canReview ? 'No team reports yet' : "You haven't submitted any reports yet"}
                             </p>
                             <button onClick={() => setShowSubmit(true)} style={{ marginTop: '14px', padding: '9px 18px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '9px', color: t.accentText, fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <Plus size={14} /> Submit first report
@@ -492,7 +550,11 @@ const ReportManagement = ({ dark = true }) => {
                             {filtered.map(r => (
                                 <ReportCard key={r.id} t={t} report={r} onView={setViewReport}
                                     onDelete={setDeleteReport}
-                                    canDelete={r.author_id === user?.id || r.submitted_by === user?.id || canReview} />
+                                    // ← CHANGED: personal users can't delete approved; admins can delete any
+                                    canDelete={(r.submitted_by === user?.id && r.status !== 'approved') || canReview}
+                                    // ← ADDED: showAuthor=true only for company admins/managers
+                                    showAuthor={canReview}
+                                />
                             ))}
                         </div>
                     )}

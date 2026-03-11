@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { db } = require('../config/database');
 const {
     createTask,
     getAllTasks,
@@ -15,6 +16,17 @@ const {
     getTaskStats,
     getTaskAuditLog
 } = require('../models/Task');
+
+// ─────────────────────────────────────────────────────────────────
+// STARTUP DDL — add any columns that may be missing from older DBs
+// Uses raw db.run callbacks — correct for one-time DDL on boot
+// ─────────────────────────────────────────────────────────────────
+db.run(`ALTER TABLE tasks ADD COLUMN visibility  TEXT DEFAULT 'personal'`, [], () => {});
+db.run(`ALTER TABLE tasks ADD COLUMN company_id  INTEGER`,                 [], () => {});
+db.run(`ALTER TABLE tasks ADD COLUMN flagged     INTEGER DEFAULT 0`,       [], () => {});
+db.run(`ALTER TABLE tasks ADD COLUMN flag_reason TEXT`,                    [], () => {});
+db.run(`ALTER TABLE tasks ADD COLUMN updated_at  TEXT`,                    [], () => {});
+db.run(`ALTER TABLE tasks ADD COLUMN deadline    TEXT`,                    [], () => {});
 
 router.use(authenticateToken);
 

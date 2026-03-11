@@ -56,6 +56,7 @@ function runQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function(err) {
             if (err) {
+                console.error('❌ runQuery error:', err.message, '\nSQL:', sql);
                 reject(err);
             } else {
                 resolve({ id: this.lastID, changes: this.changes });
@@ -69,22 +70,36 @@ function getOne(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.get(sql, params, (err, row) => {
             if (err) {
+                console.error('❌ getOne error:', err.message, '\nSQL:', sql);
                 reject(err);
             } else {
-                resolve(row);
+                // Always return null if no row found (never undefined)
+                resolve(row || null);
             }
         });
     });
 }
 
 // Helper function to get multiple rows
+// CRITICAL: ALWAYS returns an array, NEVER null/undefined
 function getAll(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.all(sql, params, (err, rows) => {
             if (err) {
+                console.error('❌ getAll error:', err.message, '\nSQL:', sql);
                 reject(err);
             } else {
-                resolve(rows);
+                // Triple-safe: ensure we ALWAYS return an array
+                let result;
+                if (rows === null || rows === undefined) {
+                    result = [];
+                } else if (Array.isArray(rows)) {
+                    result = rows;
+                } else {
+                    // Weird edge case - convert to array
+                    result = [rows];
+                }
+                resolve(result);
             }
         });
     });
