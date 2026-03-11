@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Dashboard from './components/dashboard/Dashboard';
-
+import ForgotPassword from './components/auth/ForgotPassword.jsx';
+import ResetPassword from './components/auth/ResetPassword.jsx';
 // Company Management Components
 import CompanyOnboarding from './components/company/CompanyOnboarding';
 import TeamManagement from './components/company/TeamManagement';
@@ -110,6 +111,9 @@ function AppRoutes() {
                     </ProtectedRoute>
                 } 
             />
+
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password"  element={<ResetPassword />} />
 
             {/* Fallback Routes */}
             <Route 

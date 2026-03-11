@@ -7,12 +7,14 @@ import CompanyOnboarding from '../company/CompanyOnboarding';
 import TeamManagement    from '../company/TeamManagement';
 import ProgressMonitor   from '../company/ProgressMonitor';
 import ReportManagement  from '../company/ReportManagement';
+import TaskAssignmentModal from '../company/TaskAssignment';      // ← ADDED
 import {
     Plus, Search, CheckCircle2, Clock, AlertCircle, Flag, Zap, LogOut,
     Activity, ListTodo, Sun, Moon, Trash2, Bell, X, Edit2, WifiOff, Wifi,
     User, Camera, Shield, Smartphone, Save, Eye, EyeOff,
     AlertTriangle, Building2, Users, TrendingUp, FileText, LayoutDashboard,
-    ChevronLeft, Lock, ArrowRight, Sparkles, Menu, ChevronDown
+    ChevronLeft, Lock, ArrowRight, Sparkles, Menu, ChevronDown,
+    UserPlus  // ← ADDED: for the assign button icon
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -137,7 +139,8 @@ const LogoutModal = ({ t, onConfirm, onCancel }) => (
 );
 
 // ─── Task Card ────────────────────────────────────────────────────────────────
-const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, updatingStatus, isOnline }) => {
+// ← ADDED: onAssign prop + Assign button (only shown to company managers/admins)
+const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, onAssign, updatingStatus, isOnline, canAssign }) => {
     const isOverdue = task.deadline && task.status !== 'completed' && new Date(task.deadline) < new Date();
     const isUpdating = updatingStatus === task.id;
     return (
@@ -166,6 +169,15 @@ const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, updatingStatus, i
                         <option value="completed">Completed</option>
                         <option value="blocked">Blocked</option>
                     </select>
+                    {/* ← ADDED: Assign button — only visible to company managers/admins/owners */}
+                    {canAssign && (
+                        <button onClick={onAssign} disabled={!isOnline} title="Assign task"
+                            style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',borderRadius:'6px',transition:'all 0.1s' }}
+                            onMouseEnter={e=>{e.currentTarget.style.background=t.accentBg;e.currentTarget.style.color=t.accentLight;}}
+                            onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}>
+                            <UserPlus size={13}/>
+                        </button>
+                    )}
                     <button onClick={onEdit} disabled={!isOnline} title="Edit" style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',borderRadius:'6px',transition:'all 0.1s' }} onMouseEnter={e=>{e.currentTarget.style.background=t.accentBg;e.currentTarget.style.color=t.accentLight;}} onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}><Edit2 size={13}/></button>
                     <button onClick={onDelete} disabled={!isOnline} title="Delete" style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',borderRadius:'6px',transition:'all 0.1s' }} onMouseEnter={e=>{e.currentTarget.style.background=t.dangerBg;e.currentTarget.style.color=t.danger;}} onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}><Trash2 size={13}/></button>
                 </div>
@@ -307,6 +319,7 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
 const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany }) => {
     const personalNav = [
         { id:'dashboard',     icon:<LayoutDashboard size={16}/>, label:'Dashboard'      },
+        { id:'reports',       icon:<FileText size={16}/>,        label:'My Reports'     }, // ← ADDED: personal users can access their own reports
         { id:'company-setup', icon:<Building2 size={16}/>,       label:'Upgrade to Team' },
     ];
     const companyNav = [
@@ -317,7 +330,7 @@ const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany })
         { id:'reports',       icon:<FileText size={16}/>,        label:'Reports'   },
     ];
     const nav = isCompany ? companyNav : personalNav;
-    const lockedForPersonal = ['team','progress','reports'];
+    const lockedForPersonal = ['team','progress'];  // ← CHANGED: removed 'reports' from locked list
     return (
         <aside style={{ width:collapsed?'60px':'210px',background:t.sidebarBg,borderRight:`1px solid ${t.sidebarBorder}`,height:'calc(100vh - 58px)',position:'sticky',top:'58px',transition:'width 0.22s cubic-bezier(0.4,0,0.2,1)',display:'flex',flexDirection:'column',overflow:'hidden',flexShrink:0 }}>
             {!collapsed&&<div style={{padding:'12px 12px 6px'}}><div style={{padding:'6px 10px',background:t.accentBg,border:`1px solid ${t.accentBorder}`,borderRadius:'8px',display:'flex',alignItems:'center',gap:'7px'}}><span style={{fontSize:'13px'}}>{t.modeIcon}</span><span style={{fontSize:'10px',fontWeight:'700',color:t.accentLight,textTransform:'uppercase',letterSpacing:'0.07em'}}>{t.modeLabel} Mode</span></div></div>}
@@ -330,8 +343,8 @@ const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany })
                     <div style={{marginTop:'10px',paddingTop:'10px',borderTop:`1px solid ${t.border}`}}>
                         <p style={{margin:'0 0 6px',fontSize:'9px',fontWeight:'700',color:t.textMuted,textTransform:'uppercase',letterSpacing:'0.07em',padding:'0 4px'}}>Team Features</p>
                         {lockedForPersonal.map((id,i)=>{
-                            const labels=['Team','Progress','Reports'];
-                            const icons=[<Users size={16}/>,<TrendingUp size={16}/>,<FileText size={16}/>];
+                            const labels=['Team','Progress'];
+                            const icons=[<Users size={16}/>,<TrendingUp size={16}/>];
                             return (<div key={id} style={{display:'flex',alignItems:'center',gap:'9px',padding:'9px 10px',borderRadius:'9px',opacity:0.3,cursor:'not-allowed',color:t.textMuted}}>{icons[i]}<span style={{fontSize:'12px',flex:1}}>{labels[i]}</span><Lock size={10}/></div>);
                         })}
                     </div>
@@ -389,7 +402,7 @@ const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivi
                         <div style={{ display:'flex',flexDirection:'column',gap:'7px',maxHeight:'460px',overflowY:'auto' }}>
                             {filteredTasks.length===0?(
                                 <div style={{textAlign:'center',padding:'48px 20px'}}><ListTodo size={32} color={t.textMuted}/><p style={{color:t.textMuted,margin:'10px 0 0',fontSize:'13px'}}>{searchQuery||filter!=='all'?'No matching tasks':'No tasks yet'}</p>{!searchQuery&&filter==='all'&&isOnline&&<Btn t={t} variant="ghost" size="sm" onClick={()=>setShowCreateModal(true)} style={{marginTop:'12px',border:`1px solid ${t.accentBorder}`,color:t.accentLight}}>Create your first task</Btn>}</div>
-                            ):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} updatingStatus={updatingStatus} isOnline={isOnline}/>))}
+                            ):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} updatingStatus={updatingStatus} isOnline={isOnline} canAssign={false}/>))}
                         </div>
                     </div>
                 </div>
@@ -405,7 +418,9 @@ const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivi
 };
 
 // ─── Company Dashboard ────────────────────────────────────────────────────────
-const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivity, filteredTasks, filter, setFilter, searchQuery, setSearchQuery, setShowCreateModal, updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus, companyName }) => {
+// ← ADDED: onAssign + canAssign props passed down to TaskCard
+const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivity, filteredTasks, filter, setFilter, searchQuery, setSearchQuery, setShowCreateModal, updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus, companyName, onAssign }) => {
+    const canAssign = ['owner','admin','manager'].includes(user?.role);
     const teamStats = { total:tasks.length, inProgress:tasks.filter(tk=>tk.status==='in_progress').length, completed:tasks.filter(tk=>tk.status==='completed').length, overdue:tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length, blocked:tasks.filter(tk=>tk.status==='blocked').length, flagged:tasks.filter(tk=>tk.flagged).length };
     const completionRate=tasks.length>0?Math.round((teamStats.completed/tasks.length)*100):0;
     const byAssignee=tasks.reduce((acc,t)=>{ const name=t.assignee_name||'Unassigned'; if(!acc[name])acc[name]={total:0,completed:0}; acc[name].total++; if(t.status==='completed')acc[name].completed++; return acc; },{});
@@ -445,7 +460,8 @@ const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivit
                             {['all','pending','in_progress','completed','blocked'].map(s=>(<button key={s} onClick={()=>setFilter(s)} style={{ padding:'4px 10px',background:filter===s?t.accentBg:'transparent',border:`1px solid ${filter===s?t.accentBorder:t.border}`,borderRadius:'20px',color:filter===s?t.accentLight:t.textMuted,fontSize:'10px',fontWeight:filter===s?'700':'400',cursor:'pointer',fontFamily:'inherit',transition:'all 0.13s',textTransform:'capitalize' }}>{s.replace('_',' ')}</button>))}
                         </div>
                         <div style={{ display:'flex',flexDirection:'column',gap:'7px',maxHeight:'460px',overflowY:'auto' }}>
-                            {filteredTasks.length===0?(<div style={{textAlign:'center',padding:'48px 20px'}}><ListTodo size={32} color={t.textMuted}/><p style={{color:t.textMuted,margin:'10px 0 0',fontSize:'13px'}}>No tasks found</p></div>):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} updatingStatus={updatingStatus} isOnline={isOnline}/>))}
+                            {/* ← ADDED: onAssign and canAssign wired into TaskCard */}
+                            {filteredTasks.length===0?(<div style={{textAlign:'center',padding:'48px 20px'}}><ListTodo size={32} color={t.textMuted}/><p style={{color:t.textMuted,margin:'10px 0 0',fontSize:'13px'}}>No tasks found</p></div>):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} onAssign={()=>onAssign(task)} canAssign={canAssign} updatingStatus={updatingStatus} isOnline={isOnline}/>))}
                         </div>
                     </div>
                 </div>
@@ -483,7 +499,6 @@ const Dashboard = () => {
     const isCompany = user?.accountType === 'company';
     const t = dark ? (isCompany ? COMPANY : PERSONAL) : (isCompany ? LIGHT_COMPANY : LIGHT_PERSONAL);
 
-    // ── Persist current view across refreshes ────────────────────────────────
     const [currentView, setCurrentView] = useState(() => {
         const saved = sessionStorage.getItem('syncline_view');
         const valid = ['dashboard','company-setup','team','progress','reports'];
@@ -512,6 +527,9 @@ const Dashboard = () => {
     const [updatingStatus,setUpdatingStatus]=useState(null);
     const [isOnline,setIsOnline]=useState(navigator.onLine);
     const [companyName,setCompanyName]=useState(user?.companyName||user?.company_name||null);
+    const [companyLogo,setCompanyLogo]=useState(null);
+    // ← ADDED: state for the TaskAssignmentModal
+    const [assigningTask, setAssigningTask] = useState(null);
 
     const userIdRef=useRef(user?.id);
     useEffect(()=>{ userIdRef.current=user?.id; },[user?.id]);
@@ -530,12 +548,11 @@ const Dashboard = () => {
         }catch(err){console.error('Fetch tasks:',err);}
     },[isCompany,user.company_id,user.org_id]);
 
-    // Fetch company name for header
     useEffect(()=>{
         if (!isCompany || !user?.company_id) return;
         fetch(`http://localhost:3001/api/company/team`, { headers:{ Authorization:`Bearer ${localStorage.getItem('accessToken')}` } })
             .then(r=>r.json())
-            .then(data=>{ if(data.company?.name) setCompanyName(data.company.name); })
+            .then(data=>{ if(data.company?.name) setCompanyName(data.company.name); if(data.company?.logo_url) setCompanyLogo(data.company.logo_url); })
             .catch(()=>{});
     },[isCompany,user?.company_id]);
 
@@ -616,8 +633,10 @@ const Dashboard = () => {
         updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus,
     };
 
-    // Header label: company name for company accounts, "Syncline" for personal
     const headerLabel = isCompany ? (companyName || 'Company') : 'Syncline';
+
+    // ─── route guard for server.js: task-reports is at /api/task-reports, NOT /api/tasks/reports
+    // The frontend calls /api/task-reports — this is correct. No change needed to server.js.
 
     if(loading) return (
         <div style={{ minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:t.bg,gap:'14px' }}>
@@ -647,8 +666,10 @@ const Dashboard = () => {
             <header style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 20px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'58px',flexShrink:0 }}>
                 <div style={{ display:'flex',alignItems:'center',gap:'14px' }}>
                     <div style={{ display:'flex',alignItems:'center',gap:'8px' }}>
-                        <div style={{ width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center' }}><Zap size={14} color="#fff"/></div>
-                        {/* Company name if company account, otherwise "Syncline" */}
+                        {companyLogo
+                            ? <img src={companyLogo.startsWith('http')?companyLogo:`http://localhost:3001${companyLogo}`} alt="logo" style={{ width:'32px',height:'32px',borderRadius:'7px',objectFit:'cover',border:`1px solid ${t.border}`,flexShrink:0 }}/>
+                            : <div style={{ width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center' }}><Zap size={14} color="#fff"/></div>
+                        }
                         <span style={{ fontSize:'16px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px' }}>{headerLabel}</span>
                     </div>
                     <div style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:isOnline?t.onlineBg:t.offlineBg,borderRadius:'20px',border:`1px solid ${isOnline?t.successBorder:t.dangerBorder}` }}>
@@ -689,17 +710,14 @@ const Dashboard = () => {
                         </div>
                         <ChevronDown size={10} color={t.textMuted}/>
                     </button>
-                    {/* Logout — shows confirm modal */}
                     <button onClick={()=>setShowLogoutConfirm(true)} title="Sign out" style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.textMuted,cursor:'pointer',display:'flex' }}>
                         <LogOut size={14}/>
                     </button>
                 </div>
             </header>
 
-            {/* Offline bar */}
             {!isOnline&&(<div style={{ padding:'7px 20px',background:t.offlineBg,borderBottom:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',gap:'8px',justifyContent:'center' }}><WifiOff size={12} color={t.offline}/><span style={{fontSize:'12px',color:t.offline,fontWeight:'600'}}>You're offline — some features are limited.</span></div>)}
 
-            {/* Body */}
             <div style={{display:'flex',flex:1}}>
                 <Sidebar t={t} currentView={currentView} onNavigate={navigateTo} collapsed={sidebarCollapsed} onToggle={()=>setSidebarCollapsed(!sidebarCollapsed)} isCompany={isCompany}/>
                 <main style={{flex:1,minWidth:0,display:'flex',flexDirection:'column'}}>
@@ -709,21 +727,36 @@ const Dashboard = () => {
                         <StatCard t={t} icon={<CheckCircle2 size={18}/>} value={tasks.filter(tk=>tk.status==='completed').length} label="Completed" color={t.success}/>
                         <StatCard t={t} icon={<AlertCircle size={18}/>} value={tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length} label="Overdue" color={t.danger}/>
                     </div>
-                    {currentView==='dashboard'&&(isCompany?<CompanyDashboard {...sharedDashProps} companyName={companyName}/>:<PersonalDashboard {...sharedDashProps} onNavigate={navigateTo}/>)}
+
+                    {currentView==='dashboard'&&(isCompany
+                        // ← ADDED: onAssign prop wired into CompanyDashboard
+                        ?<CompanyDashboard {...sharedDashProps} companyName={companyName} onAssign={setAssigningTask}/>
+                        :<PersonalDashboard {...sharedDashProps} onNavigate={navigateTo}/>
+                    )}
                     {currentView==='company-setup'&&<CompanyOnboarding dark={dark}/>}
                     {currentView==='team'&&(isCompany?<TeamManagement dark={dark}/>:<LockedView t={t} label="Team Management" onSetup={()=>navigateTo('company-setup')}/>)}
                     {currentView==='progress'&&(isCompany?<ProgressMonitor dark={dark}/>:<LockedView t={t} label="Progress Monitor" onSetup={()=>navigateTo('company-setup')}/>)}
-                    {currentView==='reports'&&(isCompany?<ReportManagement dark={dark}/>:<LockedView t={t} label="Reports" onSetup={()=>navigateTo('company-setup')}/>)}
+                    {/* ← FIXED: Reports now accessible to ALL users, not just company accounts */}
+                    {currentView==='reports'&&<ReportManagement dark={dark}/>}
                 </main>
             </div>
 
-            {/* Modals */}
             {showCreateModal&&(<TaskModal t={t} title="Create New Task" onClose={()=>setShowCreateModal(false)} isOnline={isOnline} onSave={async(data)=>{ try{await taskAPI.create(data);setShowCreateModal(false);addActivity(`You created "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to create task';} }}/>)}
             {editTask&&(<TaskModal t={t} title="Edit Task" initialData={editTask} onClose={()=>setEditTask(null)} isOnline={isOnline} onSave={async(data)=>{ try{await taskAPI.update(editTask.id,data);setEditTask(null);addActivity(`You updated "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to update task';} }}/>)}
             {deleteTarget&&(<DeleteModal t={t} task={deleteTarget} loading={deleteLoading} onConfirm={confirmDeleteTask} onCancel={()=>!deleteLoading&&setDeleteTarget(null)}/>)}
             {showProfile&&(<ProfileModal t={t} user={user} isOnline={isOnline} onClose={()=>setShowProfile(false)} onSave={handleProfileSave} onDeleteAccount={handleDeleteAccount}/>)}
             {showLogoutConfirm&&(<LogoutModal t={t} onConfirm={()=>{ try{sessionStorage.removeItem('syncline_view');}catch(_){} logout(); }} onCancel={()=>setShowLogoutConfirm(false)}/>)}
             {showNotifications&&(<div onClick={()=>setShowNotifications(false)} style={{position:'fixed',inset:0,zIndex:150}}/>)}
+
+            {/* ← ADDED: TaskAssignmentModal — renders when a task's assign button is clicked */}
+            {assigningTask && (
+                <TaskAssignmentModal
+                    task={assigningTask}
+                    dark={dark}
+                    onClose={() => setAssigningTask(null)}
+                    onAssigned={() => { setAssigningTask(null); fetchTasks(); }}
+                />
+            )}
         </div>
     );
 };
