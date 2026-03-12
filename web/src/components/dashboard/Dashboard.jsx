@@ -495,7 +495,11 @@ const LockedView = ({ t, label, onSetup }) => (
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 const Dashboard = () => {
     const { user, logout, updateUser } = useAuth();
-    const [dark, setDark] = useState(true);
+    const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem('syncline_theme');
+    if (saved !== null) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+});
     const isCompany = user?.accountType === 'company';
     const t = dark ? (isCompany ? COMPANY : PERSONAL) : (isCompany ? LIGHT_COMPANY : LIGHT_PERSONAL);
 
@@ -685,7 +689,11 @@ const Dashboard = () => {
                 </div>
 
                 <div style={{ display:'flex',alignItems:'center',gap:'6px' }}>
-                    <button onClick={()=>setDark(!dark)} title="Toggle theme" style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+                    <button onClick={() => {
+    const next = !dark;
+    setDark(next);
+    localStorage.setItem('syncline_theme', next ? 'dark' : 'light');
+}} title="Toggle theme" style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
                         {dark?<Sun size={14}/>:<Moon size={14}/>}
                     </button>
                     <div style={{position:'relative'}}>

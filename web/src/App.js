@@ -21,8 +21,8 @@ const ProtectedRoute = ({ children }) => {
 
     if (loading) {
         return (
-            <div style={styles.loading}>
-                <div style={styles.spinner}></div>
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
                 <p>Loading Syncline...</p>
             </div>
         );
@@ -37,8 +37,8 @@ const PublicRoute = ({ children }) => {
 
     if (loading) {
         return (
-            <div style={styles.loading}>
-                <div style={styles.spinner}></div>
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
                 <p>Loading...</p>
             </div>
         );
@@ -137,24 +137,5 @@ function App() {
         </BrowserRouter>
     );
 }
-
-const styles = {
-    loading: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: '#f5f5f5'
-    },
-    spinner: {
-        width: '50px',
-        height: '50px',
-        border: '4px solid #f3f3f3',
-        borderTop: '4px solid #667eea',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite'
-    }
-};
 
 export default App;
