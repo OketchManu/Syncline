@@ -1,5 +1,5 @@
 // web/src/components/auth/Register.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Zap, CheckCircle2, Building2, UserCircle, ArrowLeft, Globe, FileText } from 'lucide-react';
@@ -19,6 +19,25 @@ const Register = () => {
     const [loading, setLoading] = useState(false);
     const { register } = useAuth();
     const navigate = useNavigate();
+
+    // ── Theme detection ──────────────────────────────────────────────────────
+    const [dark, setDark] = useState(() => {
+        const saved = localStorage.getItem('syncline_theme');
+        if (saved !== null) return saved === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = (e) => {
+            if (!localStorage.getItem('syncline_theme')) setDark(e.matches);
+        };
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+
+    const t = dark ? tokens.dark : tokens.light;
+    // ────────────────────────────────────────────────────────────────────────
 
     const INDUSTRIES = [
         'Technology','Healthcare','Finance','Education','Retail',
@@ -49,7 +68,7 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        
+
         if (password.length < 6) {
             setError('Password must be at least 6 characters');
             return;
@@ -66,7 +85,7 @@ const Register = () => {
         }
 
         setLoading(true);
-        
+
         const result = await register(
             email,
             password,
@@ -75,13 +94,13 @@ const Register = () => {
             accountType === 'company' ? companyName : null,
             accountType === 'company' ? { industry, description, website } : null
         );
-        
+
         if (result.success) {
             navigate('/dashboard');
         } else {
             setError(result.error);
         }
-        
+
         setLoading(false);
     };
 
@@ -90,12 +109,12 @@ const Register = () => {
     };
 
     return (
-        <div style={styles.container}>
+        <div style={{ ...styles.container, background: t.bg }}>
             {/* Animated background */}
             <div style={styles.bgAnimation}>
-                <div style={styles.circle1}></div>
-                <div style={styles.circle2}></div>
-                <div style={styles.circle3}></div>
+                <div style={{ ...styles.circle1, background: t.blob1 }}></div>
+                <div style={{ ...styles.circle2, background: t.blob2 }}></div>
+                <div style={{ ...styles.circle3, background: t.blob3 }}></div>
             </div>
 
             <div style={styles.content}>
@@ -104,27 +123,27 @@ const Register = () => {
                     <div style={styles.logoIcon}>
                         <Zap size={40} color="#fff" />
                     </div>
-                    <h1 style={styles.logo}>Syncline</h1>
-                    <p style={styles.tagline}>
+                    <h1 style={{ ...styles.logo, color: t.logoText }}>Syncline</h1>
+                    <p style={{ ...styles.tagline, color: t.muted }}>
                         {step === 1 ? 'Choose your account type' : 'Complete your registration'}
                     </p>
                 </div>
 
                 {/* Main card */}
-                <div style={styles.card}>
+                <div style={{ ...styles.card, background: t.cardBg, border: `1px solid ${t.border}`, boxShadow: t.cardShadow }}>
                     {step === 1 ? (
                         /* STEP 1: Account Type Selection */
                         <>
                             <div style={styles.cardHeader}>
-                                <h2 style={styles.title}>Get Started</h2>
-                                <p style={styles.subtitle}>Select the account type that fits your needs</p>
+                                <h2 style={{ ...styles.title, color: t.text }}>Get Started</h2>
+                                <p style={{ ...styles.subtitle, color: t.muted }}>Select the account type that fits your needs</p>
                             </div>
 
                             <div style={styles.accountTypeGrid}>
                                 {/* Personal Account */}
                                 <button
                                     type="button"
-                                    style={styles.accountTypeCard}
+                                    style={{ ...styles.accountTypeCard, background: t.accountCardBg, border: `2px solid ${t.accountCardBorder}` }}
                                     onClick={() => handleAccountTypeSelect('personal')}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.borderColor = '#6366f1';
@@ -132,7 +151,7 @@ const Register = () => {
                                         e.currentTarget.style.boxShadow = '0 10px 30px rgba(99, 102, 241, 0.2)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                        e.currentTarget.style.borderColor = t.accountCardBorder;
                                         e.currentTarget.style.transform = 'translateY(0)';
                                         e.currentTarget.style.boxShadow = 'none';
                                     }}
@@ -140,25 +159,25 @@ const Register = () => {
                                     <div style={styles.accountTypeIcon}>
                                         <UserCircle size={32} color="#6366f1" />
                                     </div>
-                                    <h3 style={styles.accountTypeTitle}>Personal</h3>
-                                    <p style={styles.accountTypeDescription}>
+                                    <h3 style={{ ...styles.accountTypeTitle, color: t.text }}>Personal</h3>
+                                    <p style={{ ...styles.accountTypeDescription, color: t.muted }}>
                                         Perfect for personal task management and productivity
                                     </p>
                                     <ul style={styles.featureList}>
                                         <li style={styles.featureItem}>
                                             <CheckCircle2 size={16} color="#10b981" />
-                                            <span>Personal task management</span>
+                                            <span style={{ color: t.muted }}>Personal task management</span>
                                         </li>
                                         <li style={styles.featureItem}>
                                             <CheckCircle2 size={16} color="#10b981" />
-                                            <span>Real-time updates</span>
+                                            <span style={{ color: t.muted }}>Real-time updates</span>
                                         </li>
                                         <li style={styles.featureItem}>
                                             <CheckCircle2 size={16} color="#10b981" />
-                                            <span>Priority tracking</span>
+                                            <span style={{ color: t.muted }}>Priority tracking</span>
                                         </li>
                                     </ul>
-                                    <div style={styles.selectButton}>
+                                    <div style={{ ...styles.selectButton, background: t.selectBtnBg, border: `1px solid ${t.selectBtnBorder}`, color: '#6366f1' }}>
                                         Select Personal →
                                     </div>
                                 </button>
@@ -183,26 +202,26 @@ const Register = () => {
                                     <div style={{...styles.accountTypeIcon, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)'}}>
                                         <Building2 size={32} color="#fff" />
                                     </div>
-                                    <h3 style={styles.accountTypeTitle}>Company</h3>
-                                    <p style={styles.accountTypeDescription}>
+                                    <h3 style={{ ...styles.accountTypeTitle, color: t.text }}>Company</h3>
+                                    <p style={{ ...styles.accountTypeDescription, color: t.muted }}>
                                         Complete solution for teams and organizations
                                     </p>
                                     <ul style={styles.featureList}>
                                         <li style={styles.featureItem}>
                                             <CheckCircle2 size={16} color="#10b981" />
-                                            <span>Team collaboration</span>
+                                            <span style={{ color: t.muted }}>Team collaboration</span>
                                         </li>
                                         <li style={styles.featureItem}>
                                             <CheckCircle2 size={16} color="#10b981" />
-                                            <span>Progress monitoring</span>
+                                            <span style={{ color: t.muted }}>Progress monitoring</span>
                                         </li>
                                         <li style={styles.featureItem}>
                                             <CheckCircle2 size={16} color="#10b981" />
-                                            <span>Advanced analytics</span>
+                                            <span style={{ color: t.muted }}>Advanced analytics</span>
                                         </li>
                                         <li style={styles.featureItem}>
                                             <CheckCircle2 size={16} color="#10b981" />
-                                            <span>Team management</span>
+                                            <span style={{ color: t.muted }}>Team management</span>
                                         </li>
                                     </ul>
                                     <div style={{...styles.selectButton, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff'}}>
@@ -213,9 +232,9 @@ const Register = () => {
 
                             {/* Footer */}
                             <div style={styles.footer}>
-                                <p style={styles.footerText}>
+                                <p style={{ ...styles.footerText, color: t.muted }}>
                                     Already have an account?{' '}
-                                    <span 
+                                    <span
                                         style={styles.link}
                                         onClick={() => navigate('/login')}
                                     >
@@ -231,35 +250,35 @@ const Register = () => {
                                 <button
                                     type="button"
                                     onClick={handleBackToType}
-                                    style={styles.backButton}
+                                    style={{ ...styles.backButton, background: t.inputBg, border: `1px solid ${t.border}`, color: t.muted }}
                                     title="Go back to account type selection"
                                 >
                                     <ArrowLeft size={16} />
                                     <span>Back</span>
                                 </button>
-                                <h2 style={styles.title}>
+                                <h2 style={{ ...styles.title, color: t.text }}>
                                     {accountType === 'company' ? '🏢 Company Account' : '👤 Personal Account'}
                                 </h2>
-                                <p style={styles.subtitle}>
-                                    {accountType === 'company' 
-                                        ? 'Set up your company workspace' 
+                                <p style={{ ...styles.subtitle, color: t.muted }}>
+                                    {accountType === 'company'
+                                        ? 'Set up your company workspace'
                                         : 'Create your personal account'}
                                 </p>
                             </div>
 
                             {/* Social signup — Google only */}
                             <div style={styles.socialButtons}>
-                                <button 
+                                <button
                                     type="button"
-                                    style={{ ...styles.socialBtn, width: '100%', justifyContent: 'center' }}
+                                    style={{ ...styles.socialBtn, width: '100%', justifyContent: 'center', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                     onClick={handleGoogleSignup}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                                        e.currentTarget.style.background = t.inputBgHover;
+                                        e.currentTarget.style.borderColor = t.borderHover;
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                        e.currentTarget.style.background = t.inputBg;
+                                        e.currentTarget.style.borderColor = t.border;
                                     }}
                                 >
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -272,8 +291,8 @@ const Register = () => {
                                 </button>
                             </div>
 
-                            <div style={styles.divider}>
-                                <span style={styles.dividerText}>or continue with email</span>
+                            <div style={{ ...styles.divider, borderTop: `1px solid ${t.border}` }}>
+                                <span style={{ ...styles.dividerText, background: t.cardBg, color: t.muted }}>or continue with email</span>
                             </div>
 
                             {/* Register form */}
@@ -281,15 +300,15 @@ const Register = () => {
                                 {accountType === 'company' && (
                                     <>
                                         <div style={styles.inputGroup}>
-                                            <label style={styles.label}>Company Name *</label>
+                                            <label style={{ ...styles.label, color: t.label }}>Company Name *</label>
                                             <div style={styles.inputWrapper}>
-                                                <Building2 size={20} style={styles.inputIcon} />
+                                                <Building2 size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                                 <input
                                                     type="text"
                                                     value={companyName}
                                                     onChange={(e) => setCompanyName(e.target.value)}
                                                     placeholder="Acme Inc."
-                                                    style={styles.input}
+                                                    style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                                     required
                                                     disabled={loading}
                                                 />
@@ -297,52 +316,52 @@ const Register = () => {
                                         </div>
 
                                         <div style={styles.inputGroup}>
-                                            <label style={styles.label}>Industry</label>
+                                            <label style={{ ...styles.label, color: t.label }}>Industry</label>
                                             <div style={styles.inputWrapper}>
                                                 <select
                                                     value={industry}
                                                     onChange={(e) => setIndustry(e.target.value)}
                                                     disabled={loading}
-                                                    style={{ ...styles.input, paddingLeft: '16px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', color: industry ? '#fff' : '#64748b' }}
+                                                    style={{ ...styles.input, paddingLeft: '16px', cursor: 'pointer', background: t.inputBg, color: industry ? t.text : t.iconColor, border: `1px solid ${t.border}` }}
                                                 >
                                                     <option value="">Select industry…</option>
                                                     {INDUSTRIES.map(i => (
-                                                        <option key={i} value={i} style={{ background: '#0a0e27', color: '#fff' }}>{i}</option>
+                                                        <option key={i} value={i} style={{ background: dark ? '#0a0e27' : '#fff', color: dark ? '#fff' : '#0f172a' }}>{i}</option>
                                                     ))}
                                                 </select>
                                             </div>
                                         </div>
 
                                         <div style={styles.inputGroup}>
-                                            <label style={styles.label}>
-                                                Website <span style={{ color: '#64748b', fontWeight: 400, fontSize: 12 }}>(optional)</span>
+                                            <label style={{ ...styles.label, color: t.label }}>
+                                                Website <span style={{ color: t.iconColor, fontWeight: 400, fontSize: 12 }}>(optional)</span>
                                             </label>
                                             <div style={styles.inputWrapper}>
-                                                <Globe size={20} style={styles.inputIcon} />
+                                                <Globe size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                                 <input
                                                     type="url"
                                                     value={website}
                                                     onChange={(e) => setWebsite(e.target.value)}
                                                     placeholder="https://yourcompany.com"
-                                                    style={styles.input}
+                                                    style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                                     disabled={loading}
                                                 />
                                             </div>
                                         </div>
 
                                         <div style={styles.inputGroup}>
-                                            <label style={styles.label}>
-                                                Description <span style={{ color: '#64748b', fontWeight: 400, fontSize: 12 }}>(optional)</span>
+                                            <label style={{ ...styles.label, color: t.label }}>
+                                                Description <span style={{ color: t.iconColor, fontWeight: 400, fontSize: 12 }}>(optional)</span>
                                             </label>
                                             <div style={styles.inputWrapper}>
-                                                <FileText size={20} style={{ ...styles.inputIcon, top: '14px', position: 'absolute' }} />
+                                                <FileText size={20} style={{ ...styles.inputIcon, top: '14px', position: 'absolute', color: t.iconColor }} />
                                                 <textarea
                                                     value={description}
                                                     onChange={(e) => setDescription(e.target.value)}
                                                     placeholder="What does your company do?"
                                                     disabled={loading}
                                                     rows={3}
-                                                    style={{ ...styles.input, paddingTop: '12px', resize: 'vertical', minHeight: '80px' }}
+                                                    style={{ ...styles.input, paddingTop: '12px', resize: 'vertical', minHeight: '80px', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                                 />
                                             </div>
                                         </div>
@@ -350,15 +369,15 @@ const Register = () => {
                                 )}
 
                                 <div style={styles.inputGroup}>
-                                    <label style={styles.label}>Full Name *</label>
+                                    <label style={{ ...styles.label, color: t.label }}>Full Name *</label>
                                     <div style={styles.inputWrapper}>
-                                        <User size={20} style={styles.inputIcon} />
+                                        <User size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                         <input
                                             type="text"
                                             value={fullName}
                                             onChange={(e) => setFullName(e.target.value)}
                                             placeholder="John Doe"
-                                            style={styles.input}
+                                            style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
                                             disabled={loading}
                                         />
@@ -366,15 +385,15 @@ const Register = () => {
                                 </div>
 
                                 <div style={styles.inputGroup}>
-                                    <label style={styles.label}>Email Address *</label>
+                                    <label style={{ ...styles.label, color: t.label }}>Email Address *</label>
                                     <div style={styles.inputWrapper}>
-                                        <Mail size={20} style={styles.inputIcon} />
+                                        <Mail size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                         <input
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
                                             placeholder="name@company.com"
-                                            style={styles.input}
+                                            style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
                                             disabled={loading}
                                         />
@@ -382,15 +401,15 @@ const Register = () => {
                                 </div>
 
                                 <div style={styles.inputGroup}>
-                                    <label style={styles.label}>Password *</label>
+                                    <label style={{ ...styles.label, color: t.label }}>Password *</label>
                                     <div style={styles.inputWrapper}>
-                                        <Lock size={20} style={styles.inputIcon} />
+                                        <Lock size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                         <input
                                             type={showPassword ? 'text' : 'password'}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             placeholder="Create a strong password"
-                                            style={styles.input}
+                                            style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
                                             disabled={loading}
                                             minLength={6}
@@ -398,16 +417,16 @@ const Register = () => {
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            style={styles.eyeBtn}
+                                            style={{ ...styles.eyeBtn, color: t.iconColor }}
                                         >
                                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                         </button>
                                     </div>
-                                    
+
                                     {password && (
                                         <div style={styles.strengthContainer}>
                                             <div style={styles.strengthBar}>
-                                                <div 
+                                                <div
                                                     style={{
                                                         ...styles.strengthFill,
                                                         width: `${passwordStrength.strength}%`,
@@ -429,8 +448,8 @@ const Register = () => {
                                     </div>
                                 )}
 
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     style={{...styles.submitBtn, ...(loading ? styles.submitBtnDisabled : {})}}
                                     disabled={loading}
                                     onMouseEnter={(e) => {
@@ -457,16 +476,16 @@ const Register = () => {
                                     )}
                                 </button>
 
-                                <p style={styles.terms}>
+                                <p style={{ ...styles.terms, color: t.iconColor }}>
                                     By signing up, you agree to our{' '}
-                                    <span 
+                                    <span
                                         style={styles.termsLink}
                                         onClick={() => alert('📄 Terms of Service - Coming soon!')}
                                     >
                                         Terms of Service
                                     </span>
                                     {' '}and{' '}
-                                    <span 
+                                    <span
                                         style={styles.termsLink}
                                         onClick={() => alert('🔒 Privacy Policy - Coming soon!')}
                                     >
@@ -476,9 +495,9 @@ const Register = () => {
                             </form>
 
                             <div style={styles.footer}>
-                                <p style={styles.footerText}>
+                                <p style={{ ...styles.footerText, color: t.muted }}>
                                     Already have an account?{' '}
-                                    <span 
+                                    <span
                                         style={styles.link}
                                         onClick={() => navigate('/login')}
                                     >
@@ -503,10 +522,60 @@ const Register = () => {
                 @keyframes spin {
                     to { transform: rotate(360deg); }
                 }
+                input::placeholder, textarea::placeholder { color: ${t.placeholder}; }
             `}</style>
         </div>
     );
 };
+
+// ── Theme tokens ─────────────────────────────────────────────────────────────
+const tokens = {
+    dark: {
+        bg:                '#0a0e27',
+        blob1:             'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+        blob2:             'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
+        blob3:             'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+        cardBg:            'rgba(15, 23, 42, 0.8)',
+        cardShadow:        '0 20px 60px rgba(0, 0, 0, 0.5)',
+        border:            'rgba(255, 255, 255, 0.1)',
+        borderHover:       'rgba(255, 255, 255, 0.2)',
+        text:              '#fff',
+        logoText:          '#fff',
+        label:             '#e2e8f0',
+        muted:             '#94a3b8',
+        iconColor:         '#64748b',
+        inputBg:           'rgba(255, 255, 255, 0.05)',
+        inputBgHover:      'rgba(255, 255, 255, 0.1)',
+        placeholder:       '#64748b',
+        accountCardBg:     'rgba(255, 255, 255, 0.03)',
+        accountCardBorder: 'rgba(255, 255, 255, 0.1)',
+        selectBtnBg:       'rgba(99, 102, 241, 0.1)',
+        selectBtnBorder:   'rgba(99, 102, 241, 0.3)',
+    },
+    light: {
+        bg:                '#f0f4ff',
+        blob1:             'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)',
+        blob2:             'radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)',
+        blob3:             'radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%)',
+        cardBg:            'rgba(255, 255, 255, 0.85)',
+        cardShadow:        '0 20px 60px rgba(99, 102, 241, 0.12)',
+        border:            'rgba(99, 102, 241, 0.15)',
+        borderHover:       'rgba(99, 102, 241, 0.3)',
+        text:              '#0f172a',
+        logoText:          '#0f172a',
+        label:             '#1e293b',
+        muted:             '#64748b',
+        iconColor:         '#94a3b8',
+        inputBg:           'rgba(241, 245, 249, 0.8)',
+        inputBgHover:      'rgba(226, 232, 240, 0.9)',
+        placeholder:       '#94a3b8',
+        accountCardBg:     'rgba(241, 245, 249, 0.6)',
+        accountCardBorder: 'rgba(99, 102, 241, 0.12)',
+        selectBtnBg:       'rgba(99, 102, 241, 0.08)',
+        selectBtnBorder:   'rgba(99, 102, 241, 0.25)',
+    },
+};
+// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = {
     container: {
@@ -514,7 +583,6 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#0a0e27',
         position: 'relative',
         overflow: 'hidden',
         padding: '20px'
@@ -530,7 +598,6 @@ const styles = {
         width: '500px',
         height: '500px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
         top: '-250px',
         right: '-250px',
         animation: 'float 20s infinite ease-in-out'
@@ -540,7 +607,6 @@ const styles = {
         width: '400px',
         height: '400px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
         bottom: '-200px',
         left: '-200px',
         animation: 'float 15s infinite ease-in-out reverse'
@@ -550,7 +616,6 @@ const styles = {
         width: '300px',
         height: '300px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
@@ -580,22 +645,17 @@ const styles = {
     logo: {
         fontSize: '32px',
         fontWeight: '700',
-        color: '#fff',
         margin: '0 0 8px 0',
         letterSpacing: '-0.5px'
     },
     tagline: {
-        color: '#94a3b8',
         fontSize: '14px',
         margin: 0
     },
     card: {
-        background: 'rgba(15, 23, 42, 0.8)',
         backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '24px',
         padding: '40px',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
     },
     cardHeader: {
         marginBottom: '30px',
@@ -605,10 +665,7 @@ const styles = {
         position: 'absolute',
         top: '-50px',
         left: '0',
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '8px',
-        color: '#94a3b8',
         padding: '8px 16px',
         fontSize: '14px',
         cursor: 'pointer',
@@ -620,12 +677,10 @@ const styles = {
     title: {
         fontSize: '24px',
         fontWeight: '600',
-        color: '#fff',
         margin: '0 0 8px 0'
     },
     subtitle: {
         fontSize: '14px',
-        color: '#94a3b8',
         margin: 0
     },
     accountTypeGrid: {
@@ -635,8 +690,6 @@ const styles = {
         marginBottom: '30px'
     },
     accountTypeCard: {
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: '2px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '16px',
         padding: '30px',
         cursor: 'pointer',
@@ -673,12 +726,10 @@ const styles = {
     accountTypeTitle: {
         fontSize: '20px',
         fontWeight: '600',
-        color: '#fff',
         margin: '0 0 8px 0'
     },
     accountTypeDescription: {
         fontSize: '14px',
-        color: '#94a3b8',
         margin: '0 0 20px 0',
         lineHeight: '1.5'
     },
@@ -693,15 +744,11 @@ const styles = {
         alignItems: 'center',
         gap: '10px',
         fontSize: '13px',
-        color: '#94a3b8',
         marginBottom: '10px'
     },
     selectButton: {
         padding: '12px 20px',
-        background: 'rgba(99, 102, 241, 0.1)',
-        border: '1px solid rgba(99, 102, 241, 0.3)',
         borderRadius: '10px',
-        color: '#6366f1',
         fontSize: '14px',
         fontWeight: '600',
         transition: 'all 0.3s'
@@ -711,10 +758,7 @@ const styles = {
     },
     socialBtn: {
         padding: '12px',
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '12px',
-        color: '#fff',
         fontSize: '14px',
         fontWeight: '500',
         cursor: 'pointer',
@@ -727,17 +771,14 @@ const styles = {
         position: 'relative',
         textAlign: 'center',
         margin: '24px 0',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)'
     },
     dividerText: {
         position: 'absolute',
         top: '-10px',
         left: '50%',
         transform: 'translateX(-50%)',
-        background: 'rgba(15, 23, 42, 0.8)',
         padding: '0 12px',
         fontSize: '12px',
-        color: '#94a3b8'
     },
     form: {
         display: 'flex',
@@ -752,7 +793,6 @@ const styles = {
     label: {
         fontSize: '14px',
         fontWeight: '500',
-        color: '#e2e8f0'
     },
     inputWrapper: {
         position: 'relative',
@@ -762,17 +802,13 @@ const styles = {
     inputIcon: {
         position: 'absolute',
         left: '16px',
-        color: '#64748b',
         pointerEvents: 'none'
     },
     input: {
         width: '100%',
         padding: '14px 16px 14px 48px',
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '12px',
         fontSize: '15px',
-        color: '#fff',
         outline: 'none',
         transition: 'all 0.3s',
         boxSizing: 'border-box',
@@ -783,7 +819,6 @@ const styles = {
         right: '12px',
         background: 'none',
         border: 'none',
-        color: '#64748b',
         cursor: 'pointer',
         padding: '8px',
         display: 'flex',
@@ -854,7 +889,6 @@ const styles = {
     },
     terms: {
         fontSize: '12px',
-        color: '#64748b',
         textAlign: 'center',
         margin: '0'
     },
@@ -869,7 +903,6 @@ const styles = {
     },
     footerText: {
         fontSize: '14px',
-        color: '#94a3b8'
     },
     link: {
         color: '#6366f1',

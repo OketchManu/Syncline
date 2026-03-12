@@ -1,5 +1,5 @@
 // web/src/components/auth/Login.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Zap } from 'lucide-react';
@@ -13,19 +13,38 @@ const Login = () => {
     const { login } = useAuth();
     const navigate = useNavigate();
 
+    // ── Theme detection ──────────────────────────────────────────────────────
+    const [dark, setDark] = useState(() => {
+        const saved = localStorage.getItem('syncline_theme');
+        if (saved !== null) return saved === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = (e) => {
+            if (!localStorage.getItem('syncline_theme')) setDark(e.matches);
+        };
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+
+    const t = dark ? tokens.dark : tokens.light;
+    // ────────────────────────────────────────────────────────────────────────
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
         const result = await login(email, password);
-        
+
         if (result.success) {
             navigate('/dashboard');
         } else {
             setError(result.error);
         }
-        
+
         setLoading(false);
     };
 
@@ -34,12 +53,12 @@ const Login = () => {
     };
 
     return (
-        <div style={styles.container}>
+        <div style={{ ...styles.container, background: t.bg }}>
             {/* Animated background */}
             <div style={styles.bgAnimation}>
-                <div style={styles.circle1}></div>
-                <div style={styles.circle2}></div>
-                <div style={styles.circle3}></div>
+                <div style={{ ...styles.circle1, background: t.blob1 }}></div>
+                <div style={{ ...styles.circle2, background: t.blob2 }}></div>
+                <div style={{ ...styles.circle3, background: t.blob3 }}></div>
             </div>
 
             <div style={styles.content}>
@@ -48,22 +67,22 @@ const Login = () => {
                     <div style={styles.logoIcon}>
                         <Zap size={40} color="#fff" />
                     </div>
-                    <h1 style={styles.logo}>Syncline</h1>
-                    <p style={styles.tagline}>Real-Time Operations Platform</p>
+                    <h1 style={{ ...styles.logo, color: t.logoText }}>Syncline</h1>
+                    <p style={{ ...styles.tagline, color: t.muted }}>Real-Time Operations Platform</p>
                 </div>
 
                 {/* Main card */}
-                <div style={styles.card}>
+                <div style={{ ...styles.card, background: t.cardBg, border: `1px solid ${t.border}`, boxShadow: t.cardShadow }}>
                     <div style={styles.cardHeader}>
-                        <h2 style={styles.title}>Welcome Back</h2>
-                        <p style={styles.subtitle}>Sign in to continue to your workspace</p>
+                        <h2 style={{ ...styles.title, color: t.text }}>Welcome Back</h2>
+                        <p style={{ ...styles.subtitle, color: t.muted }}>Sign in to continue to your workspace</p>
                     </div>
 
                     {/* Social login — Google only */}
                     <div style={styles.socialButtons}>
-                        <button 
+                        <button
                             type="button"
-                            style={{ ...styles.socialBtn, width: '100%', justifyContent: 'center' }}
+                            style={{ ...styles.socialBtn, width: '100%', justifyContent: 'center', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                             onClick={handleGoogleLogin}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -76,22 +95,22 @@ const Login = () => {
                         </button>
                     </div>
 
-                    <div style={styles.divider}>
-                        <span style={styles.dividerText}>or continue with email</span>
+                    <div style={{ ...styles.divider, borderTop: `1px solid ${t.border}` }}>
+                        <span style={{ ...styles.dividerText, background: t.cardBg, color: t.muted }}>or continue with email</span>
                     </div>
 
                     {/* Login form */}
                     <form onSubmit={handleSubmit} style={styles.form}>
                         <div style={styles.inputGroup}>
-                            <label style={styles.label}>Email Address</label>
+                            <label style={{ ...styles.label, color: t.label }}>Email Address</label>
                             <div style={styles.inputWrapper}>
-                                <Mail size={20} style={styles.inputIcon} />
+                                <Mail size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="name@company.com"
-                                    style={styles.input}
+                                    style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                     required
                                     disabled={loading}
                                 />
@@ -100,8 +119,8 @@ const Login = () => {
 
                         <div style={styles.inputGroup}>
                             <div style={styles.labelRow}>
-                                <label style={styles.label}>Password</label>
-                                <span 
+                                <label style={{ ...styles.label, color: t.label }}>Password</label>
+                                <span
                                     style={styles.forgotLink}
                                     onClick={() => navigate('/forgot-password')}
                                 >
@@ -109,20 +128,20 @@ const Login = () => {
                                 </span>
                             </div>
                             <div style={styles.inputWrapper}>
-                                <Lock size={20} style={styles.inputIcon} />
+                                <Lock size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    style={styles.input}
+                                    style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                     required
                                     disabled={loading}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    style={styles.eyeBtn}
+                                    style={{ ...styles.eyeBtn, color: t.iconColor }}
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
@@ -136,8 +155,8 @@ const Login = () => {
                             </div>
                         )}
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             style={{...styles.submitBtn, ...(loading ? styles.submitBtnDisabled : {})}}
                             disabled={loading}
                         >
@@ -157,9 +176,9 @@ const Login = () => {
 
                     {/* Footer */}
                     <div style={styles.footer}>
-                        <p style={styles.footerText}>
+                        <p style={{ ...styles.footerText, color: t.muted }}>
                             Don't have an account?{' '}
-                            <span 
+                            <span
                                 style={styles.link}
                                 onClick={() => navigate('/register')}
                             >
@@ -169,9 +188,61 @@ const Login = () => {
                     </div>
                 </div>
             </div>
+
+            <style>{`
+                @keyframes float {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(20px); }
+                }
+                @keyframes pulse {
+                    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+                    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.3; }
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+                input::placeholder { color: ${t.placeholder}; }
+            `}</style>
         </div>
     );
 };
+
+// ── Theme tokens ─────────────────────────────────────────────────────────────
+const tokens = {
+    dark: {
+        bg:          '#0a0e27',
+        blob1:       'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+        blob2:       'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
+        blob3:       'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+        cardBg:      'rgba(15, 23, 42, 0.8)',
+        cardShadow:  '0 20px 60px rgba(0, 0, 0, 0.5)',
+        border:      'rgba(255, 255, 255, 0.1)',
+        text:        '#fff',
+        logoText:    '#fff',
+        label:       '#e2e8f0',
+        muted:       '#94a3b8',
+        iconColor:   '#64748b',
+        inputBg:     'rgba(255, 255, 255, 0.05)',
+        placeholder: '#64748b',
+    },
+    light: {
+        bg:          '#f0f4ff',
+        blob1:       'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)',
+        blob2:       'radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)',
+        blob3:       'radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%)',
+        cardBg:      'rgba(255, 255, 255, 0.85)',
+        cardShadow:  '0 20px 60px rgba(99, 102, 241, 0.12)',
+        border:      'rgba(99, 102, 241, 0.15)',
+        text:        '#0f172a',
+        logoText:    '#0f172a',
+        label:       '#1e293b',
+        muted:       '#64748b',
+        iconColor:   '#94a3b8',
+        inputBg:     'rgba(241, 245, 249, 0.8)',
+        placeholder: '#94a3b8',
+    },
+};
+// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = {
     container: {
@@ -179,7 +250,6 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#0a0e27',
         position: 'relative',
         overflow: 'hidden',
         padding: '20px'
@@ -195,7 +265,6 @@ const styles = {
         width: '500px',
         height: '500px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
         top: '-250px',
         left: '-250px',
         animation: 'float 20s infinite ease-in-out'
@@ -205,7 +274,6 @@ const styles = {
         width: '400px',
         height: '400px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
         bottom: '-200px',
         right: '-200px',
         animation: 'float 15s infinite ease-in-out reverse'
@@ -215,7 +283,6 @@ const styles = {
         width: '300px',
         height: '300px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
@@ -245,22 +312,17 @@ const styles = {
     logo: {
         fontSize: '32px',
         fontWeight: '700',
-        color: '#fff',
         margin: '0 0 8px 0',
         letterSpacing: '-0.5px'
     },
     tagline: {
-        color: '#94a3b8',
         fontSize: '14px',
         margin: 0
     },
     card: {
-        background: 'rgba(15, 23, 42, 0.8)',
         backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '24px',
         padding: '40px',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
     },
     cardHeader: {
         marginBottom: '30px'
@@ -268,12 +330,10 @@ const styles = {
     title: {
         fontSize: '24px',
         fontWeight: '600',
-        color: '#fff',
         margin: '0 0 8px 0'
     },
     subtitle: {
         fontSize: '14px',
-        color: '#94a3b8',
         margin: 0
     },
     socialButtons: {
@@ -281,10 +341,7 @@ const styles = {
     },
     socialBtn: {
         padding: '12px',
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '12px',
-        color: '#fff',
         fontSize: '14px',
         fontWeight: '500',
         cursor: 'pointer',
@@ -297,17 +354,14 @@ const styles = {
         position: 'relative',
         textAlign: 'center',
         margin: '24px 0',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)'
     },
     dividerText: {
         position: 'absolute',
         top: '-10px',
         left: '50%',
         transform: 'translateX(-50%)',
-        background: 'rgba(15, 23, 42, 0.8)',
         padding: '0 12px',
         fontSize: '12px',
-        color: '#94a3b8'
     },
     form: {
         display: 'flex',
@@ -327,7 +381,6 @@ const styles = {
     label: {
         fontSize: '14px',
         fontWeight: '500',
-        color: '#e2e8f0'
     },
     forgotLink: {
         fontSize: '13px',
@@ -344,26 +397,23 @@ const styles = {
     inputIcon: {
         position: 'absolute',
         left: '16px',
-        color: '#64748b',
         pointerEvents: 'none'
     },
     input: {
         width: '100%',
         padding: '14px 16px 14px 48px',
-        background: 'rgba(255, 255, 255, 0.05)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '12px',
         fontSize: '15px',
-        color: '#fff',
         outline: 'none',
-        transition: 'all 0.3s'
+        transition: 'all 0.3s',
+        boxSizing: 'border-box',
+        fontFamily: 'inherit'
     },
     eyeBtn: {
         position: 'absolute',
         right: '12px',
         background: 'none',
         border: 'none',
-        color: '#64748b',
         cursor: 'pointer',
         padding: '8px',
         display: 'flex',
@@ -415,7 +465,6 @@ const styles = {
     },
     footerText: {
         fontSize: '14px',
-        color: '#94a3b8'
     },
     link: {
         color: '#6366f1',

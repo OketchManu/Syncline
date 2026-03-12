@@ -9,6 +9,83 @@ const path = require('path');
 const fs = require('fs');
 
 // ─────────────────────────────────────────────────────────────────
+// NODEMAILER — invite email sending
+// ─────────────────────────────────────────────────────────────────
+let transporter = null;
+try {
+    const nodemailer = require('nodemailer');
+    if (process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        transporter = nodemailer.createTransport({
+            host:   process.env.EMAIL_HOST,
+            port:   parseInt(process.env.EMAIL_PORT || '587'),
+            secure: false,
+            auth:   { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        });
+        console.log('✅ Email transporter ready (SMTP)');
+    } else {
+        // Dev mode: log invite URLs to console instead of sending email
+        console.log('ℹ️  No EMAIL_* env vars — invite links will be logged to console');
+    }
+} catch (e) {
+    console.log('ℹ️  nodemailer not available — invite links will be logged to console');
+}
+
+async function sendInviteEmail({ toEmail, inviterName, companyName, role, inviteCode }) {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const joinUrl  = `${FRONTEND_URL}/join/${inviteCode}`;
+    const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+
+    const html = `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f172a;color:#e2e8f0;border-radius:16px;overflow:hidden;">
+            <div style="background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);padding:40px;text-align:center;">
+                <div style="font-size:36px;font-weight:800;color:#fff;letter-spacing:-1px;">⚡ Syncline</div>
+                <p style="color:rgba(255,255,255,0.8);margin:8px 0 0;font-size:14px;">Real-Time Operations Platform</p>
+            </div>
+            <div style="padding:40px;">
+                <h2 style="margin:0 0 16px;font-size:22px;color:#fff;">You've been invited!</h2>
+                <p style="color:#94a3b8;font-size:15px;line-height:1.6;margin:0 0 24px;">
+                    <strong style="color:#e2e8f0;">${inviterName}</strong> has invited you to join
+                    <strong style="color:#e2e8f0;">${companyName}</strong> on Syncline as a
+                    <strong style="color:#a5b4fc;">${roleLabel}</strong>.
+                </p>
+                <div style="text-align:center;margin:32px 0;">
+                    <a href="${joinUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600;box-shadow:0 4px 20px rgba(99,102,241,0.4);">
+                        Accept Invitation →
+                    </a>
+                </div>
+                <p style="color:#64748b;font-size:12px;text-align:center;margin:0;">
+                    This invite expires in 7 days. If the button doesn't work, copy this link:<br/>
+                    <a href="${joinUrl}" style="color:#6366f1;">${joinUrl}</a>
+                </p>
+            </div>
+            <div style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);text-align:center;">
+                <p style="color:#475569;font-size:12px;margin:0;">If you didn't expect this email, you can safely ignore it.</p>
+            </div>
+        </div>`;
+
+    const text = `You've been invited to join ${companyName} on Syncline as ${roleLabel}.\n\nAccept here: ${joinUrl}\n\nThis invite expires in 7 days.`;
+
+    if (!transporter) {
+        console.log(`📧 [EMAIL NOT SENT - no transporter] To: ${toEmail} | Join URL: ${joinUrl}`);
+        return { logged: true, joinUrl };
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from:    process.env.EMAIL_FROM || `"Syncline" <${process.env.EMAIL_USER || 'noreply@syncline.app'}>`,
+            to:      toEmail,
+            subject: `You're invited to join ${companyName} on Syncline`,
+            text,
+            html,
+        });
+        return { messageId: info.messageId };
+    } catch (e) {
+        console.error('❌ Email send failed:', e.message);
+        return { error: e.message };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // MULTER — logo uploads
 // ─────────────────────────────────────────────────────────────────
 let uploadLogo = (req, res, next) => next(); // no-op fallback
@@ -86,6 +163,25 @@ db.run(`
         UNIQUE(company_id, user_id)
     )
 `, [], (err) => { if (err && !err.message.includes('already exists')) console.error('join_requests table:', err.message); });
+
+// ─────────────────────────────────────────────────────────────────
+// STARTUP DDL — team_invitations table
+// ─────────────────────────────────────────────────────────────────
+db.run(`
+    CREATE TABLE IF NOT EXISTS team_invitations (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id   INTEGER NOT NULL,
+        email        TEXT NOT NULL,
+        invite_code  TEXT NOT NULL UNIQUE,
+        invited_by   INTEGER NOT NULL,
+        role         TEXT NOT NULL DEFAULT 'member',
+        status       TEXT NOT NULL DEFAULT 'pending'
+                     CHECK(status IN ('pending','accepted','expired','revoked')),
+        expires_at   TEXT NOT NULL,
+        used_at      TEXT,
+        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+`, [], (err) => { if (err && !err.message.includes('already exists')) console.error('team_invitations table:', err.message); });
 
 // Add columns that may not exist yet (ALTER TABLE fails silently if column exists)
 db.run(`ALTER TABLE users     ADD COLUMN join_status  TEXT`,  [], () => {});
@@ -231,19 +327,77 @@ router.post('/team/invite', authenticateToken, requireRole('owner', 'admin'), as
         await runQuery(
             `INSERT INTO team_invitations (company_id, email, invite_code, invited_by, role, status, expires_at, created_at)
              VALUES (?, ?, ?, ?, ?, 'pending', ?, datetime('now'))`,
-            [req.user.company_id, email, inviteCode, req.user.id, role, 'pending', expiresAt.toISOString()]
+            [req.user.company_id, email, inviteCode, req.user.id, role, expiresAt.toISOString()]
         );
 
-        console.log(`✅ Invitation sent to ${email} with code ${inviteCode}`);
+        // ── Respond immediately, send email in background ────────────────
+        const inviter = await getOne('SELECT full_name, email FROM users WHERE id = ?', [req.user.id]);
+        const company = await getOne('SELECT name FROM companies WHERE id = ?', [req.user.company_id]);
 
+        console.log(`✅ Invitation created for ${email} with code ${inviteCode}`);
+
+        // Respond to client right away — don't await email
         res.json({
             message: 'Invitation sent successfully',
             invitation: { email, role, invite_code: inviteCode, expires_at: expiresAt }
         });
 
+        // Fire-and-forget email (won't block or fail the request)
+        sendInviteEmail({
+            toEmail:     email,
+            inviterName: inviter?.full_name || inviter?.email || 'A team admin',
+            companyName: company?.name || 'the company',
+            role,
+            inviteCode,
+        }).then(emailRes => {
+            if (emailRes?.previewUrl) console.log(`📧 Email preview: ${emailRes.previewUrl}`);
+            else if (emailRes?.logged) console.log(`📧 Email logged (no transporter) — join URL: http://localhost:3000/join/${inviteCode}`);
+            else if (emailRes?.error) console.error(`📧 Email failed: ${emailRes.error}`);
+        }).catch(e => console.error('📧 Email error:', e.message));
+
     } catch (error) {
         console.error('❌ Invite error:', error.message);
         res.status(500).json({ error: 'Failed to send invitation', details: error.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/company/invite-info/:code  (PUBLIC — no auth required)
+// Frontend uses this to preview the invite before the user logs in
+// ─────────────────────────────────────────────────────────────────
+router.get('/invite-info/:code', async (req, res) => {
+    try {
+        const code = req.params.code.toUpperCase().trim();
+
+        const invitation = await getOne(
+            `SELECT ti.role, ti.expires_at, ti.status,
+                    c.name as company_name,
+                    u.full_name as inviter_name, u.email as inviter_email
+             FROM team_invitations ti
+             JOIN companies c ON ti.company_id = c.id
+             LEFT JOIN users u ON ti.invited_by = u.id
+             WHERE ti.invite_code = ?`,
+            [code]
+        );
+
+        if (!invitation)
+            return res.status(404).json({ error: 'Invalid invite link' });
+
+        if (invitation.status !== 'pending')
+            return res.status(400).json({ error: `This invite has already been ${invitation.status}` });
+
+        if (new Date(invitation.expires_at) < new Date())
+            return res.status(400).json({ error: 'This invite link has expired' });
+
+        res.json({
+            companyName:  invitation.company_name,
+            role:         invitation.role,
+            inviterName:  invitation.inviter_name || invitation.inviter_email || null,
+            expiresAt:    invitation.expires_at,
+        });
+    } catch (error) {
+        console.error('❌ Invite info error:', error.message);
+        res.status(500).json({ error: 'Failed to load invite info' });
     }
 });
 

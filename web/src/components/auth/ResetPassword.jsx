@@ -24,6 +24,25 @@ const ResetPassword = () => {
     const [done,         setDone]         = useState(false);
     const [error,        setError]        = useState('');
 
+    // ── Theme detection ──────────────────────────────────────────────────────
+    const [dark, setDark] = useState(() => {
+        const saved = localStorage.getItem('syncline_theme');
+        if (saved !== null) return saved === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = (e) => {
+            if (!localStorage.getItem('syncline_theme')) setDark(e.matches);
+        };
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+
+    const t = dark ? tokens.dark : tokens.light;
+    // ────────────────────────────────────────────────────────────────────────
+
     // Redirect if no token in URL
     useEffect(() => {
         if (!token) navigate('/forgot-password');
@@ -57,7 +76,7 @@ const ResetPassword = () => {
     };
 
     return (
-        <div style={s.page}>
+        <div style={{ ...s.page, background: t.bg }}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
                 @keyframes spin   { to { transform:rotate(360deg); } }
@@ -66,13 +85,14 @@ const ResetPassword = () => {
                 @keyframes popIn  { 0% { transform:scale(0.6); opacity:0; } 100% { transform:scale(1); opacity:1; } }
                 .rp-input:focus   { border-color:#6366f1 !important; box-shadow:0 0 0 3px rgba(99,102,241,0.18) !important; outline:none; }
                 .rp-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 28px rgba(99,102,241,0.5) !important; }
+                .rp-input::placeholder { color: ${t.placeholder}; }
             `}</style>
 
             {/* Background blobs */}
             <div style={{ position:'absolute', inset:0, overflow:'hidden', pointerEvents:'none' }}>
                 {[
-                    { w:600, h:600, top:'-200px', left:'-180px', c:'rgba(99,102,241,0.11)' },
-                    { w:450, h:450, bottom:'-160px', right:'-160px', c:'rgba(139,92,246,0.09)' },
+                    { w:600, h:600, top:'-200px', left:'-180px', c: t.blobColor1 },
+                    { w:450, h:450, bottom:'-160px', right:'-160px', c: t.blobColor2 },
                 ].map((b,i) => (
                     <div key={i} style={{
                         position:'absolute', width:b.w, height:b.h, borderRadius:'50%',
@@ -87,37 +107,37 @@ const ResetPassword = () => {
                 {/* Brand */}
                 <div style={s.brand}>
                     <div style={s.brandIcon}><Zap size={26} color="#fff" strokeWidth={2.5}/></div>
-                    <span style={s.brandName}>Syncline</span>
+                    <span style={{ ...s.brandName, color: t.logoText }}>Syncline</span>
                 </div>
 
-                <div style={s.card}>
+                <div style={{ ...s.card, background: t.cardBg, border: `1px solid ${t.border}`, boxShadow: t.cardShadow }}>
                     {!done ? (
                         <>
                             <div style={{ marginBottom:'28px' }}>
-                                <div style={s.iconWrap}>
+                                <div style={{ ...s.iconWrap, background: t.iconWrapBg, border: `1px solid ${t.iconWrapBorder}` }}>
                                     <ShieldCheck size={22} color="#6366f1"/>
                                 </div>
-                                <h2 style={s.title}>Set a new password</h2>
-                                <p style={s.sub}>Choose something secure that you haven't used before.</p>
+                                <h2 style={{ ...s.title, color: t.text }}>Set a new password</h2>
+                                <p style={{ ...s.sub, color: t.muted }}>Choose something secure that you haven't used before.</p>
                             </div>
 
                             <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
                                 {/* New password */}
                                 <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-                                    <label style={s.label}>New password</label>
+                                    <label style={{ ...s.label, color: t.label }}>New password</label>
                                     <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
-                                        <Lock size={16} style={{ position:'absolute', left:'14px', color:'#64748b', pointerEvents:'none' }}/>
+                                        <Lock size={16} style={{ position:'absolute', left:'14px', color: t.iconColor, pointerEvents:'none' }}/>
                                         <input
                                             className="rp-input"
                                             type={showPw ? 'text' : 'password'}
                                             value={password}
                                             onChange={e => setPassword(e.target.value)}
                                             placeholder="Min. 8 characters"
-                                            style={{ ...s.input, paddingRight:'44px' }}
+                                            style={{ ...s.input, paddingRight:'44px', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required disabled={loading}
                                         />
                                         <button type="button" onClick={() => setShowPw(!showPw)} style={s.eyeBtn}>
-                                            {showPw ? <EyeOff size={16} color="#64748b"/> : <Eye size={16} color="#64748b"/>}
+                                            {showPw ? <EyeOff size={16} color={t.iconColor}/> : <Eye size={16} color={t.iconColor}/>}
                                         </button>
                                     </div>
 
@@ -128,7 +148,7 @@ const ResetPassword = () => {
                                                 {[1,2,3].map(i => (
                                                     <div key={i} style={{
                                                         flex:1, height:'3px', borderRadius:'2px',
-                                                        background: i <= strength ? strengthColors[strength] : 'rgba(255,255,255,0.08)',
+                                                        background: i <= strength ? strengthColors[strength] : t.strengthBarBg,
                                                         transition:'background 0.25s',
                                                     }}/>
                                                 ))}
@@ -139,10 +159,10 @@ const ResetPassword = () => {
                                                 </span>
                                                 <div style={{ display:'flex', gap:'10px' }}>
                                                     {rules.map((r,i) => (
-                                                        <span key={i} style={{ display:'flex', alignItems:'center', gap:'3px', fontSize:'10px', color: r.test(password) ? '#10b981' : '#475569' }}>
+                                                        <span key={i} style={{ display:'flex', alignItems:'center', gap:'3px', fontSize:'10px', color: r.test(password) ? '#10b981' : t.ruleInactive }}>
                                                             {r.test(password)
                                                                 ? <CheckCircle size={10} color="#10b981"/>
-                                                                : <XCircle    size={10} color="#475569"/>
+                                                                : <XCircle    size={10} color={t.ruleInactive}/>
                                                             }
                                                             {r.label}
                                                         </span>
@@ -155,9 +175,9 @@ const ResetPassword = () => {
 
                                 {/* Confirm password */}
                                 <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-                                    <label style={s.label}>Confirm password</label>
+                                    <label style={{ ...s.label, color: t.label }}>Confirm password</label>
                                     <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
-                                        <Lock size={16} style={{ position:'absolute', left:'14px', color:'#64748b', pointerEvents:'none' }}/>
+                                        <Lock size={16} style={{ position:'absolute', left:'14px', color: t.iconColor, pointerEvents:'none' }}/>
                                         <input
                                             className="rp-input"
                                             type={showConfirm ? 'text' : 'password'}
@@ -166,17 +186,19 @@ const ResetPassword = () => {
                                             placeholder="Re-enter your password"
                                             style={{
                                                 ...s.input, paddingRight:'44px',
+                                                background: t.inputBg,
+                                                color: t.text,
                                                 ...(confirm && confirm !== password
-                                                    ? { borderColor:'rgba(239,68,68,0.4)' }
+                                                    ? { border:'1px solid rgba(239,68,68,0.4)' }
                                                     : confirm && confirm === password
-                                                        ? { borderColor:'rgba(16,185,129,0.4)' }
-                                                        : {}
+                                                        ? { border:'1px solid rgba(16,185,129,0.4)' }
+                                                        : { border: `1px solid ${t.border}` }
                                                 ),
                                             }}
                                             required disabled={loading}
                                         />
                                         <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={s.eyeBtn}>
-                                            {showConfirm ? <EyeOff size={16} color="#64748b"/> : <Eye size={16} color="#64748b"/>}
+                                            {showConfirm ? <EyeOff size={16} color={t.iconColor}/> : <Eye size={16} color={t.iconColor}/>}
                                         </button>
                                     </div>
                                     {confirm && confirm !== password && (
@@ -212,8 +234,8 @@ const ResetPassword = () => {
                             <div style={{ ...s.successIcon, animation:'popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both' }}>
                                 <CheckCircle size={32} color="#10b981" strokeWidth={2}/>
                             </div>
-                            <h2 style={{ ...s.title, marginBottom:'10px' }}>Password updated!</h2>
-                            <p style={{ ...s.sub, marginBottom:'28px' }}>
+                            <h2 style={{ ...s.title, marginBottom:'10px', color: t.text }}>Password updated!</h2>
+                            <p style={{ ...s.sub, marginBottom:'28px', color: t.muted }}>
                                 Your password has been reset successfully. You can now sign in with your new password.
                             </p>
                             <button className="rp-btn" onClick={() => navigate('/login')} style={{ ...s.submitBtn, width:'100%' }}>
@@ -227,10 +249,53 @@ const ResetPassword = () => {
     );
 };
 
+// ── Theme tokens ─────────────────────────────────────────────────────────────
+const tokens = {
+    dark: {
+        bg:             '#080c1a',
+        blobColor1:     'rgba(99,102,241,0.11)',
+        blobColor2:     'rgba(139,92,246,0.09)',
+        cardBg:         'rgba(15,23,42,0.88)',
+        cardShadow:     '0 24px 64px rgba(0,0,0,0.6)',
+        border:         'rgba(255,255,255,0.08)',
+        text:           '#f1f5f9',
+        logoText:       '#f1f5f9',
+        label:          '#94a3b8',
+        muted:          '#64748b',
+        iconColor:      '#64748b',
+        inputBg:        'rgba(255,255,255,0.05)',
+        placeholder:    '#475569',
+        iconWrapBg:     'rgba(99,102,241,0.12)',
+        iconWrapBorder: 'rgba(99,102,241,0.2)',
+        strengthBarBg:  'rgba(255,255,255,0.08)',
+        ruleInactive:   '#475569',
+    },
+    light: {
+        bg:             '#f0f4ff',
+        blobColor1:     'rgba(99,102,241,0.10)',
+        blobColor2:     'rgba(139,92,246,0.08)',
+        cardBg:         'rgba(255,255,255,0.88)',
+        cardShadow:     '0 24px 64px rgba(99,102,241,0.12)',
+        border:         'rgba(99,102,241,0.15)',
+        text:           '#0f172a',
+        logoText:       '#0f172a',
+        label:          '#475569',
+        muted:          '#64748b',
+        iconColor:      '#94a3b8',
+        inputBg:        'rgba(241,245,249,0.8)',
+        placeholder:    '#94a3b8',
+        iconWrapBg:     'rgba(99,102,241,0.08)',
+        iconWrapBorder: 'rgba(99,102,241,0.15)',
+        strengthBarBg:  'rgba(99,102,241,0.08)',
+        ruleInactive:   '#94a3b8',
+    },
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 const s = {
     page: {
         minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
-        background:'#080c1a', position:'relative', overflow:'hidden',
+        position:'relative', overflow:'hidden',
         padding:'24px', fontFamily:"'DM Sans', system-ui, sans-serif",
     },
     wrap:      { position:'relative', zIndex:1, width:'100%', maxWidth:'420px' },
@@ -240,24 +305,22 @@ const s = {
         borderRadius:'11px', display:'flex', alignItems:'center', justifyContent:'center',
         boxShadow:'0 6px 24px rgba(99,102,241,0.4)',
     },
-    brandName: { fontSize:'20px', fontWeight:'800', color:'#f1f5f9', letterSpacing:'-0.3px' },
+    brandName: { fontSize:'20px', fontWeight:'800', letterSpacing:'-0.3px' },
     card: {
-        background:'rgba(15,23,42,0.88)', backdropFilter:'blur(24px)',
-        border:'1px solid rgba(255,255,255,0.08)', borderRadius:'22px',
-        padding:'32px', boxShadow:'0 24px 64px rgba(0,0,0,0.6)',
+        backdropFilter:'blur(24px)',
+        borderRadius:'22px',
+        padding:'32px',
     },
     iconWrap: {
         width:'52px', height:'52px', borderRadius:'14px',
-        background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.2)',
         display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'18px',
     },
-    title: { margin:'0 0 8px', fontSize:'21px', fontWeight:'700', color:'#f1f5f9', letterSpacing:'-0.3px' },
-    sub:   { margin:0, fontSize:'13px', color:'#64748b', lineHeight:1.6 },
-    label: { fontSize:'12px', fontWeight:'600', color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.05em' },
+    title: { margin:'0 0 8px', fontSize:'21px', fontWeight:'700', letterSpacing:'-0.3px' },
+    sub:   { margin:0, fontSize:'13px', lineHeight:1.6 },
+    label: { fontSize:'12px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.05em' },
     input: {
         width:'100%', padding:'12px 14px 12px 40px',
-        background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)',
-        borderRadius:'10px', fontSize:'14px', color:'#f1f5f9',
+        borderRadius:'10px', fontSize:'14px',
         transition:'border-color 0.2s, box-shadow 0.2s', boxSizing:'border-box',
     },
     eyeBtn: {
