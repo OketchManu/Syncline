@@ -7,14 +7,14 @@ import CompanyOnboarding from '../company/CompanyOnboarding';
 import TeamManagement    from '../company/TeamManagement';
 import ProgressMonitor   from '../company/ProgressMonitor';
 import ReportManagement  from '../company/ReportManagement';
-import TaskAssignmentModal from '../company/TaskAssignment';      // ← ADDED
+import TaskAssignmentModal from '../company/TaskAssignment';
 import {
     Plus, Search, CheckCircle2, Clock, AlertCircle, Flag, Zap, LogOut,
     Activity, ListTodo, Sun, Moon, Trash2, Bell, X, Edit2, WifiOff, Wifi,
     User, Camera, Shield, Smartphone, Save, Eye, EyeOff,
     AlertTriangle, Building2, Users, TrendingUp, FileText, LayoutDashboard,
     ChevronLeft, Lock, ArrowRight, Sparkles, Menu, ChevronDown,
-    UserPlus  // ← ADDED: for the assign button icon
+    UserPlus
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -117,34 +117,24 @@ const LogoutModal = ({ t, onConfirm, onCancel }) => (
     <div style={{ position:'fixed',inset:0,background:t.overlay,backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:3000,padding:'16px' }} onClick={onCancel}>
         <div style={{ background:t.modalBg,border:`1px solid ${t.borderMid}`,borderRadius:'20px',padding:'28px',width:'100%',maxWidth:'380px',boxShadow:'0 40px 80px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display:'flex',alignItems:'center',gap:'14px',marginBottom:'16px' }}>
-                <div style={{ width:'46px',height:'46px',borderRadius:'13px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-                    <LogOut size={20} color={t.danger} />
-                </div>
-                <div>
-                    <h3 style={{ margin:0,fontSize:'16px',fontWeight:'700',color:t.textPrimary }}>Sign Out</h3>
-                    <p style={{ margin:'2px 0 0',fontSize:'11px',color:t.textMuted }}>You'll need to sign in again to continue</p>
-                </div>
+                <div style={{ width:'46px',height:'46px',borderRadius:'13px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><LogOut size={20} color={t.danger} /></div>
+                <div><h3 style={{ margin:0,fontSize:'16px',fontWeight:'700',color:t.textPrimary }}>Sign Out</h3><p style={{ margin:'2px 0 0',fontSize:'11px',color:t.textMuted }}>You'll need to sign in again to continue</p></div>
             </div>
-            <p style={{ fontSize:'13px',color:t.text,margin:'0 0 22px',lineHeight:1.6 }}>
-                Are you sure you want to sign out of Syncline?
-            </p>
+            <p style={{ fontSize:'13px',color:t.text,margin:'0 0 22px',lineHeight:1.6 }}>Are you sure you want to sign out of Syncline?</p>
             <div style={{ display:'flex',gap:'10px',justifyContent:'flex-end' }}>
                 <Btn t={t} variant="ghost" onClick={onCancel}>Stay Signed In</Btn>
-                <Btn t={t} variant="danger" onClick={onConfirm} style={{ background:t.danger,color:'#fff',border:'none',boxShadow:`0 4px 14px ${t.danger}40` }}>
-                    <LogOut size={13} /> Sign Out
-                </Btn>
+                <Btn t={t} variant="danger" onClick={onConfirm} style={{ background:t.danger,color:'#fff',border:'none',boxShadow:`0 4px 14px ${t.danger}40` }}><LogOut size={13} /> Sign Out</Btn>
             </div>
         </div>
     </div>
 );
 
 // ─── Task Card ────────────────────────────────────────────────────────────────
-// ← ADDED: onAssign prop + Assign button (only shown to company managers/admins)
 const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, onAssign, updatingStatus, isOnline, canAssign }) => {
     const isOverdue = task.deadline && task.status !== 'completed' && new Date(task.deadline) < new Date();
     const isUpdating = updatingStatus === task.id;
     return (
-        <div style={{ background:isOverdue?t.dangerBg:t.card,border:`1px solid ${isOverdue?t.dangerBorder:t.border}`,borderRadius:'12px',padding:'14px 16px',transition:'all 0.15s',cursor:'default' }}
+        <div style={{ background:isOverdue?t.dangerBg:t.card,border:`1px solid ${isOverdue?t.dangerBorder:t.border}`,borderRadius:'12px',padding:'14px 16px',transition:'all 0.15s' }}
             onMouseEnter={e => { if(!isOverdue) e.currentTarget.style.background=t.cardHover; e.currentTarget.style.borderColor=t.borderMid; }}
             onMouseLeave={e => { if(!isOverdue) e.currentTarget.style.background=t.card; e.currentTarget.style.borderColor=isOverdue?t.dangerBorder:t.border; }}>
             <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'10px' }}>
@@ -169,7 +159,6 @@ const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, onAssign, updatin
                         <option value="completed">Completed</option>
                         <option value="blocked">Blocked</option>
                     </select>
-                    {/* ← ADDED: Assign button — only visible to company managers/admins/owners */}
                     {canAssign && (
                         <button onClick={onAssign} disabled={!isOnline} title="Assign task"
                             style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',borderRadius:'6px',transition:'all 0.1s' }}
@@ -316,10 +305,10 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
 };
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany }) => {
+const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany, mobileOpen, onMobileClose }) => {
     const personalNav = [
-        { id:'dashboard',     icon:<LayoutDashboard size={16}/>, label:'Dashboard'      },
-        { id:'reports',       icon:<FileText size={16}/>,        label:'My Reports'     }, // ← ADDED: personal users can access their own reports
+        { id:'dashboard',     icon:<LayoutDashboard size={16}/>, label:'Dashboard'       },
+        { id:'reports',       icon:<FileText size={16}/>,        label:'My Reports'      },
         { id:'company-setup', icon:<Building2 size={16}/>,       label:'Upgrade to Team' },
     ];
     const companyNav = [
@@ -330,32 +319,56 @@ const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany })
         { id:'reports',       icon:<FileText size={16}/>,        label:'Reports'   },
     ];
     const nav = isCompany ? companyNav : personalNav;
-    const lockedForPersonal = ['team','progress'];  // ← CHANGED: removed 'reports' from locked list
+    const lockedForPersonal = ['team','progress'];
+
+    const handleNav = (id) => { onNavigate(id); if (onMobileClose) onMobileClose(); };
+
     return (
-        <aside style={{ width:collapsed?'60px':'210px',background:t.sidebarBg,borderRight:`1px solid ${t.sidebarBorder}`,height:'calc(100vh - 58px)',position:'sticky',top:'58px',transition:'width 0.22s cubic-bezier(0.4,0,0.2,1)',display:'flex',flexDirection:'column',overflow:'hidden',flexShrink:0 }}>
-            {!collapsed&&<div style={{padding:'12px 12px 6px'}}><div style={{padding:'6px 10px',background:t.accentBg,border:`1px solid ${t.accentBorder}`,borderRadius:'8px',display:'flex',alignItems:'center',gap:'7px'}}><span style={{fontSize:'13px'}}>{t.modeIcon}</span><span style={{fontSize:'10px',fontWeight:'700',color:t.accentLight,textTransform:'uppercase',letterSpacing:'0.07em'}}>{t.modeLabel} Mode</span></div></div>}
-            <nav style={{ flex:1,display:'flex',flexDirection:'column',gap:'2px',padding:collapsed?'12px 8px':'8px 8px' }}>
-                {nav.map(item=>{
-                    const active=currentView===item.id;
-                    return (<button key={item.id} onClick={()=>onNavigate(item.id)} style={{ padding:collapsed?'10px':'9px 10px',background:active?t.sidebarActive:'transparent',border:`1px solid ${active?t.sidebarActiveBorder:'transparent'}`,borderRadius:'9px',color:active?t.accentLight:t.textMuted,fontSize:'12px',fontWeight:active?'700':'400',cursor:'pointer',display:'flex',alignItems:'center',gap:'9px',justifyContent:collapsed?'center':'flex-start',width:'100%',transition:'all 0.13s',textAlign:'left',whiteSpace:'nowrap',fontFamily:'inherit' }} onMouseEnter={e=>{if(!active){e.currentTarget.style.background=t.sidebarActive+'88';e.currentTarget.style.color=t.text;}}} onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.color=t.textMuted;}}}><span style={{flexShrink:0}}>{item.icon}</span>{!collapsed&&<span>{item.label}</span>}</button>);
-                })}
-                {!isCompany&&!collapsed&&(
-                    <div style={{marginTop:'10px',paddingTop:'10px',borderTop:`1px solid ${t.border}`}}>
-                        <p style={{margin:'0 0 6px',fontSize:'9px',fontWeight:'700',color:t.textMuted,textTransform:'uppercase',letterSpacing:'0.07em',padding:'0 4px'}}>Team Features</p>
-                        {lockedForPersonal.map((id,i)=>{
-                            const labels=['Team','Progress'];
-                            const icons=[<Users size={16}/>,<TrendingUp size={16}/>];
-                            return (<div key={id} style={{display:'flex',alignItems:'center',gap:'9px',padding:'9px 10px',borderRadius:'9px',opacity:0.3,cursor:'not-allowed',color:t.textMuted}}>{icons[i]}<span style={{fontSize:'12px',flex:1}}>{labels[i]}</span><Lock size={10}/></div>);
-                        })}
+        <>
+            {mobileOpen && <div className="dash-overlay" onClick={onMobileClose} />}
+            <aside
+                className={`dash-sidebar${mobileOpen ? ' dash-sidebar--open' : ''}${collapsed ? ' dash-sidebar--collapsed' : ''}`}
+                style={{ background:t.sidebarBg, borderRight:`1px solid ${t.sidebarBorder}` }}>
+                {!collapsed && (
+                    <div style={{padding:'12px 12px 6px'}}>
+                        <div style={{padding:'6px 10px',background:t.accentBg,border:`1px solid ${t.accentBorder}`,borderRadius:'8px',display:'flex',alignItems:'center',gap:'7px'}}>
+                            <span style={{fontSize:'13px'}}>{t.modeIcon}</span>
+                            <span style={{fontSize:'10px',fontWeight:'700',color:t.accentLight,textTransform:'uppercase',letterSpacing:'0.07em'}}>{t.modeLabel} Mode</span>
+                        </div>
                     </div>
                 )}
-            </nav>
-            <div style={{padding:'8px',borderTop:`1px solid ${t.border}`}}>
-                <button onClick={onToggle} style={{ width:'100%',padding:'8px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.textMuted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',fontFamily:'inherit',transition:'all 0.13s' }}>
-                    {collapsed?<Menu size={15}/>:<><ChevronLeft size={14}/><span style={{fontSize:'11px',fontWeight:'500'}}>Collapse</span></>}
-                </button>
-            </div>
-        </aside>
+                <nav style={{ flex:1,display:'flex',flexDirection:'column',gap:'2px',padding:collapsed?'12px 8px':'8px 8px' }}>
+                    {nav.map(item => {
+                        const active = currentView === item.id;
+                        return (
+                            <button key={item.id} onClick={() => handleNav(item.id)}
+                                style={{ padding:collapsed?'10px':'9px 10px', background:active?t.sidebarActive:'transparent', border:`1px solid ${active?t.sidebarActiveBorder:'transparent'}`, borderRadius:'9px', color:active?t.accentLight:t.textMuted, fontSize:'12px', fontWeight:active?'700':'400', cursor:'pointer', display:'flex', alignItems:'center', gap:'9px', justifyContent:collapsed?'center':'flex-start', width:'100%', transition:'all 0.13s', textAlign:'left', whiteSpace:'nowrap', fontFamily:'inherit' }}
+                                onMouseEnter={e=>{if(!active){e.currentTarget.style.background=t.sidebarActive+'88';e.currentTarget.style.color=t.text;}}}
+                                onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.color=t.textMuted;}}}>
+                                <span style={{flexShrink:0}}>{item.icon}</span>
+                                {!collapsed && <span>{item.label}</span>}
+                            </button>
+                        );
+                    })}
+                    {!isCompany && !collapsed && (
+                        <div style={{marginTop:'10px',paddingTop:'10px',borderTop:`1px solid ${t.border}`}}>
+                            <p style={{margin:'0 0 6px',fontSize:'9px',fontWeight:'700',color:t.textMuted,textTransform:'uppercase',letterSpacing:'0.07em',padding:'0 4px'}}>Team Features</p>
+                            {lockedForPersonal.map((id,i) => {
+                                const labels=['Team','Progress'];
+                                const icons=[<Users size={16}/>,<TrendingUp size={16}/>];
+                                return (<div key={id} style={{display:'flex',alignItems:'center',gap:'9px',padding:'9px 10px',borderRadius:'9px',opacity:0.3,cursor:'not-allowed',color:t.textMuted}}>{icons[i]}<span style={{fontSize:'12px',flex:1}}>{labels[i]}</span><Lock size={10}/></div>);
+                            })}
+                        </div>
+                    )}
+                </nav>
+                <div style={{padding:'8px',borderTop:`1px solid ${t.border}`}}>
+                    <button onClick={onToggle}
+                        style={{ width:'100%',padding:'8px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.textMuted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',fontFamily:'inherit',transition:'all 0.13s' }}>
+                        {collapsed ? <Menu size={15}/> : <><ChevronLeft size={14}/><span style={{fontSize:'11px',fontWeight:'500'}}>Collapse</span></>}
+                    </button>
+                </div>
+            </aside>
+        </>
     );
 };
 
@@ -388,7 +401,7 @@ const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivi
                 <div style={{flex:1}}><p style={{margin:'0 0 1px',fontSize:'13px',fontWeight:'700',color:t.textPrimary}}>Unlock Team Collaboration</p><p style={{margin:0,fontSize:'11px',color:t.textMuted}}>Set up a company workspace to access team management, progress tracking & reports.</p></div>
                 <button onClick={() => onNavigate('company-setup')} style={{ padding:'8px 14px',background:t.accentGrad,border:'none',borderRadius:'8px',color:'#fff',fontSize:'11px',fontWeight:'700',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',flexShrink:0,boxShadow:`0 4px 12px ${t.accent}40`,fontFamily:'inherit' }}>Set up <ArrowRight size={12}/></button>
             </div>
-            <div style={{ display:'grid',gridTemplateColumns:'1fr 260px',gap:'16px' }}>
+            <div className="dash-content-grid">
                 <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',overflow:'hidden' }}>
                     <div style={{ padding:'16px 18px',borderBottom:`1px solid ${t.border}`,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
                         <h2 style={{ fontSize:'14px',fontWeight:'700',color:t.textPrimary,margin:0,display:'flex',alignItems:'center',gap:'7px' }}><ListTodo size={15} color={t.accentLight}/> My Tasks <span style={{fontSize:'11px',fontWeight:'600',color:t.textMuted,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'20px',padding:'1px 7px'}}>{filteredTasks.length}</span></h2>
@@ -406,7 +419,7 @@ const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivi
                         </div>
                     </div>
                 </div>
-                <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px',position:'sticky',top:'74px',height:'fit-content' }}>
+                <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px' }}>
                     <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'14px' }}><Activity size={14} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Live Activity</h3><div style={{width:'6px',height:'6px',borderRadius:'50%',background:wsConnected&&isOnline?t.success:t.danger,marginLeft:'auto',flexShrink:0}}/></div>
                     <div style={{ display:'flex',flexDirection:'column',gap:'10px',maxHeight:'400px',overflowY:'auto' }}>
                         {recentActivity.length===0?<p style={{fontSize:'12px',color:t.textMuted,textAlign:'center',padding:'24px 0',margin:0,lineHeight:1.5}}>Activity will appear here as you work.</p>:recentActivity.map(a=>(<div key={a.id} style={{display:'flex',gap:'9px'}}><div style={{width:'5px',height:'5px',borderRadius:'50%',background:t.accent,marginTop:'6px',flexShrink:0}}/><div><p style={{fontSize:'12px',color:t.text,margin:'0 0 1px',lineHeight:1.4}}>{a.message}</p><p style={{fontSize:'10px',color:t.textMuted,margin:0}}>{new Date(a.timestamp).toLocaleTimeString()}</p></div></div>))}
@@ -418,12 +431,11 @@ const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivi
 };
 
 // ─── Company Dashboard ────────────────────────────────────────────────────────
-// ← ADDED: onAssign + canAssign props passed down to TaskCard
 const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivity, filteredTasks, filter, setFilter, searchQuery, setSearchQuery, setShowCreateModal, updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus, companyName, onAssign }) => {
     const canAssign = ['owner','admin','manager'].includes(user?.role);
     const teamStats = { total:tasks.length, inProgress:tasks.filter(tk=>tk.status==='in_progress').length, completed:tasks.filter(tk=>tk.status==='completed').length, overdue:tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length, blocked:tasks.filter(tk=>tk.status==='blocked').length, flagged:tasks.filter(tk=>tk.flagged).length };
     const completionRate=tasks.length>0?Math.round((teamStats.completed/tasks.length)*100):0;
-    const byAssignee=tasks.reduce((acc,t)=>{ const name=t.assignee_name||'Unassigned'; if(!acc[name])acc[name]={total:0,completed:0}; acc[name].total++; if(t.status==='completed')acc[name].completed++; return acc; },{});
+    const byAssignee=tasks.reduce((acc,tk)=>{ const name=tk.assignee_name||'Unassigned'; if(!acc[name])acc[name]={total:0,completed:0}; acc[name].total++; if(tk.status==='completed')acc[name].completed++; return acc; },{});
     return (
         <div style={{ padding:'20px 24px 40px',display:'flex',flexDirection:'column',gap:'18px' }}>
             <div style={{ padding:'22px 26px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'18px',position:'relative',overflow:'hidden' }}>
@@ -443,12 +455,12 @@ const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivit
                     </div>
                 </div>
             </div>
-            <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px' }}>
+            <div className="dash-team-stats">
                 {[{icon:<Clock size={17}/>,v:teamStats.inProgress,label:'In Progress',color:t.info},{icon:<CheckCircle2 size={17}/>,v:teamStats.completed,label:'Completed',color:t.success},{icon:<AlertCircle size={17}/>,v:teamStats.overdue,label:'Overdue',color:t.danger}].map((s,i)=>(
                     <div key={i} style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'13px',padding:'14px 16px',display:'flex',alignItems:'center',gap:'12px' }}><div style={{width:'38px',height:'38px',borderRadius:'10px',background:`${s.color}15`,color:s.color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{s.icon}</div><div><div style={{fontSize:'24px',fontWeight:'800',color:t.textPrimary,lineHeight:1}}>{s.v}</div><div style={{fontSize:'10px',color:t.textMuted,marginTop:'2px',fontWeight:'500'}}>{s.label}</div></div></div>
                 ))}
             </div>
-            <div style={{ display:'grid',gridTemplateColumns:'1fr 280px',gap:'16px' }}>
+            <div className="dash-content-grid">
                 <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',overflow:'hidden' }}>
                     <div style={{ padding:'16px 18px',borderBottom:`1px solid ${t.border}`,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
                         <h2 style={{ fontSize:'14px',fontWeight:'700',color:t.textPrimary,margin:0,display:'flex',alignItems:'center',gap:'7px' }}><ListTodo size={15} color={t.accentLight}/> All Team Tasks <span style={{fontSize:'11px',fontWeight:'600',color:t.textMuted,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'20px',padding:'1px 7px'}}>{filteredTasks.length}</span></h2>
@@ -460,12 +472,11 @@ const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivit
                             {['all','pending','in_progress','completed','blocked'].map(s=>(<button key={s} onClick={()=>setFilter(s)} style={{ padding:'4px 10px',background:filter===s?t.accentBg:'transparent',border:`1px solid ${filter===s?t.accentBorder:t.border}`,borderRadius:'20px',color:filter===s?t.accentLight:t.textMuted,fontSize:'10px',fontWeight:filter===s?'700':'400',cursor:'pointer',fontFamily:'inherit',transition:'all 0.13s',textTransform:'capitalize' }}>{s.replace('_',' ')}</button>))}
                         </div>
                         <div style={{ display:'flex',flexDirection:'column',gap:'7px',maxHeight:'460px',overflowY:'auto' }}>
-                            {/* ← ADDED: onAssign and canAssign wired into TaskCard */}
                             {filteredTasks.length===0?(<div style={{textAlign:'center',padding:'48px 20px'}}><ListTodo size={32} color={t.textMuted}/><p style={{color:t.textMuted,margin:'10px 0 0',fontSize:'13px'}}>No tasks found</p></div>):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} onAssign={()=>onAssign(task)} canAssign={canAssign} updatingStatus={updatingStatus} isOnline={isOnline}/>))}
                         </div>
                     </div>
                 </div>
-                <div style={{ display:'flex',flexDirection:'column',gap:'12px',position:'sticky',top:'74px',height:'fit-content' }}>
+                <div style={{ display:'flex',flexDirection:'column',gap:'12px' }}>
                     <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px' }}>
                         <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'14px' }}><Users size={14} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Team Workload</h3></div>
                         {Object.entries(byAssignee).length===0?<p style={{fontSize:'12px',color:t.textMuted,margin:0}}>No assignments yet</p>:Object.entries(byAssignee).map(([name,data])=>{ const pct=data.total>0?Math.round((data.completed/data.total)*100):0; return (<div key={name} style={{marginBottom:'12px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}><span style={{fontSize:'12px',color:t.text,fontWeight:'500'}}>{name}</span><span style={{fontSize:'10px',color:t.textMuted}}>{data.completed}/{data.total}</span></div><div style={{height:'4px',background:t.border,borderRadius:'2px',overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:pct===100?t.success:t.accentGrad,borderRadius:'2px'}}/></div></div>); })}
@@ -496,11 +507,11 @@ const LockedView = ({ t, label, onSetup }) => (
 const Dashboard = () => {
     const { user, logout, updateUser } = useAuth();
     const [dark, setDark] = useState(() => {
-    const saved = localStorage.getItem('syncline_theme');
-    if (saved !== null) return saved === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-});
-    const isCompany = user?.accountType === 'company';
+        const saved = localStorage.getItem('syncline_theme');
+        if (saved !== null) return saved === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+    const isCompany = user?.accountType === 'company' || user?.account_type === 'company';
     const t = dark ? (isCompany ? COMPANY : PERSONAL) : (isCompany ? LIGHT_COMPANY : LIGHT_PERSONAL);
 
     const [currentView, setCurrentView] = useState(() => {
@@ -508,12 +519,10 @@ const Dashboard = () => {
         const valid = ['dashboard','company-setup','team','progress','reports'];
         return (saved && valid.includes(saved)) ? saved : 'dashboard';
     });
-    const navigateTo = (view) => {
-        setCurrentView(view);
-        sessionStorage.setItem('syncline_view', view);
-    };
+    const navigateTo = (view) => { setCurrentView(view); sessionStorage.setItem('syncline_view', view); };
 
-    const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [tasks,setTasks]=useState([]);
     const [loading,setLoading]=useState(true);
     const [filter,setFilter]=useState('all');
@@ -532,7 +541,6 @@ const Dashboard = () => {
     const [isOnline,setIsOnline]=useState(navigator.onLine);
     const [companyName,setCompanyName]=useState(user?.companyName||user?.company_name||null);
     const [companyLogo,setCompanyLogo]=useState(null);
-    // ← ADDED: state for the TaskAssignmentModal
     const [assigningTask, setAssigningTask] = useState(null);
 
     const userIdRef=useRef(user?.id);
@@ -630,20 +638,11 @@ const Dashboard = () => {
     };
 
     const unreadCount=notifications.filter(n=>!n.read).length;
-
-    const sharedDashProps = {
-        t, user, tasks, isOnline, wsConnected, recentActivity, filteredTasks,
-        filter, setFilter, searchQuery, setSearchQuery, setShowCreateModal,
-        updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus,
-    };
-
+    const sharedDashProps = { t, user, tasks, isOnline, wsConnected, recentActivity, filteredTasks, filter, setFilter, searchQuery, setSearchQuery, setShowCreateModal, updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus };
     const headerLabel = isCompany ? (companyName || 'Company') : 'Syncline';
 
-    // ─── route guard for server.js: task-reports is at /api/task-reports, NOT /api/tasks/reports
-    // The frontend calls /api/task-reports — this is correct. No change needed to server.js.
-
     if(loading) return (
-        <div style={{ minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:t.bg,gap:'14px' }}>
+        <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif" }}>
             <div style={{ width:'42px',height:'42px',border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:'50%',animation:'spin 0.75s linear infinite' }}/>
             <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
             <p style={{ color:t.textMuted,fontSize:'13px',margin:0 }}>Loading Syncline…</p>
@@ -652,119 +651,262 @@ const Dashboard = () => {
 
     return (
         <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif",display:'flex',flexDirection:'column' }}>
+
+            {/* ─── Responsive CSS ─────────────────────────────────────────────── */}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
-                @keyframes spin { to { transform:rotate(360deg); } }
-                @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-                @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
-                input:focus, select:focus, textarea:focus { outline:none; border-color:${t.accent} !important; box-shadow:0 0 0 3px ${t.accent}22 !important; }
-                ::-webkit-scrollbar { width:4px; height:4px; }
+                @keyframes spin      { to { transform:rotate(360deg); } }
+                @keyframes fadeUp    { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+                *,*::before,*::after { box-sizing:border-box; }
+                html,body,#root      { overflow-x:hidden; max-width:100vw; }
+                input:focus,select:focus,textarea:focus { outline:none; border-color:${t.accent} !important; box-shadow:0 0 0 3px ${t.accent}22 !important; }
+                ::-webkit-scrollbar       { width:4px; height:4px; }
                 ::-webkit-scrollbar-track { background:transparent; }
                 ::-webkit-scrollbar-thumb { background:${t.border}; border-radius:2px; }
                 ::-webkit-scrollbar-thumb:hover { background:${t.borderMid}; }
-                * { box-sizing:border-box; }
                 select option { background:${t.surfaceRaised}; color:${t.textPrimary}; }
+
+                /* Prevent iOS input zoom */
+                @media (max-width:768px) {
+                    input,select,textarea { font-size:16px !important; }
+                }
+
+                /* ── Sidebar ── */
+                .dash-sidebar {
+                    width: 210px;
+                    height: calc(100vh - 58px);
+                    position: sticky;
+                    top: 58px;
+                    transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    flex-shrink: 0;
+                }
+                .dash-sidebar--collapsed { width: 60px; }
+
+                /* ── Stat cards row: 4 columns ── */
+                .dash-stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 10px;
+                    padding: 16px 24px 0;
+                    flex-shrink: 0;
+                }
+
+                /* ── 2-column content layout ── */
+                .dash-content-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 280px;
+                    gap: 16px;
+                }
+
+                /* ── Company 3-column mini stats ── */
+                .dash-team-stats {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 10px;
+                }
+
+                /* ── Hamburger button: hidden on desktop ── */
+                .dash-hamburger { display: none; }
+
+                /* ── Mobile overlay ── */
+                .dash-overlay {
+                    display: none;
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0,0,0,0.55);
+                    z-index: 140;
+                    backdrop-filter: blur(2px);
+                    -webkit-backdrop-filter: blur(2px);
+                }
+
+                /* ── Tablet ≤ 900px ── */
+                @media (max-width: 900px) {
+                    .dash-stats-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                        padding: 12px 16px 0;
+                        gap: 8px;
+                    }
+                    .dash-content-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                /* ── Mobile ≤ 640px ── */
+                @media (max-width: 640px) {
+                    /* Sidebar slides in from left as a drawer */
+                    .dash-sidebar {
+                        position: fixed !important;
+                        top: 58px !important;
+                        left: 0 !important;
+                        height: calc(100vh - 58px) !important;
+                        width: 220px !important;
+                        z-index: 150 !important;
+                        transform: translateX(-110%);
+                        transition: transform 0.25s ease !important;
+                        box-shadow: 4px 0 32px rgba(0,0,0,0.45);
+                    }
+                    .dash-sidebar--open    { transform: translateX(0) !important; }
+                    .dash-sidebar--collapsed { width: 220px !important; }
+
+                    /* Show dimmed overlay behind drawer */
+                    .dash-overlay { display: block; }
+
+                    /* Reveal hamburger button */
+                    .dash-hamburger {
+                        display: flex !important;
+                        align-items: center;
+                        justify-content: center;
+                    }
+
+                    /* Collapse header text to make room */
+                    .dash-header-name { display: none !important; }
+
+                    /* Stat cards: 2 columns */
+                    .dash-stats-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                        padding: 10px 12px 0;
+                        gap: 8px;
+                    }
+
+                    /* Notification dropdown spans most of screen */
+                    .dash-notif-panel {
+                        width: calc(100vw - 24px) !important;
+                        right: -48px !important;
+                    }
+
+                    .dash-content-grid { gap: 12px; }
+                    .dash-team-stats   { gap: 8px; }
+                }
+
+                /* ── Very small phones ≤ 400px ── */
+                @media (max-width: 400px) {
+                    .dash-stats-grid { gap: 6px; }
+                    .dash-team-stats { gap: 6px; }
+                }
             `}</style>
 
             {/* ── Header ── */}
-            <header style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 20px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'58px',flexShrink:0 }}>
-                <div style={{ display:'flex',alignItems:'center',gap:'14px' }}>
-                    <div style={{ display:'flex',alignItems:'center',gap:'8px' }}>
+            <header style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 16px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'58px',flexShrink:0,gap:'8px' }}>
+                <div style={{ display:'flex',alignItems:'center',gap:'8px',minWidth:0 }}>
+
+                    {/* Hamburger — CSS makes this visible only on mobile */}
+                    <button className="dash-hamburger"
+                        onClick={() => setMobileSidebarOpen(o => !o)}
+                        style={{ padding:'7px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.text,cursor:'pointer',flexShrink:0,
+                                 /* display:none is the default; CSS overrides to flex on mobile */
+                                 display:'none',alignItems:'center',justifyContent:'center' }}>
+                        <Menu size={16}/>
+                    </button>
+
+                    <div style={{ display:'flex',alignItems:'center',gap:'8px',flexShrink:0 }}>
                         {companyLogo
                             ? <img src={companyLogo.startsWith('http')?companyLogo:`http://localhost:3001${companyLogo}`} alt="logo" style={{ width:'32px',height:'32px',borderRadius:'7px',objectFit:'cover',border:`1px solid ${t.border}`,flexShrink:0 }}/>
-                            : <div style={{ width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center' }}><Zap size={14} color="#fff"/></div>
+                            : <div style={{ width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Zap size={14} color="#fff"/></div>
                         }
-                        <span style={{ fontSize:'16px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px' }}>{headerLabel}</span>
+                        {/* Hidden on mobile via CSS .dash-header-name */}
+                        <span className="dash-header-name" style={{ fontSize:'16px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px',whiteSpace:'nowrap' }}>{headerLabel}</span>
                     </div>
-                    <div style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:isOnline?t.onlineBg:t.offlineBg,borderRadius:'20px',border:`1px solid ${isOnline?t.successBorder:t.dangerBorder}` }}>
+
+                    <div style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:isOnline?t.onlineBg:t.offlineBg,borderRadius:'20px',border:`1px solid ${isOnline?t.successBorder:t.dangerBorder}`,flexShrink:0 }}>
                         {isOnline?<Wifi size={9} color={t.online}/>:<WifiOff size={9} color={t.offline}/>}
-                        <span style={{ fontSize:'9px',color:isOnline?t.online:t.offline,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>{!isOnline?'Offline':wsConnected?'Live':'Connecting'}</span>
+                       <span style={{ fontSize:'9px',color:isOnline?t.online :t.offline,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>{!isOnline?'Offline':wsConnected?'Live':'Connecting'}</span>
                     </div>
-                    {isCompany&&(
-                        <div style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:t.accentBg,borderRadius:'20px',border:`1px solid ${t.accentBorder}` }}>
+
+                    {isCompany && (
+                        <div className="dash-header-name" style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:t.accentBg,borderRadius:'20px',border:`1px solid ${t.accentBorder}`,flexShrink:0 }}>
                             <Building2 size={9} color={t.accentLight}/>
-                            <span style={{ fontSize:'9px',color:t.accentLight,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>Team Workspace</span>
+                            <span style={{ fontSize:'9px',color:t.accentLight,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>Team</span>
                         </div>
                     )}
                 </div>
 
-                <div style={{ display:'flex',alignItems:'center',gap:'6px' }}>
-                    <button onClick={() => {
-    const next = !dark;
-    setDark(next);
-    localStorage.setItem('syncline_theme', next ? 'dark' : 'light');
-}} title="Toggle theme" style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+                <div style={{ display:'flex',alignItems:'center',gap:'6px',flexShrink:0 }}>
+                    <button onClick={() => { const next=!dark; setDark(next); localStorage.setItem('syncline_theme',next?'dark':'light'); }} title="Toggle theme"
+                        style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
                         {dark?<Sun size={14}/>:<Moon size={14}/>}
                     </button>
+
                     <div style={{position:'relative'}}>
-                        <button onClick={()=>setShowNotifications(!showNotifications)} style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',position:'relative' }}>
+                        <button onClick={()=>setShowNotifications(!showNotifications)}
+                            style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',position:'relative' }}>
                             <Bell size={14}/>
                             {unreadCount>0&&<span style={{ position:'absolute',top:'1px',right:'1px',width:'14px',height:'14px',borderRadius:'50%',background:t.danger,color:'#fff',fontSize:'8px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center',border:`2px solid ${t.sidebarBg}` }}>{unreadCount>9?'9+':unreadCount}</span>}
                         </button>
-                        {showNotifications&&(
-                            <div style={{ position:'absolute',top:'calc(100% + 8px)',right:0,width:'300px',background:t.modalBg,border:`1px solid ${t.borderMid}`,borderRadius:'14px',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',zIndex:200,overflow:'hidden',animation:'slideDown 0.15s ease' }}>
+                        {showNotifications && (
+                            <div className="dash-notif-panel" style={{ position:'absolute',top:'calc(100% + 8px)',right:0,width:'300px',background:t.modalBg,border:`1px solid ${t.borderMid}`,borderRadius:'14px',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',zIndex:200,overflow:'hidden',animation:'slideDown 0.15s ease' }}>
                                 <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 14px',borderBottom:`1px solid ${t.border}` }}><span style={{fontSize:'12px',fontWeight:'700',color:t.textPrimary}}>Notifications</span><button onClick={()=>setNotifications(p=>p.map(n=>({...n,read:true})))} style={{background:'none',border:'none',color:t.accentLight,fontSize:'11px',cursor:'pointer',fontWeight:'600',fontFamily:'inherit'}}>Mark all read</button></div>
                                 <div style={{maxHeight:'280px',overflowY:'auto'}}>{notifications.length===0?<p style={{fontSize:'12px',color:t.textMuted,textAlign:'center',padding:'24px',margin:0}}>No notifications</p>:notifications.map(n=>(<div key={n.id} onClick={()=>setNotifications(p=>p.map(i=>i.id===n.id?{...i,read:true}:i))} style={{padding:'10px 14px',borderBottom:`1px solid ${t.border}`,background:n.read?'transparent':t.accentBg,cursor:'pointer'}}><p style={{margin:'0 0 2px',fontSize:'12px',fontWeight:n.read?'500':'700',color:t.textPrimary}}>{n.title}</p><p style={{margin:0,fontSize:'11px',color:t.textMuted,lineHeight:1.4}}>{n.message}</p></div>))}</div>
                             </div>
                         )}
                     </div>
-                    <button onClick={()=>setShowProfile(true)} style={{ display:'flex',alignItems:'center',gap:'7px',padding:'4px 10px 4px 4px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'9px',cursor:'pointer',transition:'all 0.13s' }}>
+
+                    <button onClick={()=>setShowProfile(true)}
+                        style={{ display:'flex',alignItems:'center',gap:'7px',padding:'4px 10px 4px 4px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'9px',cursor:'pointer',transition:'all 0.13s' }}>
                         <div style={{ width:'26px',height:'26px',borderRadius:'6px',overflow:'hidden',flexShrink:0 }}>
                             {(user?.avatar||user?.avatar_url)?<img src={resolveAvatar(user.avatar||user.avatar_url)} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'800',color:'#fff'}}>{(user?.fullName||user?.email||'?').charAt(0).toUpperCase()}</div>}
                         </div>
-                        <div style={{textAlign:'left'}}>
+                        {/* Name hidden on mobile via CSS */}
+                        <div className="dash-header-name" style={{textAlign:'left'}}>
                             <div style={{fontSize:'11px',fontWeight:'700',color:t.textPrimary,maxWidth:'90px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.fullName||user?.email}</div>
                             <div style={{fontSize:'9px',color:t.textMuted,textTransform:'capitalize'}}>{user?.role}</div>
                         </div>
                         <ChevronDown size={10} color={t.textMuted}/>
                     </button>
-                    <button onClick={()=>setShowLogoutConfirm(true)} title="Sign out" style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.textMuted,cursor:'pointer',display:'flex' }}>
+
+                    <button onClick={()=>setShowLogoutConfirm(true)} title="Sign out"
+                        style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.textMuted,cursor:'pointer',display:'flex' }}>
                         <LogOut size={14}/>
                     </button>
                 </div>
             </header>
 
-            {!isOnline&&(<div style={{ padding:'7px 20px',background:t.offlineBg,borderBottom:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',gap:'8px',justifyContent:'center' }}><WifiOff size={12} color={t.offline}/><span style={{fontSize:'12px',color:t.offline,fontWeight:'600'}}>You're offline — some features are limited.</span></div>)}
+            {!isOnline && (
+                <div style={{ padding:'7px 20px',background:t.offlineBg,borderBottom:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',gap:'8px',justifyContent:'center' }}>
+                    <WifiOff size={12} color={t.offline}/><span style={{fontSize:'12px',color:t.offline,fontWeight:'600'}}>You're offline — some features are limited.</span>
+                </div>
+            )}
 
-            <div style={{display:'flex',flex:1}}>
-                <Sidebar t={t} currentView={currentView} onNavigate={navigateTo} collapsed={sidebarCollapsed} onToggle={()=>setSidebarCollapsed(!sidebarCollapsed)} isCompany={isCompany}/>
-                <main style={{flex:1,minWidth:0,display:'flex',flexDirection:'column'}}>
-                    <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',padding:'16px 24px 0',flexShrink:0 }}>
+           <div style={{display:'flex',width:'100%'}}>
+                <Sidebar
+                    t={t}
+                    currentView={currentView}
+                    onNavigate={navigateTo}
+                    collapsed={sidebarCollapsed}
+                    onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+                    isCompany={isCompany}
+                    mobileOpen={mobileSidebarOpen}
+                    onMobileClose={() => setMobileSidebarOpen(false)}
+                />
+                <main style={{flex:1,width:'100%',overflowX:'hidden'}}>
+                    <div className="dash-stats-grid">
                         <StatCard t={t} icon={<ListTodo size={18}/>} value={tasks.length} label="Total Tasks" color={t.accent}/>
                         <StatCard t={t} icon={<Clock size={18}/>} value={tasks.filter(tk=>tk.status==='in_progress').length} label="In Progress" color={t.info}/>
                         <StatCard t={t} icon={<CheckCircle2 size={18}/>} value={tasks.filter(tk=>tk.status==='completed').length} label="Completed" color={t.success}/>
                         <StatCard t={t} icon={<AlertCircle size={18}/>} value={tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length} label="Overdue" color={t.danger}/>
                     </div>
 
-                    {currentView==='dashboard'&&(isCompany
-                        // ← ADDED: onAssign prop wired into CompanyDashboard
-                        ?<CompanyDashboard {...sharedDashProps} companyName={companyName} onAssign={setAssigningTask}/>
-                        :<PersonalDashboard {...sharedDashProps} onNavigate={navigateTo}/>
+                    {currentView==='dashboard' && (isCompany
+                        ? <CompanyDashboard {...sharedDashProps} companyName={companyName} onAssign={setAssigningTask}/>
+                        : <PersonalDashboard {...sharedDashProps} onNavigate={navigateTo}/>
                     )}
-                    {currentView==='company-setup'&&<CompanyOnboarding dark={dark}/>}
-                    {currentView==='team'&&(isCompany?<TeamManagement dark={dark}/>:<LockedView t={t} label="Team Management" onSetup={()=>navigateTo('company-setup')}/>)}
-                    {currentView==='progress'&&(isCompany?<ProgressMonitor dark={dark}/>:<LockedView t={t} label="Progress Monitor" onSetup={()=>navigateTo('company-setup')}/>)}
-                    {/* ← FIXED: Reports now accessible to ALL users, not just company accounts */}
-                    {currentView==='reports'&&<ReportManagement dark={dark}/>}
+                    {currentView==='company-setup' && <CompanyOnboarding dark={dark}/>}
+                    {currentView==='team'     && (isCompany ? <TeamManagement dark={dark}/> : <LockedView t={t} label="Team Management" onSetup={()=>navigateTo('company-setup')}/>)}
+                    {currentView==='progress' && (isCompany ? <ProgressMonitor dark={dark}/> : <LockedView t={t} label="Progress Monitor" onSetup={()=>navigateTo('company-setup')}/>)}
+                    {currentView==='reports'  && <ReportManagement dark={dark}/>}
                 </main>
             </div>
 
-            {showCreateModal&&(<TaskModal t={t} title="Create New Task" onClose={()=>setShowCreateModal(false)} isOnline={isOnline} onSave={async(data)=>{ try{await taskAPI.create(data);setShowCreateModal(false);addActivity(`You created "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to create task';} }}/>)}
-            {editTask&&(<TaskModal t={t} title="Edit Task" initialData={editTask} onClose={()=>setEditTask(null)} isOnline={isOnline} onSave={async(data)=>{ try{await taskAPI.update(editTask.id,data);setEditTask(null);addActivity(`You updated "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to update task';} }}/>)}
-            {deleteTarget&&(<DeleteModal t={t} task={deleteTarget} loading={deleteLoading} onConfirm={confirmDeleteTask} onCancel={()=>!deleteLoading&&setDeleteTarget(null)}/>)}
-            {showProfile&&(<ProfileModal t={t} user={user} isOnline={isOnline} onClose={()=>setShowProfile(false)} onSave={handleProfileSave} onDeleteAccount={handleDeleteAccount}/>)}
-            {showLogoutConfirm&&(<LogoutModal t={t} onConfirm={()=>{ try{sessionStorage.removeItem('syncline_view');}catch(_){} logout(); }} onCancel={()=>setShowLogoutConfirm(false)}/>)}
-            {showNotifications&&(<div onClick={()=>setShowNotifications(false)} style={{position:'fixed',inset:0,zIndex:150}}/>)}
-
-            {/* ← ADDED: TaskAssignmentModal — renders when a task's assign button is clicked */}
-            {assigningTask && (
-                <TaskAssignmentModal
-                    task={assigningTask}
-                    dark={dark}
-                    onClose={() => setAssigningTask(null)}
-                    onAssigned={() => { setAssigningTask(null); fetchTasks(); }}
-                />
-            )}
+            {showCreateModal && (<TaskModal t={t} title="Create New Task" onClose={()=>setShowCreateModal(false)} isOnline={isOnline} onSave={async(data)=>{ try{await taskAPI.create(data);setShowCreateModal(false);addActivity(`You created "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to create task';} }}/>)}
+            {editTask       && (<TaskModal t={t} title="Edit Task" initialData={editTask} onClose={()=>setEditTask(null)} isOnline={isOnline} onSave={async(data)=>{ try{await taskAPI.update(editTask.id,data);setEditTask(null);addActivity(`You updated "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to update task';} }}/>)}
+            {deleteTarget   && (<DeleteModal t={t} task={deleteTarget} loading={deleteLoading} onConfirm={confirmDeleteTask} onCancel={()=>!deleteLoading&&setDeleteTarget(null)}/>)}
+            {showProfile    && (<ProfileModal t={t} user={user} isOnline={isOnline} onClose={()=>setShowProfile(false)} onSave={handleProfileSave} onDeleteAccount={handleDeleteAccount}/>)}
+            {showLogoutConfirm && (<LogoutModal t={t} onConfirm={()=>{ try{sessionStorage.removeItem('syncline_view');}catch(_){} logout(); }} onCancel={()=>setShowLogoutConfirm(false)}/>)}
+            {showNotifications && (<div onClick={()=>setShowNotifications(false)} style={{position:'fixed',inset:0,zIndex:150}}/>)}
+            {assigningTask  && (<TaskAssignmentModal task={assigningTask} dark={dark} onClose={()=>setAssigningTask(null)} onAssigned={()=>{ setAssigningTask(null); fetchTasks(); }}/>)}
         </div>
     );
 };
