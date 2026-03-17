@@ -87,11 +87,22 @@ const JoinCompany = () => {
 
     return (
         <div style={styles.container}>
+            <style>{`
+                @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(20px)} }
+                @keyframes pulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5} 50%{transform:translate(-50%,-50%) scale(1.1);opacity:.3} }
+                @keyframes spin  { to{transform:rotate(360deg)} }
+                
+                @media (max-width: 640px) {
+                    .join-btn { font-size: 14px !important; padding: 12px 20px !important; }
+                    .join-company-name { font-size: 16px !important; }
+                }
+            `}</style>
+
             {/* Background */}
             <div style={styles.bgAnimation}>
-                <div style={styles.circle1} />
-                <div style={styles.circle2} />
-                <div style={styles.circle3} />
+                <div style={{...styles.circle1, width:'min(500px, 80vw)', height:'min(500px, 80vw)'}} />
+                <div style={{...styles.circle2, width:'min(400px, 70vw)', height:'min(400px, 70vw)'}} />
+                <div style={{...styles.circle3, width:'min(300px, 60vw)', height:'min(300px, 60vw)'}} />
             </div>
 
             <div style={styles.content}>
@@ -133,12 +144,14 @@ const JoinCompany = () => {
                                 <button
                                     onClick={() => navigate(`/login?redirect=/join/${code}`)}
                                     style={styles.primaryBtn}
+                                    className="join-btn"
                                 >
                                     Sign In to Accept
                                 </button>
                                 <button
                                     onClick={() => navigate(`/register?redirect=/join/${code}`)}
                                     style={styles.secondaryBtn}
+                                    className="join-btn"
                                 >
                                     Create Account
                                 </button>
@@ -166,10 +179,10 @@ const JoinCompany = () => {
                                     <Building2 size={28} color="#6366f1" />
                                 </div>
                                 <div>
-                                    <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#fff' }}>
+                                    <p className="join-company-name" style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#fff' }}>
                                         {inviteInfo.companyName}
                                     </p>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
                                         <span style={{ fontSize: '18px' }}>{roleCfg.icon}</span>
                                         <span style={{ fontSize: '13px', color: roleCfg.color, fontWeight: '600' }}>
                                             {roleCfg.label}
@@ -180,10 +193,10 @@ const JoinCompany = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '24px' }}>
-                                <button onClick={handleJoin} style={styles.primaryBtn}>
+                                <button onClick={handleJoin} style={styles.primaryBtn} className="join-btn">
                                     ✅ Accept & Join Company
                                 </button>
-                                <button onClick={() => navigate('/dashboard')} style={styles.secondaryBtn}>
+                                <button onClick={() => navigate('/dashboard')} style={styles.secondaryBtn} className="join-btn">
                                     Decline
                                 </button>
                             </div>
@@ -221,6 +234,7 @@ const JoinCompany = () => {
                             <button
                                 onClick={() => navigate(user ? '/dashboard' : '/login')}
                                 style={{ ...styles.primaryBtn, marginTop: '24px' }}
+                                className="join-btn"
                             >
                                 {user ? 'Go to Dashboard' : 'Go to Login'}
                             </button>
@@ -229,12 +243,6 @@ const JoinCompany = () => {
 
                 </div>
             </div>
-
-            <style>{`
-                @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(20px)} }
-                @keyframes pulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5} 50%{transform:translate(-50%,-50%) scale(1.1);opacity:.3} }
-                @keyframes spin  { to{transform:rotate(360deg)} }
-            `}</style>
         </div>
     );
 };
@@ -242,69 +250,69 @@ const JoinCompany = () => {
 const styles = {
     container: {
         minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#0a0e27', position: 'relative', overflow: 'hidden', padding: '20px',
+        background: '#0a0e27', position: 'relative', overflow: 'hidden', padding: 'clamp(16px, 4vw, 20px)',
     },
     bgAnimation: { position: 'absolute', width: '100%', height: '100%', overflow: 'hidden' },
     circle1: {
-        position: 'absolute', width: '500px', height: '500px', borderRadius: '50%',
+        position: 'absolute', borderRadius: '50%',
         background: 'radial-gradient(circle,rgba(99,102,241,.15) 0%,transparent 70%)',
         top: '-250px', left: '-250px', animation: 'float 20s infinite ease-in-out',
     },
     circle2: {
-        position: 'absolute', width: '400px', height: '400px', borderRadius: '50%',
+        position: 'absolute', borderRadius: '50%',
         background: 'radial-gradient(circle,rgba(139,92,246,.15) 0%,transparent 70%)',
         bottom: '-200px', right: '-200px', animation: 'float 15s infinite ease-in-out reverse',
     },
     circle3: {
-        position: 'absolute', width: '300px', height: '300px', borderRadius: '50%',
+        position: 'absolute', borderRadius: '50%',
         background: 'radial-gradient(circle,rgba(59,130,246,.15) 0%,transparent 70%)',
         top: '50%', left: '50%', transform: 'translate(-50%,-50%)', animation: 'pulse 10s infinite ease-in-out',
     },
-    content: { position: 'relative', zIndex: 1, width: '100%', maxWidth: '460px' },
-    logoSection: { textAlign: 'center', marginBottom: '36px' },
+    content: { position: 'relative', zIndex: 1, width: '100%', maxWidth: 'min(460px, 95vw)' },
+    logoSection: { textAlign: 'center', marginBottom: 'clamp(28px, 6vw, 36px)' },
     logoIcon: {
-        width: '80px', height: '80px', margin: '0 auto 20px',
+        width: 'clamp(70px, 15vw, 80px)', height: 'clamp(70px, 15vw, 80px)', margin: '0 auto 20px',
         background: 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)',
         borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: '0 10px 40px rgba(99,102,241,.4)',
     },
-    logo: { fontSize: '32px', fontWeight: '700', color: '#fff', margin: '0 0 8px 0', letterSpacing: '-0.5px' },
-    tagline: { color: '#94a3b8', fontSize: '14px', margin: 0 },
+    logo: { fontSize: 'clamp(26px, 6vw, 32px)', fontWeight: '700', color: '#fff', margin: '0 0 8px 0', letterSpacing: '-0.5px' },
+    tagline: { color: '#94a3b8', fontSize: 'clamp(13px, 3vw, 14px)', margin: 0 },
     card: {
         background: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px',
-        padding: '40px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', textAlign: 'center',
+        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'clamp(18px, 4vw, 24px)',
+        padding: 'clamp(28px, 6vw, 40px)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', textAlign: 'center',
     },
     centered: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' },
     iconCircle: (color) => ({
-        width: '72px', height: '72px', borderRadius: '50%', margin: '0 auto 20px',
+        width: 'clamp(64px, 14vw, 72px)', height: 'clamp(64px, 14vw, 72px)', borderRadius: '50%', margin: '0 auto 20px',
         background: `linear-gradient(135deg,${color},#8b5cf6)`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: `0 8px 30px ${color}44`,
     }),
-    title: { fontSize: '22px', fontWeight: '700', color: '#fff', margin: '0 0 8px' },
-    subtitle: { fontSize: '14px', color: '#94a3b8', margin: '0 0 24px' },
-    mutedText: { fontSize: '14px', color: '#94a3b8', margin: 0, lineHeight: 1.6 },
+    title: { fontSize: 'clamp(20px, 4.5vw, 22px)', fontWeight: '700', color: '#fff', margin: '0 0 8px' },
+    subtitle: { fontSize: 'clamp(13px, 3vw, 14px)', color: '#94a3b8', margin: '0 0 24px' },
+    mutedText: { fontSize: 'clamp(13px, 3vw, 14px)', color: '#94a3b8', margin: 0, lineHeight: 1.6 },
     companyCard: {
-        display: 'flex', alignItems: 'center', gap: '16px', textAlign: 'left',
-        padding: '18px 20px', background: 'rgba(99,102,241,0.1)',
+        display: 'flex', alignItems: 'center', gap: 'clamp(12px, 3vw, 16px)', textAlign: 'left',
+        padding: 'clamp(16px, 4vw, 18px) clamp(16px, 4vw, 20px)', background: 'rgba(99,102,241,0.1)',
         border: '1px solid rgba(99,102,241,0.25)', borderRadius: '14px',
     },
     companyIcon: {
-        width: '52px', height: '52px', borderRadius: '12px', flexShrink: 0,
+        width: 'clamp(48px, 10vw, 52px)', height: 'clamp(48px, 10vw, 52px)', borderRadius: '12px', flexShrink: 0,
         background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center',
     },
     primaryBtn: {
-        width: '100%', padding: '14px 24px',
+        width: '100%', padding: 'clamp(12px, 3vw, 14px) clamp(20px, 4vw, 24px)',
         background: 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)',
         border: 'none', borderRadius: '12px', color: '#fff',
-        fontSize: '15px', fontWeight: '600', cursor: 'pointer',
+        fontSize: 'clamp(14px, 3.2vw, 15px)', fontWeight: '600', cursor: 'pointer',
         boxShadow: '0 4px 20px rgba(99,102,241,.4)',
     },
     secondaryBtn: {
-        width: '100%', padding: '13px 24px',
+        width: '100%', padding: 'clamp(11px, 2.8vw, 13px) clamp(20px, 4vw, 24px)',
         background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '12px', color: '#94a3b8', fontSize: '14px', cursor: 'pointer',
+        borderRadius: '12px', color: '#94a3b8', fontSize: 'clamp(13px, 3vw, 14px)', cursor: 'pointer',
     },
 };
 

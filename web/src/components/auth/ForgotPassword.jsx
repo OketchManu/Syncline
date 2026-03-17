@@ -62,13 +62,17 @@ const ForgotPassword = () => {
                 .fp-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 28px rgba(99,102,241,0.5) !important; }
                 .fp-back:hover     { color:#a5b4fc !important; }
                 .fp-input::placeholder { color: ${t.placeholder}; }
+                
+                @media (max-width: 640px) {
+                    .fp-input { font-size: 16px !important; }
+                }
             `}</style>
 
             {/* Background */}
             <div style={{ position:'absolute', inset:0, overflow:'hidden', pointerEvents:'none' }}>
                 {[
-                    { w:600, h:600, top:'-220px', left:'-180px', c: t.blobColor1 },
-                    { w:450, h:450, bottom:'-160px', right:'-160px', c: t.blobColor2 },
+                    { w:'min(600px, 90vw)', h:'min(600px, 90vw)', top:'-220px', left:'-180px', c: t.blobColor1 },
+                    { w:'min(450px, 70vw)', h:'min(450px, 70vw)', bottom:'-160px', right:'-160px', c: t.blobColor2 },
                 ].map((b,i)=>(
                     <div key={i} style={{
                         position:'absolute', width:b.w, height:b.h, borderRadius:'50%',
@@ -226,36 +230,36 @@ const s = {
     page: {
         minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
         position:'relative', overflow:'hidden',
-        padding:'24px', fontFamily:"'DM Sans', system-ui, sans-serif",
+        padding:'clamp(16px, 4vw, 24px)', fontFamily:"'DM Sans', system-ui, sans-serif",
     },
     wrap:      { position:'relative', zIndex:1, width:'100%', maxWidth:'400px' },
-    brand:     { display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'28px' },
+    brand:     { display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'clamp(20px, 5vw, 28px)' },
     brandIcon: {
-        width:'40px', height:'40px', background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+        width:'clamp(36px, 8vw, 40px)', height:'clamp(36px, 8vw, 40px)', background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
         borderRadius:'11px', display:'flex', alignItems:'center', justifyContent:'center',
         boxShadow:'0 6px 24px rgba(99,102,241,0.4)',
     },
-    brandName: { fontSize:'20px', fontWeight:'800', letterSpacing:'-0.3px' },
+    brandName: { fontSize:'clamp(18px, 4vw, 20px)', fontWeight:'800', letterSpacing:'-0.3px' },
     card: {
         backdropFilter:'blur(24px)',
-        borderRadius:'22px',
-        padding:'32px',
+        borderRadius:'clamp(16px, 4vw, 22px)',
+        padding:'clamp(24px, 6vw, 32px)',
     },
     back: {
         display:'inline-flex', alignItems:'center', gap:'6px', background:'none', border:'none',
         fontSize:'13px', fontWeight:'600', cursor:'pointer',
-        padding:0, marginBottom:'24px', transition:'color 0.2s',
+        padding:0, marginBottom:'clamp(16px, 4vw, 24px)', transition:'color 0.2s',
     },
     iconWrap: {
-        width:'52px', height:'52px', borderRadius:'14px',
+        width:'clamp(48px, 10vw, 52px)', height:'clamp(48px, 10vw, 52px)', borderRadius:'14px',
         display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'18px',
     },
-    title: { margin:'0 0 8px', fontSize:'21px', fontWeight:'700', letterSpacing:'-0.3px' },
-    sub:   { margin:0, fontSize:'13px', lineHeight:1.6 },
+    title: { margin:'0 0 8px', fontSize:'clamp(19px, 4.5vw, 21px)', fontWeight:'700', letterSpacing:'-0.3px' },
+    sub:   { margin:0, fontSize:'clamp(12px, 2.8vw, 13px)', lineHeight:1.6 },
     label: { fontSize:'12px', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.05em' },
     input: {
-        width:'100%', padding:'12px 14px 12px 40px',
-        borderRadius:'10px', fontSize:'14px',
+        width:'100%', padding:'clamp(10px, 2.5vw, 12px) clamp(12px, 3vw, 14px) clamp(10px, 2.5vw, 12px) clamp(36px, 8vw, 40px)',
+        borderRadius:'10px', fontSize:'clamp(13px, 3vw, 14px)',
         transition:'border-color 0.2s, box-shadow 0.2s', boxSizing:'border-box',
     },
     errBox: {
@@ -264,9 +268,9 @@ const s = {
         borderRadius:'10px', color:'#fca5a5',
     },
     submitBtn: {
-        width:'100%', padding:'13px', display:'flex', alignItems:'center', justifyContent:'center',
+        width:'100%', padding:'clamp(11px, 2.8vw, 13px)', display:'flex', alignItems:'center', justifyContent:'center',
         gap:'8px', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', border:'none',
-        borderRadius:'12px', color:'#fff', fontSize:'15px', fontWeight:'700',
+        borderRadius:'12px', color:'#fff', fontSize:'clamp(14px, 3.2vw, 15px)', fontWeight:'700',
         cursor:'pointer', transition:'all 0.2s', boxShadow:'0 4px 20px rgba(99,102,241,0.4)',
     },
     spinner: {
@@ -274,7 +278,7 @@ const s = {
         borderTop:'2px solid #fff', borderRadius:'50%', animation:'spin 0.75s linear infinite',
     },
     successIcon: {
-        width:'72px', height:'72px', borderRadius:'50%',
+        width:'clamp(64px, 14vw, 72px)', height:'clamp(64px, 14vw, 72px)', borderRadius:'50%',
         background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.25)',
         display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 22px',
     },
