@@ -120,7 +120,7 @@ const SubmitModal = ({ t, tasks, onClose, onSubmit }) => {
                         <textarea value={summary} onChange={e => setSummary(e.target.value)} placeholder="What did you accomplish?" rows={4} style={{ ...inputSt(t), resize: 'vertical' }} />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '12px' }}>
                         <div>
                             <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: t.textSecondary, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Hours Spent</label>
                             <input type="number" min="0" step="0.5" value={hours} onChange={e => setHours(e.target.value)} placeholder="e.g. 8" style={inputSt(t)} />
@@ -470,7 +470,7 @@ const ReportManagement = ({ dark = true }) => {
             )}
 
             {/* Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid',gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '12px', marginBottom: '20px' }}>
                 {[
                     { icon: <FileText size={18} />,     value: totalReports,   label: 'Total Reports',  color: '#6366f1' },
                     { icon: <Clock size={18} />,        value: pendingReports, label: 'Pending Review', color: '#f59e0b' },
@@ -516,7 +516,7 @@ const ReportManagement = ({ dark = true }) => {
                     </div>
 
                     {/* Search */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', flex: 1, minWidth: '180px', maxWidth: '280px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', flex: 1, minWidth: '180px', maxWidth: '280px', flexBasis: 'min(100%, 280px)'}}>
                         <Search size={13} color={t.textMuted} />
                         <input type="text" placeholder="Search reports…" value={search} onChange={e => setSearch(e.target.value)}
                             style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
@@ -546,7 +546,7 @@ const ReportManagement = ({ dark = true }) => {
                             </button>
                         </div>
                     ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '10px' }}>
                             {filtered.map(r => (
                                 <ReportCard key={r.id} t={t} report={r} onView={setViewReport}
                                     onDelete={setDeleteReport}
