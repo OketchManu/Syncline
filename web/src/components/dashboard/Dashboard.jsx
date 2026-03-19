@@ -17,7 +17,6 @@ import {
     UserPlus
 } from 'lucide-react';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const API_ORIGIN = 'http://localhost:3001';
 
 const resolveAvatar = (avatar) => {
@@ -41,7 +40,6 @@ const getDeviceInfo = () => {
     return `${browser} on ${os}`;
 };
 
-// ─── Theme System ─────────────────────────────────────────────────────────────
 const PERSONAL = {
     bg:'#05080f',surface:'#0a0f1e',surfaceRaised:'#0f1628',card:'rgba(255,255,255,0.025)',cardHover:'rgba(255,255,255,0.045)',
     border:'rgba(255,255,255,0.06)',borderMid:'rgba(255,255,255,0.1)',borderStrong:'rgba(255,255,255,0.16)',
@@ -79,7 +77,6 @@ const STATUS_COLOR  = { pending:'#f59e0b',in_progress:'#3b82f6',completed:'#10b9
 const PRIORITY_COLOR= { low:'#64748b',medium:'#f59e0b',high:'#ef4444',urgent:'#dc2626' };
 const STATUS_LABEL  = { pending:'Pending',in_progress:'In Progress',completed:'Completed',blocked:'Blocked' };
 
-// ─── Shared Primitives ────────────────────────────────────────────────────────
 const Pill = ({ color, children }) => (
     <span style={{ padding:'2px 8px',borderRadius:'20px',fontSize:'10px',fontWeight:'700',letterSpacing:'0.03em',background:`${color}20`,color,display:'inline-block' }}>{children}</span>
 );
@@ -106,13 +103,12 @@ const StatCard = ({ t, icon, value, label, color }) => (
         <div style={{ position:'absolute',top:0,right:0,width:'80px',height:'80px',borderRadius:'50%',background:`radial-gradient(circle at 70% 30%,${color}18,transparent 70%)`,pointerEvents:'none' }} />
         <div style={{ width:'42px',height:'42px',borderRadius:'11px',background:`${color}15`,color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>{icon}</div>
         <div>
-            <div style={{ fontSize:'26px',fontWeight:'800',color:t.textPrimary,lineHeight:1,fontVariantNumeric:'tabular-nums' }}>{value}</div>
+            <div style={{ fontSize:'clamp(18px, 4vw, 26px)',fontWeight:'800',color:t.textPrimary,lineHeight:1,fontVariantNumeric:'tabular-nums' }}>{value}</div>
             <div style={{ fontSize:'11px',color:t.textMuted,marginTop:'3px',fontWeight:'500' }}>{label}</div>
         </div>
     </div>
 );
 
-// ─── Logout Confirm Modal ─────────────────────────────────────────────────────
 const LogoutModal = ({ t, onConfirm, onCancel }) => (
     <div style={{ position:'fixed',inset:0,background:t.overlay,backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:3000,padding:'16px' }} onClick={onCancel}>
         <div style={{ background:t.modalBg,border:`1px solid ${t.borderMid}`,borderRadius:'20px',padding:'28px',width:'100%',maxWidth:'380px',boxShadow:'0 40px 80px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
@@ -129,7 +125,6 @@ const LogoutModal = ({ t, onConfirm, onCancel }) => (
     </div>
 );
 
-// ─── Task Card ────────────────────────────────────────────────────────────────
 const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, onAssign, updatingStatus, isOnline, canAssign }) => {
     const isOverdue = task.deadline && task.status !== 'completed' && new Date(task.deadline) < new Date();
     const isUpdating = updatingStatus === task.id;
@@ -175,7 +170,6 @@ const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, onAssign, updatin
     );
 };
 
-// ─── Task Modal ───────────────────────────────────────────────────────────────
 const TaskModal = ({ t, title, initialData, onClose, onSave, isOnline }) => {
     const [formTitle,setFormTitle]=useState(initialData?.title||'');
     const [description,setDescription]=useState(initialData?.description||'');
@@ -210,7 +204,6 @@ const TaskModal = ({ t, title, initialData, onClose, onSave, isOnline }) => {
     );
 };
 
-// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 const DeleteModal = ({ t, task, onConfirm, onCancel, loading }) => (
     <div style={{ position:'fixed',inset:0,background:t.overlay,backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,padding:'16px' }} onClick={()=>!loading&&onCancel()}>
         <div style={{ background:t.modalBg,border:`1px solid ${t.dangerBorder}`,borderRadius:'20px',padding:'28px',width:'100%',maxWidth:'400px',boxShadow:'0 40px 80px rgba(0,0,0,0.5)' }} onClick={e=>e.stopPropagation()}>
@@ -227,7 +220,6 @@ const DeleteModal = ({ t, task, onConfirm, onCancel, loading }) => (
     </div>
 );
 
-// ─── Profile Modal ────────────────────────────────────────────────────────────
 const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) => {
     const [tab,setTab]=useState('profile');
     const [fullName,setFullName]=useState(user?.fullName||'');
@@ -265,13 +257,13 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
                     {status&&<div style={{marginBottom:'16px'}}><Alert t={t} type={status.type}>{status.type==='success'?<CheckCircle2 size={13}/>:<AlertCircle size={13}/>} {status.msg}</Alert></div>}
                     {tab==='profile'&&(
                         <div style={{ display:'flex',flexDirection:'column',gap:'18px' }}>
-                            <div style={{ display:'flex',alignItems:'center',gap:'18px',padding:'18px',background:t.accentBg,border:`1px solid ${t.accentBorder}`,borderRadius:'14px' }}>
+                            <div style={{ display:'flex',alignItems:'center',gap:'18px',padding:'18px',background:t.accentBg,border:`1px solid ${t.accentBorder}`,borderRadius:'14px',flexWrap:'wrap' }}>
                                 <div style={{ position:'relative',flexShrink:0 }}>
                                     <div style={{ width:'72px',height:'72px',borderRadius:'50%',overflow:'hidden',border:`3px solid ${t.accentBorder}` }}>{avatarPreview?<img src={avatarPreview} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{ width:'100%',height:'100%',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'26px',fontWeight:'800',color:'#fff' }}>{(user?.fullName||user?.email||'?').charAt(0).toUpperCase()}</div>}</div>
                                     <button onClick={()=>fileRef.current.click()} style={{ position:'absolute',bottom:0,right:0,width:'22px',height:'22px',borderRadius:'50%',background:t.accent,border:`2px solid ${t.modalBg}`,color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}><Camera size={10}/></button>
                                     <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleAvatarChange}/>
                                 </div>
-                                <div style={{flex:1}}><p style={{ margin:'0 0 3px',fontSize:'13px',fontWeight:'600',color:t.textPrimary }}>Profile Photo</p><p style={{ margin:'0 0 10px',fontSize:'11px',color:t.textMuted }}>JPG, PNG · Max 3 MB</p><div style={{display:'flex',gap:'7px'}}><Btn t={t} variant="ghost" size="sm" onClick={()=>fileRef.current.click()} style={{border:`1px solid ${t.accentBorder}`,color:t.accentLight}}>Upload</Btn>{avatarPreview&&<Btn t={t} variant="danger" size="sm" onClick={()=>{setAvatarPreview(null);setAvatarFile(null);}}>Remove</Btn>}</div></div>
+                                <div style={{flex:1,minWidth:'140px'}}><p style={{ margin:'0 0 3px',fontSize:'13px',fontWeight:'600',color:t.textPrimary }}>Profile Photo</p><p style={{ margin:'0 0 10px',fontSize:'11px',color:t.textMuted }}>JPG, PNG · Max 3 MB</p><div style={{display:'flex',gap:'7px',flexWrap:'wrap'}}><Btn t={t} variant="ghost" size="sm" onClick={()=>fileRef.current.click()} style={{border:`1px solid ${t.accentBorder}`,color:t.accentLight}}>Upload</Btn>{avatarPreview&&<Btn t={t} variant="danger" size="sm" onClick={()=>{setAvatarPreview(null);setAvatarFile(null);}}>Remove</Btn>}</div></div>
                             </div>
                             <Input t={t} label="Full Name" type="text" value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Your full name"/>
                             <div><Input t={t} label="Email" type="email" value={user?.email||''} readOnly style={{opacity:0.5,cursor:'not-allowed'}}/><p style={{margin:'5px 0 0',fontSize:'10px',color:t.textMuted}}>Email can only be changed via support.</p></div>
@@ -304,7 +296,6 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     );
 };
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
 const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany, mobileOpen, onMobileClose }) => {
     const personalNav = [
         { id:'dashboard',     icon:<LayoutDashboard size={16}/>, label:'Dashboard'       },
@@ -372,33 +363,32 @@ const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany, m
     );
 };
 
-// ─── Personal Dashboard ───────────────────────────────────────────────────────
 const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivity, filteredTasks, filter, setFilter, searchQuery, setSearchQuery, setShowCreateModal, updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus, onNavigate }) => {
     const hour=new Date().getHours();
     const greeting=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
     const completed=tasks.filter(tk=>tk.status==='completed').length;
     const rate=tasks.length>0?Math.round((completed/tasks.length)*100):0;
     return (
-        <div style={{ padding:'20px 24px 40px',display:'flex',flexDirection:'column',gap:'18px' }}>
-            <div style={{ padding:'24px 28px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'18px',position:'relative',overflow:'hidden' }}>
+        <div style={{ padding:'20px 16px 40px',display:'flex',flexDirection:'column',gap:'18px' }}>
+            <div style={{ padding:'24px 20px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'18px',position:'relative',overflow:'hidden' }}>
                 <div style={{ position:'absolute',top:'-50px',right:'-30px',width:'180px',height:'180px',borderRadius:'50%',background:`radial-gradient(circle,${t.accent}20,transparent 70%)`,pointerEvents:'none' }}/>
                 <p style={{ margin:'0 0 2px',fontSize:'12px',color:t.accentLight,fontWeight:'600' }}>{greeting},</p>
-                <h2 style={{ margin:'0 0 16px',fontSize:'24px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.4px' }}>{user?.fullName||user?.email?.split('@')[0]} 👋</h2>
+                <h2 style={{ margin:'0 0 16px',fontSize:'22px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.4px' }}>{user?.fullName||user?.email?.split('@')[0]} 👋</h2>
                 <div style={{ display:'flex',alignItems:'center',gap:'20px',flexWrap:'wrap' }}>
-                    <div style={{ flex:1,minWidth:'180px' }}>
+                    <div style={{ flex:1,minWidth:'160px' }}>
                         <div style={{ display:'flex',justifyContent:'space-between',marginBottom:'6px' }}><span style={{fontSize:'11px',color:t.textMuted,fontWeight:'500'}}>Today's completion</span><span style={{fontSize:'11px',fontWeight:'800',color:rate>=70?t.success:rate>=40?t.warning:t.accentLight}}>{rate}%</span></div>
                         <div style={{ height:'5px',background:t.border,borderRadius:'3px',overflow:'hidden' }}><div style={{ height:'100%',width:`${rate}%`,background:rate>=70?`linear-gradient(90deg,${t.success},#34d399)`:t.accentGrad,borderRadius:'3px',transition:'width 0.6s ease' }}/></div>
                     </div>
-                    <div style={{ display:'flex',gap:'8px' }}>
+                    <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', justifyContent:'flex-end' }}>
                         {[{v:tasks.length,label:'Total',color:t.accent},{v:completed,label:'Done',color:t.success},{v:tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length,label:'Overdue',color:t.danger}].map((s,i)=>(
-                            <div key={i} style={{ textAlign:'center',padding:'8px 14px',background:'rgba(255,255,255,0.03)',borderRadius:'10px',border:`1px solid ${t.border}` }}><div style={{fontSize:'22px',fontWeight:'800',color:s.color,lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{s.v}</div><div style={{fontSize:'9px',color:t.textMuted,marginTop:'2px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em'}}>{s.label}</div></div>
+                            <div key={i} style={{ textAlign:'center',padding:'8px 12px',background:'rgba(255,255,255,0.03)',borderRadius:'10px',border:`1px solid ${t.border}` }}><div style={{fontSize:'20px',fontWeight:'800',color:s.color,lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{s.v}</div><div style={{fontSize:'9px',color:t.textMuted,marginTop:'2px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em'}}>{s.label}</div></div>
                         ))}
                     </div>
                 </div>
             </div>
-            <div style={{ padding:'14px 18px',background:`linear-gradient(135deg,rgba(124,58,237,0.08),rgba(16,185,129,0.04))`,border:`1px solid ${t.accentBorder}`,borderRadius:'13px',display:'flex',alignItems:'center',gap:'14px' }}>
+            <div style={{ padding:'14px 16px',background:`linear-gradient(135deg,rgba(124,58,237,0.08),rgba(16,185,129,0.04))`,border:`1px solid ${t.accentBorder}`,borderRadius:'13px',display:'flex',alignItems:'center',gap:'14px',flexWrap:'wrap' }}>
                 <div style={{ width:'36px',height:'36px',borderRadius:'10px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Sparkles size={17} color="#fff"/></div>
-                <div style={{flex:1}}><p style={{margin:'0 0 1px',fontSize:'13px',fontWeight:'700',color:t.textPrimary}}>Unlock Team Collaboration</p><p style={{margin:0,fontSize:'11px',color:t.textMuted}}>Set up a company workspace to access team management, progress tracking & reports.</p></div>
+                <div style={{flex:1,minWidth:'160px'}}><p style={{margin:'0 0 1px',fontSize:'13px',fontWeight:'700',color:t.textPrimary}}>Unlock Team Collaboration</p><p style={{margin:0,fontSize:'11px',color:t.textMuted}}>Set up a company workspace to access team management, progress tracking and reports.</p></div>
                 <button onClick={() => onNavigate('company-setup')} style={{ padding:'8px 14px',background:t.accentGrad,border:'none',borderRadius:'8px',color:'#fff',fontSize:'11px',fontWeight:'700',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',flexShrink:0,boxShadow:`0 4px 12px ${t.accent}40`,fontFamily:'inherit' }}>Set up <ArrowRight size={12}/></button>
             </div>
             <div className="dash-content-grid">
@@ -430,26 +420,25 @@ const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivi
     );
 };
 
-// ─── Company Dashboard ────────────────────────────────────────────────────────
 const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivity, filteredTasks, filter, setFilter, searchQuery, setSearchQuery, setShowCreateModal, updateTaskStatus, setDeleteTarget, setEditTask, updatingStatus, companyName, onAssign }) => {
     const canAssign = ['owner','admin','manager'].includes(user?.role);
     const teamStats = { total:tasks.length, inProgress:tasks.filter(tk=>tk.status==='in_progress').length, completed:tasks.filter(tk=>tk.status==='completed').length, overdue:tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length, blocked:tasks.filter(tk=>tk.status==='blocked').length, flagged:tasks.filter(tk=>tk.flagged).length };
     const completionRate=tasks.length>0?Math.round((teamStats.completed/tasks.length)*100):0;
     const byAssignee=tasks.reduce((acc,tk)=>{ const name=tk.assignee_name||'Unassigned'; if(!acc[name])acc[name]={total:0,completed:0}; acc[name].total++; if(tk.status==='completed')acc[name].completed++; return acc; },{});
     return (
-        <div style={{ padding:'20px 24px 40px',display:'flex',flexDirection:'column',gap:'18px' }}>
-            <div style={{ padding:'22px 26px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'18px',position:'relative',overflow:'hidden' }}>
+        <div style={{ padding:'20px 16px 40px',display:'flex',flexDirection:'column',gap:'18px' }}>
+            <div style={{ padding:'22px 20px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'18px',position:'relative',overflow:'hidden' }}>
                 <div style={{ position:'absolute',top:'-40px',right:'-40px',width:'160px',height:'160px',borderRadius:'50%',background:`radial-gradient(circle,${t.accent}18,transparent 70%)`,pointerEvents:'none' }}/>
-                <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'16px' }}>
+                <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'16px',flexWrap:'wrap' }}>
                     <div>
                         <div style={{ display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px' }}>
-                            <div style={{ width:'36px',height:'36px',borderRadius:'10px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center' }}><Building2 size={18} color="#fff"/></div>
+                            <div style={{ width:'36px',height:'36px',borderRadius:'10px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Building2 size={18} color="#fff"/></div>
                             <div><p style={{margin:0,fontSize:'11px',color:t.accentLight,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em'}}>Company Workspace</p><h2 style={{margin:0,fontSize:'20px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px'}}>Team Overview</h2></div>
                         </div>
                         <p style={{margin:0,fontSize:'12px',color:t.textMuted}}>Welcome back, <strong style={{color:t.text}}>{user?.fullName}</strong> · {user?.role}</p>
                     </div>
                     <div style={{textAlign:'right',flexShrink:0}}>
-                        <div style={{fontSize:'36px',fontWeight:'900',color:t.textPrimary,lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{completionRate}%</div>
+                        <div style={{ fontSize:'clamp(24px, 5vw, 36px)', fontWeight:'900',color:t.textPrimary,lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{completionRate}%</div>
                         <div style={{fontSize:'10px',color:t.textMuted,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:'2px'}}>Team Completion</div>
                         <div style={{marginTop:'8px',height:'4px',background:t.border,borderRadius:'2px',width:'100px',overflow:'hidden'}}><div style={{height:'100%',width:`${completionRate}%`,background:t.accentGrad,borderRadius:'2px',transition:'width 0.6s ease'}}/></div>
                     </div>
@@ -494,7 +483,6 @@ const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivit
     );
 };
 
-// ─── Locked View ──────────────────────────────────────────────────────────────
 const LockedView = ({ t, label, onSetup }) => (
     <div style={{ display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'400px',gap:'14px',padding:'40px' }}>
         <div style={{ width:'58px',height:'58px',borderRadius:'16px',background:t.inputBg,border:`1px solid ${t.border}`,display:'flex',alignItems:'center',justifyContent:'center' }}><Lock size={24} color={t.textMuted}/></div>
@@ -503,7 +491,6 @@ const LockedView = ({ t, label, onSetup }) => (
     </div>
 );
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
 const Dashboard = () => {
     const { user, logout, updateUser } = useAuth();
     const [dark, setDark] = useState(() => {
@@ -642,9 +629,11 @@ const Dashboard = () => {
     const headerLabel = isCompany ? (companyName || 'Company') : 'Syncline';
 
     if(loading) return (
-        <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif" }}>
+        <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif",display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px' }}>
             <div style={{ width:'42px',height:'42px',border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:'50%',animation:'spin 0.75s linear infinite' }}/>
-            <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
+            <style>
+                
+                {`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
             <p style={{ color:t.textMuted,fontSize:'13px',margin:0 }}>Loading Syncline…</p>
         </div>
     );
@@ -652,7 +641,6 @@ const Dashboard = () => {
     return (
         <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif",display:'flex',flexDirection:'column' }}>
 
-            {/* ─── Responsive CSS ─────────────────────────────────────────────── */}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
                 @keyframes spin      { to { transform:rotate(360deg); } }
@@ -667,12 +655,10 @@ const Dashboard = () => {
                 ::-webkit-scrollbar-thumb:hover { background:${t.borderMid}; }
                 select option { background:${t.surfaceRaised}; color:${t.textPrimary}; }
 
-                /* Prevent iOS input zoom */
                 @media (max-width:768px) {
                     input,select,textarea { font-size:16px !important; }
                 }
 
-                /* ── Sidebar ── */
                 .dash-sidebar {
                     width: 210px;
                     height: calc(100vh - 58px);
@@ -686,33 +672,28 @@ const Dashboard = () => {
                 }
                 .dash-sidebar--collapsed { width: 60px; }
 
-                /* ── Stat cards row: 4 columns ── */
                 .dash-stats-grid {
                     display: grid;
                     grid-template-columns: repeat(4, 1fr);
                     gap: 10px;
-                    padding: 16px 24px 0;
+                    padding: 16px 20px 0;
                     flex-shrink: 0;
                 }
 
-                /* ── 2-column content layout ── */
                 .dash-content-grid {
                     display: grid;
                     grid-template-columns: 1fr 280px;
                     gap: 16px;
                 }
 
-                /* ── Company 3-column mini stats ── */
                 .dash-team-stats {
                     display: grid;
                     grid-template-columns: repeat(3, 1fr);
                     gap: 10px;
                 }
 
-                /* ── Hamburger button: hidden on desktop ── */
                 .dash-hamburger { display: none; }
 
-                /* ── Mobile overlay ── */
                 .dash-overlay {
                     display: none;
                     position: fixed;
@@ -723,21 +704,17 @@ const Dashboard = () => {
                     -webkit-backdrop-filter: blur(2px);
                 }
 
-                /* ── Tablet ≤ 900px ── */
                 @media (max-width: 900px) {
                     .dash-stats-grid {
                         grid-template-columns: repeat(2, 1fr);
-                        padding: 12px 16px 0;
+                        padding: 12px 14px 0;
                         gap: 8px;
                     }
-                    .dash-content-grid {
-                        grid-template-columns: 1fr;
-                    }
+                    .dash-content-grid { grid-template-columns: 1fr; }
+                    .dash-team-stats   { grid-template-columns: repeat(3, 1fr); }
                 }
 
-                /* ── Mobile ≤ 640px ── */
                 @media (max-width: 640px) {
-                    /* Sidebar slides in from left as a drawer */
                     .dash-sidebar {
                         position: fixed !important;
                         top: 58px !important;
@@ -749,56 +726,45 @@ const Dashboard = () => {
                         transition: transform 0.25s ease !important;
                         box-shadow: 4px 0 32px rgba(0,0,0,0.45);
                     }
+                    @media (max-width: 360px) {
+                    .dash-status-text { display: none; }
+                    .dash-stats-grid { grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px 8px 0; }
+                    .dash-team-stats { grid-template-columns: 1fr 1fr; }
+}
                     .dash-sidebar--open    { transform: translateX(0) !important; }
                     .dash-sidebar--collapsed { width: 220px !important; }
-
-                    /* Show dimmed overlay behind drawer */
                     .dash-overlay { display: block; }
-
-                    /* Reveal hamburger button */
                     .dash-hamburger {
                         display: flex !important;
                         align-items: center;
                         justify-content: center;
                     }
-
-                    /* Collapse header text to make room */
                     .dash-header-name { display: none !important; }
-
-                    /* Stat cards: 2 columns */
                     .dash-stats-grid {
                         grid-template-columns: repeat(2, 1fr);
-                        padding: 10px 12px 0;
+                        padding: 10px 10px 0;
                         gap: 8px;
                     }
-
-                    /* Notification dropdown spans most of screen */
                     .dash-notif-panel {
                         width: calc(100vw - 24px) !important;
                         right: -48px !important;
                     }
-
-                    .dash-content-grid { gap: 12px; }
+                    .dash-content-grid { gap: 10px; }
                     .dash-team-stats   { gap: 8px; }
                 }
 
-                /* ── Very small phones ≤ 400px ── */
                 @media (max-width: 400px) {
                     .dash-stats-grid { gap: 6px; }
                     .dash-team-stats { gap: 6px; }
                 }
             `}</style>
 
-            {/* ── Header ── */}
-            <header style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 16px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'58px',flexShrink:0,gap:'8px' }}>
+            {/* Header */}
+            <header style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 14px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'58px',flexShrink:0,gap:'8px' }}>
                 <div style={{ display:'flex',alignItems:'center',gap:'8px',minWidth:0 }}>
-
-                    {/* Hamburger — CSS makes this visible only on mobile */}
                     <button className="dash-hamburger"
                         onClick={() => setMobileSidebarOpen(o => !o)}
-                        style={{ padding:'7px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.text,cursor:'pointer',flexShrink:0,
-                                 /* display:none is the default; CSS overrides to flex on mobile */
-                                 display:'none',alignItems:'center',justifyContent:'center' }}>
+                        style={{ padding:'7px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.text,cursor:'pointer',flexShrink:0,display:'none',alignItems:'center',justifyContent:'center' }}>
                         <Menu size={16}/>
                     </button>
 
@@ -807,13 +773,12 @@ const Dashboard = () => {
                             ? <img src={companyLogo.startsWith('http')?companyLogo:`http://localhost:3001${companyLogo}`} alt="logo" style={{ width:'32px',height:'32px',borderRadius:'7px',objectFit:'cover',border:`1px solid ${t.border}`,flexShrink:0 }}/>
                             : <div style={{ width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Zap size={14} color="#fff"/></div>
                         }
-                        {/* Hidden on mobile via CSS .dash-header-name */}
                         <span className="dash-header-name" style={{ fontSize:'16px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px',whiteSpace:'nowrap' }}>{headerLabel}</span>
                     </div>
 
                     <div style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:isOnline?t.onlineBg:t.offlineBg,borderRadius:'20px',border:`1px solid ${isOnline?t.successBorder:t.dangerBorder}`,flexShrink:0 }}>
                         {isOnline?<Wifi size={9} color={t.online}/>:<WifiOff size={9} color={t.offline}/>}
-                       <span style={{ fontSize:'9px',color:isOnline?t.online :t.offline,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>{!isOnline?'Offline':wsConnected?'Live':'Connecting'}</span>
+                        <span className="dash-status-text" style={{ fontSize:'9px',color:isOnline?t.online:t.offline,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>{!isOnline?'Offline':wsConnected?'Live':'Connecting'}</span>
                     </div>
 
                     {isCompany && (
@@ -849,7 +814,6 @@ const Dashboard = () => {
                         <div style={{ width:'26px',height:'26px',borderRadius:'6px',overflow:'hidden',flexShrink:0 }}>
                             {(user?.avatar||user?.avatar_url)?<img src={resolveAvatar(user.avatar||user.avatar_url)} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'800',color:'#fff'}}>{(user?.fullName||user?.email||'?').charAt(0).toUpperCase()}</div>}
                         </div>
-                        {/* Name hidden on mobile via CSS */}
                         <div className="dash-header-name" style={{textAlign:'left'}}>
                             <div style={{fontSize:'11px',fontWeight:'700',color:t.textPrimary,maxWidth:'90px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.fullName||user?.email}</div>
                             <div style={{fontSize:'9px',color:t.textMuted,textTransform:'capitalize'}}>{user?.role}</div>
@@ -870,7 +834,7 @@ const Dashboard = () => {
                 </div>
             )}
 
-           <div style={{display:'flex',width:'100%'}}>
+            <div style={{display:'flex',width:'100%'}}>
                 <Sidebar
                     t={t}
                     currentView={currentView}
@@ -881,7 +845,7 @@ const Dashboard = () => {
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />
-                <main style={{flex:1,width:'100%',overflowX:'hidden'}}>
+                <main style={{flex:1,width:'100%',overflowX:'hidden',minWidth:0}}>
                     <div className="dash-stats-grid">
                         <StatCard t={t} icon={<ListTodo size={18}/>} value={tasks.length} label="Total Tasks" color={t.accent}/>
                         <StatCard t={t} icon={<Clock size={18}/>} value={tasks.filter(tk=>tk.status==='in_progress').length} label="In Progress" color={t.info}/>

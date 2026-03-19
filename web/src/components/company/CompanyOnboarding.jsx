@@ -401,7 +401,7 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
             style={inputStyle} onFocus={iF} onBlur={iB} />
         </Field>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid",gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
           <Field label="Industry" tk={tk}>
             <select value={form.industry} onChange={e => set("industry", e.target.value)}
               style={{ ...inputStyle, background: "rgba(255,255,255,0.04)", cursor: "pointer" }}
@@ -508,7 +508,7 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
               <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: tk.text }}>Your industry</h3>
               <p style={{ margin: 0, fontSize: 13, color: tk.subtle }}>Helps us tailor features to your workflow.</p>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7 }}>
+            <div style={{ display: "grid",gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 110px), 1fr))', gap: 7 }}>
               {INDUSTRIES.map(ind => {
                 const active = form.industry === ind;
                 return (
@@ -668,7 +668,7 @@ const CompanyCard = ({ company, companyName, canEdit, onEdit, tk }) => {
           </div>
 
           {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+          <div style={{ display: "grid",gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 90px), 1fr))', gap: 8 }}>
             {[
               { label: "Industry",  value: company?.industry     || "—" },
               { label: "Team Size", value: company?.size         || "—" },

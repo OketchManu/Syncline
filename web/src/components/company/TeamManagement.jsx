@@ -5,12 +5,11 @@ import {
     Users, UserPlus, Shield, Search, X,
     Mail, Crown, Briefcase, User, CheckCircle2,
     MoreVertical, UserMinus, RefreshCw, Send,
-    Download, Eye, 
+    Download, Eye,
     AlertCircle, Activity,
     Check, Ban
 } from 'lucide-react';
 
-// ─── Theme (mirrors Dashboard.jsx exactly) ───────────────────────────────────
 const themes = {
     dark: {
         bg: '#0f172a', surfacePrimary: '#1e293b', surfaceSecondary: 'rgba(30,41,59,0.9)',
@@ -62,7 +61,6 @@ const roleConfig = {
     member:  { label: 'Member',  color: '#94a3b8', bg: 'rgba(148,163,184,0.15)',  icon: <User size={11} />, rank: 1 },
 };
 
-// ─── Shared UI Atoms ─────────────────────────────────────────────────────────
 const StatusAlert = ({ t, type, children }) => {
     const s = {
         error:   { bg: t.errorBg,   border: t.errorBorder,   color: t.errorText },
@@ -101,14 +99,12 @@ const Spinner = ({ size = 16, color = '#6366f1' }) => (
 
 // ─── Invite Member Modal ──────────────────────────────────────────────────────
 const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
-    const [email, setEmail]   = useState('');
-    const [role, setRole]     = useState('member');
+    const [email, setEmail]     = useState('');
+    const [role, setRole]       = useState('member');
     const [loading, setLoading] = useState(false);
-    const [status, setStatus] = useState(null);
+    const [status, setStatus]   = useState(null);
 
-    const allowedRoles = currentUserRole === 'owner'
-        ? ['admin', 'manager', 'member']
-        : ['member'];
+    const allowedRoles = currentUserRole === 'owner' ? ['admin', 'manager', 'member'] : ['member'];
 
     const handleSubmit = async () => {
         if (!email.trim()) { setStatus({ type: 'error', msg: 'Email is required' }); return; }
@@ -121,8 +117,8 @@ const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
     };
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }} onClick={onClose}>
-            <div style={{ background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '20px', width: '90%', maxWidth: '460px', padding: '28px', boxShadow: '0 32px 80px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500, padding: '16px' }} onClick={onClose}>
+            <div style={{ background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '20px', width: '100%', maxWidth: '460px', padding: '28px', boxShadow: '0 32px 80px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                     <div>
                         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: t.textPrimary }}>Invite Team Member</h2>
@@ -153,7 +149,6 @@ const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
                         </select>
                     </div>
 
-                    {/* Role description card */}
                     <div style={{ padding: '12px 14px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '10px' }}>
                         <p style={{ margin: 0, fontSize: '12px', color: t.accentText, lineHeight: 1.6 }}>
                             {role === 'admin' && '🛡️ Admins can manage users, assign tasks, view all reports, and access company analytics.'}
@@ -178,13 +173,11 @@ const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
 
 // ─── Change Role Modal ────────────────────────────────────────────────────────
 const ChangeRoleModal = ({ t, member, onClose, onSave, currentUserRole }) => {
-    const [role, setRole]     = useState(member.role);
+    const [role, setRole]       = useState(member.role);
     const [loading, setLoading] = useState(false);
-    const [status, setStatus] = useState(null);
+    const [status, setStatus]   = useState(null);
 
-    const availableRoles = currentUserRole === 'owner'
-        ? ['admin', 'manager', 'member']
-        : ['manager', 'member'];
+    const availableRoles = currentUserRole === 'owner' ? ['admin', 'manager', 'member'] : ['manager', 'member'];
 
     const handleSave = async () => {
         if (role === member.role) { onClose(); return; }
@@ -196,8 +189,8 @@ const ChangeRoleModal = ({ t, member, onClose, onSave, currentUserRole }) => {
     };
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }} onClick={onClose}>
-            <div style={{ background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '20px', width: '90%', maxWidth: '400px', padding: '28px', boxShadow: '0 32px 80px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500, padding: '16px' }} onClick={onClose}>
+            <div style={{ background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '20px', width: '100%', maxWidth: '400px', padding: '28px', boxShadow: '0 32px 80px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: t.textPrimary }}>Change Role</h2>
                     <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex' }}><X size={15} /></button>
@@ -249,8 +242,8 @@ const ChangeRoleModal = ({ t, member, onClose, onSave, currentUserRole }) => {
 
 // ─── Remove Member Confirm Modal ──────────────────────────────────────────────
 const RemoveModal = ({ t, member, onClose, onConfirm, loading }) => (
-    <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }} onClick={() => !loading && onClose()}>
-        <div style={{ background: t.modalBg, border: `1px solid ${t.dangerBorder}`, borderRadius: '18px', padding: '28px', width: '90%', maxWidth: '420px', boxShadow: '0 30px 70px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px' }} onClick={() => !loading && onClose()}>
+        <div style={{ background: t.modalBg, border: `1px solid ${t.dangerBorder}`, borderRadius: '18px', padding: '28px', width: '100%', maxWidth: '420px', boxShadow: '0 30px 70px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <UserMinus size={22} color={t.dangerText} />
@@ -276,37 +269,29 @@ const RemoveModal = ({ t, member, onClose, onConfirm, loading }) => (
 
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
-    const memberTasks = tasks.filter(tk =>
-        tk.assignee_id === member.id || tk.created_by === member.id
-    );
-    const completed = memberTasks.filter(tk => tk.status === 'completed').length;
-    const inProgress = memberTasks.filter(tk => tk.status === 'in_progress').length;
-    const overdue = memberTasks.filter(tk =>
-        tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed'
-    ).length;
-    const completionRate = memberTasks.length > 0
-        ? Math.round((completed / memberTasks.length) * 100) : 0;
+    const memberTasks  = tasks.filter(tk => tk.assignee_id === member.id || tk.created_by === member.id);
+    const completed    = memberTasks.filter(tk => tk.status === 'completed').length;
+    const inProgress   = memberTasks.filter(tk => tk.status === 'in_progress').length;
+    const overdue      = memberTasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length;
+    const completionRate = memberTasks.length > 0 ? Math.round((completed / memberTasks.length) * 100) : 0;
 
-    const statusColor = { pending: '#f59e0b', in_progress: '#3b82f6', completed: '#10b981', blocked: '#ef4444' };
+    const statusColor   = { pending: '#f59e0b', in_progress: '#3b82f6', completed: '#10b981', blocked: '#ef4444' };
     const priorityColor = { low: '#64748b', medium: '#f59e0b', high: '#ef4444', urgent: '#dc2626' };
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500 }} onClick={onClose}>
-            <div style={{ background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '20px', width: '90%', maxWidth: '580px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-
-                {/* Header */}
+        <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500, padding: '16px' }} onClick={onClose}>
+            <div style={{ background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '20px', width: '100%', maxWidth: '580px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
                 <div style={{ padding: '24px', borderBottom: `1px solid ${t.border}`, display: 'flex', gap: '16px', alignItems: 'center' }}>
                     <Avatar user={member} size={56} />
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: t.textPrimary }}>{member.fullName || 'No name'}</h2>
-                        <p style={{ margin: '3px 0 6px', fontSize: '13px', color: t.textMuted }}>{member.email}</p>
+                        <p style={{ margin: '3px 0 6px', fontSize: '13px', color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</p>
                         <RoleBadge role={member.role} />
                     </div>
                     <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex', alignSelf: 'flex-start' }}><X size={15} /></button>
                 </div>
 
-                {/* Stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', padding: '18px 24px', borderBottom: `1px solid ${t.border}` }}>
+                <div className="tm-member-stats" style={{ padding: '18px 24px', borderBottom: `1px solid ${t.border}` }}>
                     {[
                         { label: 'Total Tasks', value: memberTasks.length, color: '#6366f1' },
                         { label: 'Completed',   value: completed,          color: '#10b981' },
@@ -320,7 +305,6 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
                     ))}
                 </div>
 
-                {/* Completion bar */}
                 <div style={{ padding: '14px 24px', borderBottom: `1px solid ${t.border}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                         <span style={{ fontSize: '12px', color: t.textSecondary, fontWeight: '500' }}>Completion Rate</span>
@@ -331,7 +315,6 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
                     </div>
                 </div>
 
-                {/* Task list */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px' }}>
                     <h4 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '600', color: t.textSecondary }}>ASSIGNED TASKS ({memberTasks.length})</h4>
                     {memberTasks.length === 0
@@ -346,7 +329,7 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
                                             {isOverdue ? '⚠️ Overdue: ' : '📅 '}{new Date(task.deadline).toLocaleDateString()}
                                         </p>}
                                     </div>
-                                    <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+                                    <div style={{ display: 'flex', gap: '5px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                         <span style={{ padding: '2px 7px', borderRadius: '12px', fontSize: '10px', fontWeight: '600', background: `${statusColor[task.status]}22`, color: statusColor[task.status] }}>
                                             {task.status.replace('_', ' ')}
                                         </span>
@@ -364,7 +347,7 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
     );
 };
 
-// ─── Member Row / Card ────────────────────────────────────────────────────────
+// ─── Member Row ───────────────────────────────────────────────────────────────
 const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onRemove, onDeactivate }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef();
@@ -375,26 +358,24 @@ const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onR
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const memberTasks = tasks.filter(tk => tk.assignee_id === member.id || tk.created_by === member.id);
-    const completed   = memberTasks.filter(tk => tk.status === 'completed').length;
-    const overdue     = memberTasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length;
+    const memberTasks    = tasks.filter(tk => tk.assignee_id === member.id || tk.created_by === member.id);
+    const completed      = memberTasks.filter(tk => tk.status === 'completed').length;
+    const overdue        = memberTasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length;
     const completionRate = memberTasks.length > 0 ? Math.round((completed / memberTasks.length) * 100) : 0;
 
-    const isSelf     = member.id === currentUser.id;
-    const canManage  = ['owner', 'admin'].includes(currentUser.role) && !isSelf;
+    const isSelf        = member.id === currentUser.id;
+    const canManage     = ['owner', 'admin'].includes(currentUser.role) && !isSelf;
     const canRoleChange = canManage && member.role !== 'owner';
-
-    const joinedDate = member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
+    const joinedDate    = member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '13px', transition: 'border-color 0.15s', position: 'relative' }}
+        <div className="tm-member-row" style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '13px', transition: 'border-color 0.15s', position: 'relative' }}
             onMouseEnter={e => e.currentTarget.style.borderColor = t.borderMid}
             onMouseLeave={e => e.currentTarget.style.borderColor = t.border}>
 
             <Avatar user={member} size={42} />
 
-            {/* Name & email */}
-            <div style={{ flex: '0 0 200px', minWidth: 0 }}>
+            <div className="tm-member-name-col">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {member.fullName || 'No name'}
@@ -404,13 +385,11 @@ const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onR
                 <p style={{ margin: '2px 0 0', fontSize: '12px', color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</p>
             </div>
 
-            {/* Role */}
-            <div style={{ flex: '0 0 100px' }}>
+            <div className="tm-member-role-col">
                 <RoleBadge role={member.role} />
             </div>
 
-            {/* Task stats */}
-            <div style={{ flex: 1, display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div className="tm-member-task-stats">
                 <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '16px', fontWeight: '700', color: t.textPrimary }}>{memberTasks.length}</div>
                     <div style={{ fontSize: '10px', color: t.textMuted }}>Tasks</div>
@@ -425,8 +404,7 @@ const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onR
                         <div style={{ fontSize: '10px', color: t.textMuted }}>Overdue</div>
                     </div>
                 )}
-                {/* Progress bar */}
-                <div style={{ flex: 1, maxWidth: '100px' }}>
+                <div className="tm-progress-bar-wrap">
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                         <span style={{ fontSize: '10px', color: t.textMuted }}>Progress</span>
                         <span style={{ fontSize: '10px', fontWeight: '600', color: completionRate >= 70 ? '#10b981' : completionRate >= 40 ? '#f59e0b' : t.textMuted }}>{completionRate}%</span>
@@ -437,16 +415,13 @@ const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onR
                 </div>
             </div>
 
-            {/* Joined */}
-            <div style={{ flex: '0 0 80px', textAlign: 'right' }}>
+            <div className="tm-member-joined-col">
                 <p style={{ margin: 0, fontSize: '11px', color: t.textMuted }}>Joined</p>
                 <p style={{ margin: '1px 0 0', fontSize: '12px', color: t.textSecondary, fontWeight: '500' }}>{joinedDate}</p>
             </div>
 
-            {/* Status dot */}
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: member.isActive !== false ? '#10b981' : '#ef4444', flexShrink: 0 }} title={member.isActive !== false ? 'Active' : 'Deactivated'} />
 
-            {/* Actions */}
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button onClick={() => onInspect(member)}
                     style={{ padding: '6px 12px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '7px', color: t.accentText, fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -498,15 +473,14 @@ const InvitationsPanel = ({ t, invitations, onResend, onRevoke, loading }) => {
             No pending invitations
         </div>
     );
-
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {invitations.map(inv => (
-                <div key={inv.id || inv.email} style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '13px 16px', background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '11px' }}>
+                <div key={inv.id || inv.email} style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '13px 16px', background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '11px', flexWrap: 'wrap' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: t.warnBg, border: `1px solid ${t.warnBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Mail size={15} color={t.warnText} />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ flex: 1, minWidth: '120px' }}>
                         <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.email}</p>
                         <p style={{ margin: '2px 0 0', fontSize: '11px', color: t.textMuted }}>
                             Invited as <span style={{ color: roleConfig[inv.role]?.color }}>{roleConfig[inv.role]?.label}</span>
@@ -535,22 +509,22 @@ const TeamManagement = ({ dark = true }) => {
     const { user } = useAuth();
     const t = dark ? themes.dark : themes.light;
 
-    const [members, setMembers]           = useState([]);
-    const [invitations, setInvitations]   = useState([]);
-    const [tasks, setTasks]               = useState([]);
-    const [loading, setLoading]           = useState(true);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [error, setError]               = useState(null);
-    const [toast, setToast]               = useState(null);
+    const [members, setMembers]               = useState([]);
+    const [invitations, setInvitations]       = useState([]);
+    const [tasks, setTasks]                   = useState([]);
+    const [loading, setLoading]               = useState(true);
+    const [actionLoading, setActionLoading]   = useState(false);
+    const [error, setError]                   = useState(null);
+    const [toast, setToast]                   = useState(null);
 
-    const [tab, setTab]                   = useState('members'); // members | invitations
-    const [search, setSearch]             = useState('');
-    const [roleFilter, setRoleFilter]     = useState('all');
+    const [tab, setTab]                       = useState('members');
+    const [search, setSearch]                 = useState('');
+    const [roleFilter, setRoleFilter]         = useState('all');
 
-    const [showInvite, setShowInvite]     = useState(false);
+    const [showInvite, setShowInvite]         = useState(false);
     const [changeRoleMember, setChangeRoleMember] = useState(null);
-    const [removeMember, setRemoveMember] = useState(null);
-    const [inspectMember, setInspectMember] = useState(null);
+    const [removeMember, setRemoveMember]     = useState(null);
+    const [inspectMember, setInspectMember]   = useState(null);
 
     const canManage = ['owner', 'admin'].includes(user?.role);
 
@@ -564,13 +538,11 @@ const TeamManagement = ({ dark = true }) => {
         Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
     }), []);
 
-    // ── Fetch members ──────────────────────────────────────────────────────────
     const fetchMembers = useCallback(async () => {
         try {
             const res = await fetch(`${API_BASE}/company/team`, { headers: authHeaders() });
             if (!res.ok) throw new Error('Failed to fetch team');
             const data = await res.json();
-            // Normalize field names
             const normalized = (data.members || []).map(m => ({
                 ...m,
                 fullName: m.fullName || m.full_name || null,
@@ -578,22 +550,18 @@ const TeamManagement = ({ dark = true }) => {
                 createdAt: m.createdAt || m.created_at,
             }));
             setMembers(normalized);
-        } catch (err) {
-            setError(err.message);
-        }
+        } catch (err) { setError(err.message); }
     }, [authHeaders]);
 
-    // ── Fetch invitations ──────────────────────────────────────────────────────
     const fetchInvitations = useCallback(async () => {
         try {
             const res = await fetch(`${API_BASE}/company/invitations`, { headers: authHeaders() });
-            if (!res.ok) return; // endpoint may not exist yet — fail silently
+            if (!res.ok) return;
             const data = await res.json();
             setInvitations(data.invitations || []);
         } catch (_) {}
     }, [authHeaders]);
 
-    // ── Fetch all company tasks (for stats) ────────────────────────────────────
     const fetchTasks = useCallback(async () => {
         try {
             const res = await fetch(`${API_BASE}/tasks`, { headers: authHeaders() });
@@ -612,14 +580,9 @@ const TeamManagement = ({ dark = true }) => {
         load();
     }, [fetchMembers, fetchInvitations, fetchTasks]);
 
-    // ── Invite ─────────────────────────────────────────────────────────────────
     const handleInvite = async ({ email, role }) => {
         try {
-            const res = await fetch(`${API_BASE}/company/team/invite`, {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({ email, role }),
-            });
+            const res = await fetch(`${API_BASE}/company/team/invite`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ email, role }) });
             const data = await res.json();
             if (!res.ok) return data.error || 'Failed to send invitation';
             await fetchInvitations();
@@ -628,14 +591,9 @@ const TeamManagement = ({ dark = true }) => {
         } catch (err) { return err.message; }
     };
 
-    // ── Change role ────────────────────────────────────────────────────────────
     const handleChangeRole = async (userId, role) => {
         try {
-            const res = await fetch(`${API_BASE}/company/team/${userId}/role`, {
-                method: 'PATCH',
-                headers: authHeaders(),
-                body: JSON.stringify({ role }),
-            });
+            const res = await fetch(`${API_BASE}/company/team/${userId}/role`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ role }) });
             const data = await res.json();
             if (!res.ok) return data.error || 'Failed to update role';
             setMembers(prev => prev.map(m => m.id === userId ? { ...m, role } : m));
@@ -644,15 +602,11 @@ const TeamManagement = ({ dark = true }) => {
         } catch (err) { return err.message; }
     };
 
-    // ── Remove member ──────────────────────────────────────────────────────────
     const handleRemove = async () => {
         if (!removeMember) return;
         setActionLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/company/team/${removeMember.id}`, {
-                method: 'DELETE',
-                headers: authHeaders(),
-            });
+            const res = await fetch(`${API_BASE}/company/team/${removeMember.id}`, { method: 'DELETE', headers: authHeaders() });
             if (!res.ok) { const d = await res.json(); showToast(d.error || 'Failed to remove', 'error'); }
             else { setMembers(prev => prev.filter(m => m.id !== removeMember.id)); showToast(`${removeMember.fullName || removeMember.email} removed`); }
         } catch (err) { showToast(err.message, 'error'); }
@@ -660,29 +614,19 @@ const TeamManagement = ({ dark = true }) => {
         setRemoveMember(null);
     };
 
-    // ── Deactivate / reactivate ────────────────────────────────────────────────
     const handleDeactivate = async (member) => {
         const newState = member.isActive === false ? true : false;
         try {
-            const res = await fetch(`${API_BASE}/company/team/${member.id}/status`, {
-                method: 'PATCH',
-                headers: authHeaders(),
-                body: JSON.stringify({ isActive: newState }),
-            });
+            const res = await fetch(`${API_BASE}/company/team/${member.id}/status`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ isActive: newState }) });
             if (!res.ok) { showToast('Failed to update status', 'error'); return; }
             setMembers(prev => prev.map(m => m.id === member.id ? { ...m, isActive: newState } : m));
             showToast(`${member.fullName || member.email} ${newState ? 'reactivated' : 'deactivated'}`);
         } catch (err) { showToast(err.message, 'error'); }
     };
 
-    // ── Resend / revoke invitation ─────────────────────────────────────────────
     const handleResendInvite = async (inv) => {
         try {
-            const res = await fetch(`${API_BASE}/company/team/invite`, {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({ email: inv.email, role: inv.role }),
-            });
+            const res = await fetch(`${API_BASE}/company/team/invite`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ email: inv.email, role: inv.role }) });
             if (!res.ok) { showToast('Failed to resend', 'error'); return; }
             showToast(`Invitation resent to ${inv.email}`);
         } catch (err) { showToast(err.message, 'error'); }
@@ -690,28 +634,24 @@ const TeamManagement = ({ dark = true }) => {
 
     const handleRevokeInvite = async (inv) => {
         try {
-            const res = await fetch(`${API_BASE}/company/invitations/${inv.id || inv.token}`, {
-                method: 'DELETE',
-                headers: authHeaders(),
-            });
+            const res = await fetch(`${API_BASE}/company/invitations/${inv.id || inv.token}`, { method: 'DELETE', headers: authHeaders() });
             if (!res.ok) { showToast('Failed to revoke', 'error'); return; }
             setInvitations(prev => prev.filter(i => i.id !== inv.id && i.token !== inv.token));
             showToast('Invitation revoked');
         } catch (err) { showToast(err.message, 'error'); }
     };
 
-    // ── Export CSV ─────────────────────────────────────────────────────────────
     const exportCSV = () => {
         const rows = [
             ['Name', 'Email', 'Role', 'Total Tasks', 'Completed', 'Overdue', 'Joined'],
             ...members.map(m => {
-                const mt = tasks.filter(tk => tk.assignee_id === m.id || tk.created_by === m.id);
+                const mt   = tasks.filter(tk => tk.assignee_id === m.id || tk.created_by === m.id);
                 const done = mt.filter(tk => tk.status === 'completed').length;
                 const od   = mt.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length;
                 return [m.fullName || '', m.email, m.role, mt.length, done, od, m.createdAt ? new Date(m.createdAt).toLocaleDateString() : ''];
             })
         ];
-        const csv = rows.map(r => r.join(',')).join('\n');
+        const csv  = rows.map(r => r.join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement('a'); a.href = url; a.download = 'team-export.csv'; a.click();
@@ -719,16 +659,12 @@ const TeamManagement = ({ dark = true }) => {
         showToast('Team exported as CSV');
     };
 
-    // ── Filtered members ───────────────────────────────────────────────────────
     const filtered = members.filter(m => {
-        const matchSearch = !search ||
-            (m.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
-            m.email.toLowerCase().includes(search.toLowerCase());
-        const matchRole = roleFilter === 'all' || m.role === roleFilter;
+        const matchSearch = !search || (m.fullName || '').toLowerCase().includes(search.toLowerCase()) || m.email.toLowerCase().includes(search.toLowerCase());
+        const matchRole   = roleFilter === 'all' || m.role === roleFilter;
         return matchSearch && matchRole;
     });
 
-    // ── Summary stats ──────────────────────────────────────────────────────────
     const stats = {
         total:   members.length,
         active:  members.filter(m => m.isActive !== false).length,
@@ -736,7 +672,6 @@ const TeamManagement = ({ dark = true }) => {
         pending: invitations.length,
     };
 
-    // ── Loading state ──────────────────────────────────────────────────────────
     if (loading) return (
         <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
             <Spinner size={32} />
@@ -746,10 +681,76 @@ const TeamManagement = ({ dark = true }) => {
     );
 
     return (
-        <div style={{ padding: '24px 28px', maxWidth: '1400px', margin: '0 auto', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+        <div style={{ padding: '24px 20px', maxWidth: '1400px', margin: '0 auto', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+            <style>{`
+                @keyframes spin     { to { transform: rotate(360deg); } }
+                @keyframes slideIn  { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 
-            {/* ── Toast ── */}
+                /* ── Member row layout ── */
+                .tm-member-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 14px 18px;
+                    flex-wrap: nowrap;
+                }
+                .tm-member-name-col  { flex: 0 0 200px; min-width: 0; }
+                .tm-member-role-col  { flex: 0 0 100px; }
+                .tm-member-task-stats {
+                    flex: 1;
+                    display: flex;
+                    gap: 16px;
+                    align-items: center;
+                }
+                .tm-progress-bar-wrap { flex: 1; max-width: 100px; }
+                .tm-member-joined-col { flex: 0 0 80px; text-align: right; }
+
+                /* ── Stats row: 4 cols ── */
+                .tm-stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 12px;
+                    margin-bottom: 22px;
+                }
+
+                /* ── Member detail stats ── */
+                .tm-member-stats {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 10px;
+                }
+
+                /* ── Tablet ≤ 768px ── */
+                @media (max-width: 768px) {
+                    .tm-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+                    .tm-member-joined-col { display: none; }
+                    .tm-progress-bar-wrap { display: none; }
+                    .tm-member-task-stats { gap: 12px; }
+                }
+
+                /* ── Mobile ≤ 600px ── */
+                @media (max-width: 600px) {
+                    .tm-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+                    .tm-member-row { min-width: 0; overflow: hidden;}
+                    .tm-member-row { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+                    .tm-member-name-col  { flex: 1; min-width: 120px; }
+                    .tm-member-role-col  { flex: 0 0 auto; }
+                    .tm-member-task-stats { display: none; }
+                    .tm-member-joined-col { display: none; }
+                    .tm-member-stats { grid-template-columns: repeat(2, 1fr); }
+                }
+                    @media (max-width: 400px) {
+    .tm-member-stats { grid-template-columns: repeat(2, 1fr); }
+    .tm-stats-grid   { grid-template-columns: 1fr 1fr; }
+}
+
+                /* ── Very small ≤ 420px ── */
+                @media (max-width: 420px) {
+                    .tm-stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+                }
+            `}</style>
+
+            {/* Toast */}
             {toast && (
                 <div style={{ position: 'fixed', top: '20px', right: '24px', zIndex: 3000, animation: 'slideIn 0.25s ease', background: toast.type === 'error' ? t.dangerBg : t.successBg, border: `1px solid ${toast.type === 'error' ? t.dangerBorder : t.successBorder}`, color: toast.type === 'error' ? t.dangerText : t.successText, padding: '12px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', maxWidth: '320px' }}>
                     {toast.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
@@ -757,8 +758,8 @@ const TeamManagement = ({ dark = true }) => {
                 </div>
             )}
 
-            {/* ── Page Header ── */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+            {/* Page Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
                     <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: t.textPrimary, display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Users size={22} color="#6366f1" /> Team Management
@@ -768,7 +769,7 @@ const TeamManagement = ({ dark = true }) => {
                     </p>
                 </div>
                 {canManage && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button onClick={exportCSV}
                             style={{ padding: '9px 16px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Download size={14} /> Export
@@ -781,13 +782,13 @@ const TeamManagement = ({ dark = true }) => {
                 )}
             </div>
 
-            {/* ── Stats Row ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '22px' }}>
+            {/* Stats Row */}
+            <div className="tm-stats-grid">
                 {[
-                    { icon: <Users size={19} />,       value: stats.total,   label: 'Total Members',    color: '#6366f1' },
-                    { icon: <Activity size={19} />,    value: stats.active,  label: 'Active Members',   color: '#10b981' },
-                    { icon: <Shield size={19} />,      value: stats.admins,  label: 'Admins & Owners',  color: '#f59e0b' },
-                    { icon: <Mail size={19} />,        value: stats.pending, label: 'Pending Invites',  color: '#3b82f6' },
+                    { icon: <Users size={19} />,    value: stats.total,   label: 'Total Members',   color: '#6366f1' },
+                    { icon: <Activity size={19} />, value: stats.active,  label: 'Active Members',  color: '#10b981' },
+                    { icon: <Shield size={19} />,   value: stats.admins,  label: 'Admins & Owners', color: '#f59e0b' },
+                    { icon: <Mail size={19} />,     value: stats.pending, label: 'Pending Invites', color: '#3b82f6' },
                 ].map((s, i) => (
                     <div key={i} style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '13px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '13px' }}>
                         <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: `${s.color}18`, color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{s.icon}</div>
@@ -799,49 +800,48 @@ const TeamManagement = ({ dark = true }) => {
                 ))}
             </div>
 
-            {/* ── Error Banner ── */}
+            {/* Error Banner */}
             {error && (
                 <div style={{ marginBottom: '16px' }}>
-                    <StatusAlert t={t} type="error"><AlertCircle size={14} /> {error} — <button onClick={() => { setError(null); fetchMembers(); }} style={{ background: 'none', border: 'none', color: t.errorText, cursor: 'pointer', textDecoration: 'underline', fontSize: '13px', padding: 0 }}>retry</button></StatusAlert>
+                    <StatusAlert t={t} type="error">
+                        <AlertCircle size={14} /> {error} —{' '}
+                        <button onClick={() => { setError(null); fetchMembers(); }} style={{ background: 'none', border: 'none', color: t.errorText, cursor: 'pointer', textDecoration: 'underline', fontSize: '13px', padding: 0 }}>retry</button>
+                    </StatusAlert>
                 </div>
             )}
 
-            {/* ── Main Panel ── */}
+            {/* Main Panel */}
             <div style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '15px', overflow: 'hidden' }}>
 
                 {/* Toolbar */}
-                <div style={{ padding: '16px 20px', borderBottom: `1px solid ${t.border}`, display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Tabs */}
+                <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', gap: '2px', background: t.inputBg, borderRadius: '9px', padding: '3px' }}>
                         {[
                             { id: 'members',     label: `Members (${members.length})` },
                             { id: 'invitations', label: `Pending (${invitations.length})` },
                         ].map(tb => (
                             <button key={tb.id} onClick={() => setTab(tb.id)}
-                                style={{ padding: '6px 14px', background: tab === tb.id ? t.surfacePrimary : 'none', border: tab === tb.id ? `1px solid ${t.border}` : '1px solid transparent', borderRadius: '7px', color: tab === tb.id ? t.textPrimary : t.textMuted, fontSize: '12px', fontWeight: tab === tb.id ? '600' : '400', cursor: 'pointer', transition: 'all 0.15s' }}>
+                                style={{ padding: '6px 12px', background: tab === tb.id ? t.surfacePrimary : 'none', border: tab === tb.id ? `1px solid ${t.border}` : '1px solid transparent', borderRadius: '7px', color: tab === tb.id ? t.textPrimary : t.textMuted, fontSize: '12px', fontWeight: tab === tb.id ? '600' : '400', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
                                 {tb.label}
                             </button>
                         ))}
                     </div>
 
-                    {/* Search */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', flex: 1, minWidth: '200px', maxWidth: '320px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', flex: 1, minWidth: '140px', maxWidth: '320px' }}>
                         <Search size={14} color={t.textMuted} />
                         <input type="text" placeholder="Search members…" value={search} onChange={e => setSearch(e.target.value)}
                             style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
                         {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', display: 'flex', padding: 0 }}><X size={13} /></button>}
                     </div>
 
-                    {/* Role filter */}
                     {tab === 'members' && (
                         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-                            style={{ padding: '7px 12px', background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.selectText, fontSize: '12px', cursor: 'pointer', outline: 'none' }}>
+                            style={{ padding: '7px 10px', background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.selectText, fontSize: '12px', cursor: 'pointer', outline: 'none' }}>
                             <option value="all">All Roles</option>
                             {Object.keys(roleConfig).map(r => <option key={r} value={r}>{roleConfig[r].label}</option>)}
                         </select>
                     )}
 
-                    {/* Refresh */}
                     <button onClick={() => { fetchMembers(); fetchInvitations(); fetchTasks(); }}
                         style={{ padding: '7px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', display: 'flex', marginLeft: 'auto' }}>
                         <RefreshCw size={14} />
@@ -849,7 +849,7 @@ const TeamManagement = ({ dark = true }) => {
                 </div>
 
                 {/* Content */}
-                <div style={{ padding: '16px 20px' }}>
+                <div style={{ padding: '14px 16px' }}>
                     {tab === 'members' ? (
                         filtered.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '52px 20px' }}>
@@ -882,21 +882,11 @@ const TeamManagement = ({ dark = true }) => {
                 </div>
             </div>
 
-            {/* ── Modals ── */}
-            {showInvite && (
-                <InviteModal t={t} currentUserRole={user?.role} onClose={() => setShowInvite(false)} onInvite={handleInvite} />
-            )}
-            {changeRoleMember && (
-                <ChangeRoleModal t={t} member={changeRoleMember} currentUserRole={user?.role}
-                    onClose={() => setChangeRoleMember(null)} onSave={handleChangeRole} />
-            )}
-            {removeMember && (
-                <RemoveModal t={t} member={removeMember} loading={actionLoading}
-                    onClose={() => setRemoveMember(null)} onConfirm={handleRemove} />
-            )}
-            {inspectMember && (
-                <MemberDetailPanel t={t} member={inspectMember} tasks={tasks} onClose={() => setInspectMember(null)} />
-            )}
+            {/* Modals */}
+            {showInvite && <InviteModal t={t} currentUserRole={user?.role} onClose={() => setShowInvite(false)} onInvite={handleInvite} />}
+            {changeRoleMember && <ChangeRoleModal t={t} member={changeRoleMember} currentUserRole={user?.role} onClose={() => setChangeRoleMember(null)} onSave={handleChangeRole} />}
+            {removeMember     && <RemoveModal t={t} member={removeMember} loading={actionLoading} onClose={() => setRemoveMember(null)} onConfirm={handleRemove} />}
+            {inspectMember    && <MemberDetailPanel t={t} member={inspectMember} tasks={tasks} onClose={() => setInspectMember(null)} />}
         </div>
     );
 };
