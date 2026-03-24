@@ -5,12 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Zap } from 'lucide-react';
 
 const Login = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email,        setEmail]        = useState('');
+    const [password,     setPassword]     = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    const [error,        setError]        = useState('');
+    const [loading,      setLoading]      = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+
+    const { login, loginWithGoogle } = useAuth();
     const navigate = useNavigate();
 
     // ── Theme detection ──────────────────────────────────────────────────────
@@ -42,15 +44,29 @@ const Login = () => {
         if (result.success) {
             navigate('/dashboard');
         } else {
-            setError(result.error);
+            setError(result.error || 'Sign in failed. Please try again.');
         }
 
         setLoading(false);
     };
 
-    const handleGoogleLogin = () => {
-        alert('🚧 Google OAuth integration coming soon! This is a demo feature.');
+    const handleGoogleLogin = async () => {
+        setError('');
+        setGoogleLoading(true);
+
+        const result = await loginWithGoogle();
+
+        if (result.success) {
+            navigate('/dashboard');
+        } else if (result.error) {
+            // result.error is null when user simply closed the popup — don't show anything
+            setError(result.error);
+        }
+
+        setGoogleLoading(false);
     };
+
+    const isDisabled = loading || googleLoading;
 
     return (
         <div style={{ ...styles.container, background: t.bg }}>
@@ -78,20 +94,34 @@ const Login = () => {
                         <p style={{ ...styles.subtitle, color: t.muted }}>Sign in to continue to your workspace</p>
                     </div>
 
-                    {/* Social login — Google only */}
+                    {/* Google login */}
                     <div style={styles.socialButtons}>
                         <button
                             type="button"
-                            style={{ ...styles.socialBtn, width: '100%', justifyContent: 'center', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
+                            style={{
+                                ...styles.socialBtn,
+                                width: '100%',
+                                justifyContent: 'center',
+                                background: t.inputBg,
+                                border: `1px solid ${t.border}`,
+                                color: t.text,
+                                opacity: isDisabled ? 0.6 : 1,
+                                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            }}
                             onClick={handleGoogleLogin}
+                            disabled={isDisabled}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                            </svg>
-                            <span>Continue with Google</span>
+                            {googleLoading ? (
+                                <div style={styles.spinner} />
+                            ) : (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                                </svg>
+                            )}
+                            <span>{googleLoading ? 'Signing in…' : 'Continue with Google'}</span>
                         </button>
                     </div>
 
@@ -99,7 +129,7 @@ const Login = () => {
                         <span style={{ ...styles.dividerText, background: t.cardBg, color: t.muted }}>or continue with email</span>
                     </div>
 
-                    {/* Login form */}
+                    {/* Email / password form */}
                     <form onSubmit={handleSubmit} style={styles.form}>
                         <div style={styles.inputGroup}>
                             <label style={{ ...styles.label, color: t.label }}>Email Address</label>
@@ -112,7 +142,7 @@ const Login = () => {
                                     placeholder="name@company.com"
                                     style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                     required
-                                    disabled={loading}
+                                    disabled={isDisabled}
                                 />
                             </div>
                         </div>
@@ -136,12 +166,13 @@ const Login = () => {
                                     placeholder="••••••••"
                                     style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                     required
-                                    disabled={loading}
+                                    disabled={isDisabled}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
                                     style={{ ...styles.eyeBtn, color: t.iconColor }}
+                                    disabled={isDisabled}
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
@@ -157,13 +188,13 @@ const Login = () => {
 
                         <button
                             type="submit"
-                            style={{...styles.submitBtn, ...(loading ? styles.submitBtnDisabled : {})}}
-                            disabled={loading}
+                            style={{ ...styles.submitBtn, ...(isDisabled ? styles.submitBtnDisabled : {}) }}
+                            disabled={isDisabled}
                         >
                             {loading ? (
                                 <>
                                     <div style={styles.spinner}></div>
-                                    <span>Signing in...</span>
+                                    <span>Signing in…</span>
                                 </>
                             ) : (
                                 <>
@@ -178,10 +209,7 @@ const Login = () => {
                     <div style={styles.footer}>
                         <p style={{ ...styles.footerText, color: t.muted }}>
                             Don't have an account?{' '}
-                            <span
-                                style={styles.link}
-                                onClick={() => navigate('/register')}
-                            >
+                            <span style={styles.link} onClick={() => navigate('/register')}>
                                 Sign up for free
                             </span>
                         </p>
@@ -207,7 +235,7 @@ const Login = () => {
     );
 };
 
-// ── Theme tokens ─────────────────────────────────────────────────────────────
+// ── Theme tokens ──────────────────────────────────────────────────────────────
 const tokens = {
     dark: {
         bg:          '#0a0e27',
@@ -242,7 +270,6 @@ const tokens = {
         placeholder: '#94a3b8',
     },
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = {
     container: {
@@ -252,13 +279,13 @@ const styles = {
         justifyContent: 'center',
         position: 'relative',
         overflow: 'hidden',
-        padding: '20px'
+        padding: '20px',
     },
     bgAnimation: {
         position: 'absolute',
         width: '100%',
         height: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
     },
     circle1: {
         position: 'absolute',
@@ -267,7 +294,7 @@ const styles = {
         borderRadius: '50%',
         top: '-250px',
         left: '-250px',
-        animation: 'float 20s infinite ease-in-out'
+        animation: 'float 20s infinite ease-in-out',
     },
     circle2: {
         position: 'absolute',
@@ -276,7 +303,7 @@ const styles = {
         borderRadius: '50%',
         bottom: '-200px',
         right: '-200px',
-        animation: 'float 15s infinite ease-in-out reverse'
+        animation: 'float 15s infinite ease-in-out reverse',
     },
     circle3: {
         position: 'absolute',
@@ -286,17 +313,17 @@ const styles = {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        animation: 'pulse 10s infinite ease-in-out'
+        animation: 'pulse 10s infinite ease-in-out',
     },
     content: {
         position: 'relative',
         zIndex: 1,
         width: '100%',
-        maxWidth: '480px'
+        maxWidth: '480px',
     },
     logoSection: {
         textAlign: 'center',
-        marginBottom: '40px'
+        marginBottom: '40px',
     },
     logoIcon: {
         width: '80px',
@@ -307,17 +334,17 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 10px 40px rgba(99,102,241,0.4)'
+        boxShadow: '0 10px 40px rgba(99,102,241,0.4)',
     },
     logo: {
         fontSize: '32px',
         fontWeight: '700',
         margin: '0 0 8px 0',
-        letterSpacing: '-0.5px'
+        letterSpacing: '-0.5px',
     },
     tagline: {
         fontSize: '14px',
-        margin: 0
+        margin: 0,
     },
     card: {
         backdropFilter: 'blur(20px)',
@@ -325,30 +352,29 @@ const styles = {
         padding: '40px',
     },
     cardHeader: {
-        marginBottom: '30px'
+        marginBottom: '30px',
     },
     title: {
         fontSize: '24px',
         fontWeight: '600',
-        margin: '0 0 8px 0'
+        margin: '0 0 8px 0',
     },
     subtitle: {
         fontSize: '14px',
-        margin: 0
+        margin: 0,
     },
     socialButtons: {
-        marginBottom: '24px'
+        marginBottom: '24px',
     },
     socialBtn: {
         padding: '12px',
         borderRadius: '12px',
         fontSize: '14px',
         fontWeight: '500',
-        cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        transition: 'all 0.3s'
+        transition: 'all 0.3s',
     },
     divider: {
         position: 'relative',
@@ -366,17 +392,17 @@ const styles = {
     form: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px'
+        gap: '20px',
     },
     inputGroup: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px'
+        gap: '8px',
     },
     labelRow: {
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
     },
     label: {
         fontSize: '14px',
@@ -385,19 +411,18 @@ const styles = {
     forgotLink: {
         fontSize: '13px',
         color: '#6366f1',
-        textDecoration: 'none',
         fontWeight: '500',
-        cursor: 'pointer'
+        cursor: 'pointer',
     },
     inputWrapper: {
         position: 'relative',
         display: 'flex',
-        alignItems: 'center'
+        alignItems: 'center',
     },
     inputIcon: {
         position: 'absolute',
         left: '16px',
-        pointerEvents: 'none'
+        pointerEvents: 'none',
     },
     input: {
         width: '100%',
@@ -407,7 +432,7 @@ const styles = {
         outline: 'none',
         transition: 'all 0.3s',
         boxSizing: 'border-box',
-        fontFamily: 'inherit'
+        fontFamily: 'inherit',
     },
     eyeBtn: {
         position: 'absolute',
@@ -418,7 +443,7 @@ const styles = {
         padding: '8px',
         display: 'flex',
         alignItems: 'center',
-        borderRadius: '8px'
+        borderRadius: '8px',
     },
     error: {
         background: 'rgba(239, 68, 68, 0.1)',
@@ -429,7 +454,7 @@ const styles = {
         fontSize: '14px',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: '8px',
     },
     submitBtn: {
         padding: '14px 24px',
@@ -445,11 +470,11 @@ const styles = {
         justifyContent: 'center',
         gap: '8px',
         transition: 'all 0.3s',
-        boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)'
+        boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)',
     },
     submitBtnDisabled: {
         opacity: 0.6,
-        cursor: 'not-allowed'
+        cursor: 'not-allowed',
     },
     spinner: {
         width: '20px',
@@ -457,11 +482,11 @@ const styles = {
         border: '2px solid rgba(255,255,255,0.3)',
         borderTop: '2px solid #fff',
         borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite'
+        animation: 'spin 0.8s linear infinite',
     },
     footer: {
         marginTop: '24px',
-        textAlign: 'center'
+        textAlign: 'center',
     },
     footerText: {
         fontSize: '14px',
@@ -469,8 +494,8 @@ const styles = {
     link: {
         color: '#6366f1',
         fontWeight: '600',
-        cursor: 'pointer'
-    }
+        cursor: 'pointer',
+    },
 };
 
 export default Login;

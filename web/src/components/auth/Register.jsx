@@ -2,22 +2,27 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Zap, CheckCircle2, Building2, UserCircle, ArrowLeft, Globe, FileText } from 'lucide-react';
+import {
+    Eye, EyeOff, Mail, Lock, User, Zap, CheckCircle2,
+    Building2, UserCircle, ArrowLeft, Globe, FileText,
+} from 'lucide-react';
 
 const Register = () => {
-    const [step, setStep] = useState(1); // 1: account type, 2: details
-    const [accountType, setAccountType] = useState(''); // 'personal' or 'company'
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [fullName, setFullName] = useState('');
-    const [companyName, setCompanyName] = useState('');
-    const [industry, setIndustry] = useState('');
-    const [description, setDescription] = useState('');
-    const [website, setWebsite] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const { register } = useAuth();
+    const [step,          setStep]          = useState(1); // 1: account type, 2: details
+    const [accountType,   setAccountType]   = useState('');
+    const [email,         setEmail]         = useState('');
+    const [password,      setPassword]      = useState('');
+    const [fullName,      setFullName]      = useState('');
+    const [companyName,   setCompanyName]   = useState('');
+    const [industry,      setIndustry]      = useState('');
+    const [description,   setDescription]   = useState('');
+    const [website,       setWebsite]       = useState('');
+    const [showPassword,  setShowPassword]  = useState(false);
+    const [error,         setError]         = useState('');
+    const [loading,       setLoading]       = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+
+    const { register, loginWithGoogle } = useAuth();
     const navigate = useNavigate();
 
     // ── Theme detection ──────────────────────────────────────────────────────
@@ -40,19 +45,20 @@ const Register = () => {
     // ────────────────────────────────────────────────────────────────────────
 
     const INDUSTRIES = [
-        'Technology','Healthcare','Finance','Education','Retail',
-        'Manufacturing','Consulting','Media & Entertainment','Real Estate',
-        'Logistics','Legal','Non-profit','Other',
+        'Technology', 'Healthcare', 'Finance', 'Education', 'Retail',
+        'Manufacturing', 'Consulting', 'Media & Entertainment', 'Real Estate',
+        'Logistics', 'Legal', 'Non-profit', 'Other',
     ];
 
     const getPasswordStrength = () => {
         if (password.length === 0) return { strength: 0, label: '', color: '#64748b' };
-        if (password.length < 6) return { strength: 33, label: 'Weak', color: '#ef4444' };
-        if (password.length < 10) return { strength: 66, label: 'Good', color: '#f59e0b' };
-        return { strength: 100, label: 'Strong', color: '#10b981' };
+        if (password.length < 6)   return { strength: 33, label: 'Weak',   color: '#ef4444' };
+        if (password.length < 10)  return { strength: 66, label: 'Good',   color: '#f59e0b' };
+        return                            { strength: 100, label: 'Strong', color: '#10b981' };
     };
-
     const passwordStrength = getPasswordStrength();
+
+    const isDisabled = loading || googleLoading;
 
     const handleAccountTypeSelect = (type) => {
         setAccountType(type);
@@ -65,22 +71,21 @@ const Register = () => {
         setError('');
     };
 
+    // ── Email / password register ─────────────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
+        if (!fullName.trim()) {
+            setError('Full name is required');
+            return;
+        }
         if (password.length < 6) {
             setError('Password must be at least 6 characters');
             return;
         }
-
         if (accountType === 'company' && !companyName.trim()) {
             setError('Company name is required');
-            return;
-        }
-
-        if (!fullName.trim()) {
-            setError('Full name is required');
             return;
         }
 
@@ -92,20 +97,35 @@ const Register = () => {
             fullName,
             accountType,
             accountType === 'company' ? companyName : null,
-            accountType === 'company' ? { industry, description, website } : null
+            accountType === 'company' ? { industry, description, website } : null,
         );
 
         if (result.success) {
             navigate('/dashboard');
         } else {
-            setError(result.error);
+            setError(result.error || 'Registration failed. Please try again.');
         }
 
         setLoading(false);
     };
 
-    const handleGoogleSignup = () => {
-        alert('🚧 Google OAuth integration coming soon!');
+    // ── Google register ───────────────────────────────────────────────────────
+    const handleGoogleSignup = async () => {
+        setError('');
+        setGoogleLoading(true);
+
+        const result = await loginWithGoogle(
+            accountType || 'personal',
+            accountType === 'company' ? companyName || null : null,
+        );
+
+        if (result.success) {
+            navigate('/dashboard');
+        } else if (result.error) {
+            setError(result.error);
+        }
+
+        setGoogleLoading(false);
     };
 
     return (
@@ -131,8 +151,9 @@ const Register = () => {
 
                 {/* Main card */}
                 <div style={{ ...styles.card, background: t.cardBg, border: `1px solid ${t.border}`, boxShadow: t.cardShadow }}>
+
+                    {/* ── STEP 1: Account type ── */}
                     {step === 1 ? (
-                        /* STEP 1: Account Type Selection */
                         <>
                             <div style={styles.cardHeader}>
                                 <h2 style={{ ...styles.title, color: t.text }}>Get Started</h2>
@@ -140,20 +161,20 @@ const Register = () => {
                             </div>
 
                             <div style={styles.accountTypeGrid}>
-                                {/* Personal Account */}
+                                {/* Personal */}
                                 <button
                                     type="button"
                                     style={{ ...styles.accountTypeCard, background: t.accountCardBg, border: `2px solid ${t.accountCardBorder}` }}
                                     onClick={() => handleAccountTypeSelect('personal')}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor = '#6366f1';
-                                        e.currentTarget.style.transform = 'translateY(-4px)';
-                                        e.currentTarget.style.boxShadow = '0 10px 30px rgba(99, 102, 241, 0.2)';
+                                        e.currentTarget.style.borderColor  = '#6366f1';
+                                        e.currentTarget.style.transform    = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow    = '0 10px 30px rgba(99,102,241,0.2)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = t.accountCardBorder;
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = 'none';
+                                        e.currentTarget.style.borderColor  = t.accountCardBorder;
+                                        e.currentTarget.style.transform    = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow    = 'none';
                                     }}
                                 >
                                     <div style={styles.accountTypeIcon}>
@@ -164,42 +185,36 @@ const Register = () => {
                                         Perfect for personal task management and productivity
                                     </p>
                                     <ul style={styles.featureList}>
-                                        <li style={styles.featureItem}>
-                                            <CheckCircle2 size={16} color="#10b981" />
-                                            <span style={{ color: t.muted }}>Personal task management</span>
-                                        </li>
-                                        <li style={styles.featureItem}>
-                                            <CheckCircle2 size={16} color="#10b981" />
-                                            <span style={{ color: t.muted }}>Real-time updates</span>
-                                        </li>
-                                        <li style={styles.featureItem}>
-                                            <CheckCircle2 size={16} color="#10b981" />
-                                            <span style={{ color: t.muted }}>Priority tracking</span>
-                                        </li>
+                                        {['Personal task management', 'Real-time updates', 'Priority tracking'].map(f => (
+                                            <li key={f} style={styles.featureItem}>
+                                                <CheckCircle2 size={16} color="#10b981" />
+                                                <span style={{ color: t.muted }}>{f}</span>
+                                            </li>
+                                        ))}
                                     </ul>
                                     <div style={{ ...styles.selectButton, background: t.selectBtnBg, border: `1px solid ${t.selectBtnBorder}`, color: '#6366f1' }}>
                                         Select Personal →
                                     </div>
                                 </button>
 
-                                {/* Company Account */}
+                                {/* Company */}
                                 <button
                                     type="button"
-                                    style={{...styles.accountTypeCard, ...styles.accountTypeCardFeatured}}
+                                    style={{ ...styles.accountTypeCard, ...styles.accountTypeCardFeatured }}
                                     onClick={() => handleAccountTypeSelect('company')}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor = '#8b5cf6';
-                                        e.currentTarget.style.transform = 'translateY(-4px)';
-                                        e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.2)';
+                                        e.currentTarget.style.borderColor  = '#8b5cf6';
+                                        e.currentTarget.style.transform    = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow    = '0 10px 30px rgba(139,92,246,0.2)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = 'none';
+                                        e.currentTarget.style.borderColor  = 'rgba(139,92,246,0.3)';
+                                        e.currentTarget.style.transform    = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow    = 'none';
                                     }}
                                 >
                                     <div style={styles.featuredBadge}>RECOMMENDED</div>
-                                    <div style={{...styles.accountTypeIcon, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)'}}>
+                                    <div style={{ ...styles.accountTypeIcon, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
                                         <Building2 size={32} color="#fff" />
                                     </div>
                                     <h3 style={{ ...styles.accountTypeTitle, color: t.text }}>Company</h3>
@@ -207,51 +222,34 @@ const Register = () => {
                                         Complete solution for teams and organizations
                                     </p>
                                     <ul style={styles.featureList}>
-                                        <li style={styles.featureItem}>
-                                            <CheckCircle2 size={16} color="#10b981" />
-                                            <span style={{ color: t.muted }}>Team collaboration</span>
-                                        </li>
-                                        <li style={styles.featureItem}>
-                                            <CheckCircle2 size={16} color="#10b981" />
-                                            <span style={{ color: t.muted }}>Progress monitoring</span>
-                                        </li>
-                                        <li style={styles.featureItem}>
-                                            <CheckCircle2 size={16} color="#10b981" />
-                                            <span style={{ color: t.muted }}>Advanced analytics</span>
-                                        </li>
-                                        <li style={styles.featureItem}>
-                                            <CheckCircle2 size={16} color="#10b981" />
-                                            <span style={{ color: t.muted }}>Team management</span>
-                                        </li>
+                                        {['Team collaboration', 'Progress monitoring', 'Advanced analytics', 'Team management'].map(f => (
+                                            <li key={f} style={styles.featureItem}>
+                                                <CheckCircle2 size={16} color="#10b981" />
+                                                <span style={{ color: t.muted }}>{f}</span>
+                                            </li>
+                                        ))}
                                     </ul>
-                                    <div style={{...styles.selectButton, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff'}}>
+                                    <div style={{ ...styles.selectButton, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff' }}>
                                         Select Company →
                                     </div>
                                 </button>
                             </div>
 
-                            {/* Footer */}
                             <div style={styles.footer}>
                                 <p style={{ ...styles.footerText, color: t.muted }}>
                                     Already have an account?{' '}
-                                    <span
-                                        style={styles.link}
-                                        onClick={() => navigate('/login')}
-                                    >
-                                        Sign in here
-                                    </span>
+                                    <span style={styles.link} onClick={() => navigate('/login')}>Sign in here</span>
                                 </p>
                             </div>
                         </>
                     ) : (
-                        /* STEP 2: Registration Form */
+                        /* ── STEP 2: Registration form ── */
                         <>
                             <div style={styles.cardHeader}>
                                 <button
                                     type="button"
                                     onClick={handleBackToType}
                                     style={{ ...styles.backButton, background: t.inputBg, border: `1px solid ${t.border}`, color: t.muted }}
-                                    title="Go back to account type selection"
                                 >
                                     <ArrowLeft size={16} />
                                     <span>Back</span>
@@ -260,34 +258,38 @@ const Register = () => {
                                     {accountType === 'company' ? '🏢 Company Account' : '👤 Personal Account'}
                                 </h2>
                                 <p style={{ ...styles.subtitle, color: t.muted }}>
-                                    {accountType === 'company'
-                                        ? 'Set up your company workspace'
-                                        : 'Create your personal account'}
+                                    {accountType === 'company' ? 'Set up your company workspace' : 'Create your personal account'}
                                 </p>
                             </div>
 
-                            {/* Social signup — Google only */}
+                            {/* Google signup */}
                             <div style={styles.socialButtons}>
                                 <button
                                     type="button"
-                                    style={{ ...styles.socialBtn, width: '100%', justifyContent: 'center', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
+                                    style={{
+                                        ...styles.socialBtn,
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                        background: t.inputBg,
+                                        border: `1px solid ${t.border}`,
+                                        color: t.text,
+                                        opacity: isDisabled ? 0.6 : 1,
+                                        cursor:  isDisabled ? 'not-allowed' : 'pointer',
+                                    }}
                                     onClick={handleGoogleSignup}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = t.inputBgHover;
-                                        e.currentTarget.style.borderColor = t.borderHover;
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = t.inputBg;
-                                        e.currentTarget.style.borderColor = t.border;
-                                    }}
+                                    disabled={isDisabled}
                                 >
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                                    </svg>
-                                    <span>Continue with Google</span>
+                                    {googleLoading ? (
+                                        <div style={styles.spinner} />
+                                    ) : (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                                        </svg>
+                                    )}
+                                    <span>{googleLoading ? 'Signing up…' : 'Continue with Google'}</span>
                                 </button>
                             </div>
 
@@ -295,10 +297,10 @@ const Register = () => {
                                 <span style={{ ...styles.dividerText, background: t.cardBg, color: t.muted }}>or continue with email</span>
                             </div>
 
-                            {/* Register form */}
                             <form onSubmit={handleSubmit} style={styles.form}>
                                 {accountType === 'company' && (
                                     <>
+                                        {/* Company name */}
                                         <div style={styles.inputGroup}>
                                             <label style={{ ...styles.label, color: t.label }}>Company Name *</label>
                                             <div style={styles.inputWrapper}>
@@ -310,18 +312,19 @@ const Register = () => {
                                                     placeholder="Acme Inc."
                                                     style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                                     required
-                                                    disabled={loading}
+                                                    disabled={isDisabled}
                                                 />
                                             </div>
                                         </div>
 
+                                        {/* Industry */}
                                         <div style={styles.inputGroup}>
                                             <label style={{ ...styles.label, color: t.label }}>Industry</label>
                                             <div style={styles.inputWrapper}>
                                                 <select
                                                     value={industry}
                                                     onChange={(e) => setIndustry(e.target.value)}
-                                                    disabled={loading}
+                                                    disabled={isDisabled}
                                                     style={{ ...styles.input, paddingLeft: '16px', cursor: 'pointer', background: t.inputBg, color: industry ? t.text : t.iconColor, border: `1px solid ${t.border}` }}
                                                 >
                                                     <option value="">Select industry…</option>
@@ -332,6 +335,7 @@ const Register = () => {
                                             </div>
                                         </div>
 
+                                        {/* Website */}
                                         <div style={styles.inputGroup}>
                                             <label style={{ ...styles.label, color: t.label }}>
                                                 Website <span style={{ color: t.iconColor, fontWeight: 400, fontSize: 12 }}>(optional)</span>
@@ -344,11 +348,12 @@ const Register = () => {
                                                     onChange={(e) => setWebsite(e.target.value)}
                                                     placeholder="https://yourcompany.com"
                                                     style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
-                                                    disabled={loading}
+                                                    disabled={isDisabled}
                                                 />
                                             </div>
                                         </div>
 
+                                        {/* Description */}
                                         <div style={styles.inputGroup}>
                                             <label style={{ ...styles.label, color: t.label }}>
                                                 Description <span style={{ color: t.iconColor, fontWeight: 400, fontSize: 12 }}>(optional)</span>
@@ -359,7 +364,7 @@ const Register = () => {
                                                     value={description}
                                                     onChange={(e) => setDescription(e.target.value)}
                                                     placeholder="What does your company do?"
-                                                    disabled={loading}
+                                                    disabled={isDisabled}
                                                     rows={3}
                                                     style={{ ...styles.input, paddingTop: '12px', resize: 'vertical', minHeight: '80px', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                                 />
@@ -368,6 +373,7 @@ const Register = () => {
                                     </>
                                 )}
 
+                                {/* Full name */}
                                 <div style={styles.inputGroup}>
                                     <label style={{ ...styles.label, color: t.label }}>Full Name *</label>
                                     <div style={styles.inputWrapper}>
@@ -379,11 +385,12 @@ const Register = () => {
                                             placeholder="John Doe"
                                             style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
-                                            disabled={loading}
+                                            disabled={isDisabled}
                                         />
                                     </div>
                                 </div>
 
+                                {/* Email */}
                                 <div style={styles.inputGroup}>
                                     <label style={{ ...styles.label, color: t.label }}>Email Address *</label>
                                     <div style={styles.inputWrapper}>
@@ -395,11 +402,12 @@ const Register = () => {
                                             placeholder="name@company.com"
                                             style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
-                                            disabled={loading}
+                                            disabled={isDisabled}
                                         />
                                     </div>
                                 </div>
 
+                                {/* Password */}
                                 <div style={styles.inputGroup}>
                                     <label style={{ ...styles.label, color: t.label }}>Password *</label>
                                     <div style={styles.inputWrapper}>
@@ -411,13 +419,14 @@ const Register = () => {
                                             placeholder="Create a strong password"
                                             style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
-                                            disabled={loading}
+                                            disabled={isDisabled}
                                             minLength={6}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
                                             style={{ ...styles.eyeBtn, color: t.iconColor }}
+                                            disabled={isDisabled}
                                         >
                                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                         </button>
@@ -426,15 +435,9 @@ const Register = () => {
                                     {password && (
                                         <div style={styles.strengthContainer}>
                                             <div style={styles.strengthBar}>
-                                                <div
-                                                    style={{
-                                                        ...styles.strengthFill,
-                                                        width: `${passwordStrength.strength}%`,
-                                                        background: passwordStrength.color
-                                                    }}
-                                                ></div>
+                                                <div style={{ ...styles.strengthFill, width: `${passwordStrength.strength}%`, background: passwordStrength.color }} />
                                             </div>
-                                            <span style={{...styles.strengthLabel, color: passwordStrength.color}}>
+                                            <span style={{ ...styles.strengthLabel, color: passwordStrength.color }}>
                                                 {passwordStrength.label}
                                             </span>
                                         </div>
@@ -450,23 +453,13 @@ const Register = () => {
 
                                 <button
                                     type="submit"
-                                    style={{...styles.submitBtn, ...(loading ? styles.submitBtnDisabled : {})}}
-                                    disabled={loading}
-                                    onMouseEnter={(e) => {
-                                        if (!loading) {
-                                            e.currentTarget.style.transform = 'translateY(-2px)';
-                                            e.currentTarget.style.boxShadow = '0 6px 25px rgba(99, 102, 241, 0.5)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(99, 102, 241, 0.4)';
-                                    }}
+                                    style={{ ...styles.submitBtn, ...(isDisabled ? styles.submitBtnDisabled : {}) }}
+                                    disabled={isDisabled}
                                 >
                                     {loading ? (
                                         <>
                                             <div style={styles.spinner}></div>
-                                            <span>Creating account...</span>
+                                            <span>Creating account…</span>
                                         </>
                                     ) : (
                                         <>
@@ -477,32 +470,17 @@ const Register = () => {
                                 </button>
 
                                 <p style={{ ...styles.terms, color: t.iconColor }}>
-                                    By signing up, you agree to our{' '}
-                                    <span
-                                        style={styles.termsLink}
-                                        onClick={() => alert('📄 Terms of Service - Coming soon!')}
-                                    >
-                                        Terms of Service
-                                    </span>
+                                    By signing up you agree to our{' '}
+                                    <span style={styles.termsLink}>Terms of Service</span>
                                     {' '}and{' '}
-                                    <span
-                                        style={styles.termsLink}
-                                        onClick={() => alert('🔒 Privacy Policy - Coming soon!')}
-                                    >
-                                        Privacy Policy
-                                    </span>
+                                    <span style={styles.termsLink}>Privacy Policy</span>
                                 </p>
                             </form>
 
                             <div style={styles.footer}>
                                 <p style={{ ...styles.footerText, color: t.muted }}>
                                     Already have an account?{' '}
-                                    <span
-                                        style={styles.link}
-                                        onClick={() => navigate('/login')}
-                                    >
-                                        Sign in here
-                                    </span>
+                                    <span style={styles.link} onClick={() => navigate('/login')}>Sign in here</span>
                                 </p>
                             </div>
                         </>
@@ -528,7 +506,7 @@ const Register = () => {
     );
 };
 
-// ── Theme tokens ─────────────────────────────────────────────────────────────
+// ── Theme tokens ──────────────────────────────────────────────────────────────
 const tokens = {
     dark: {
         bg:                '#0a0e27',
@@ -538,19 +516,17 @@ const tokens = {
         cardBg:            'rgba(15, 23, 42, 0.8)',
         cardShadow:        '0 20px 60px rgba(0, 0, 0, 0.5)',
         border:            'rgba(255, 255, 255, 0.1)',
-        borderHover:       'rgba(255, 255, 255, 0.2)',
         text:              '#fff',
         logoText:          '#fff',
         label:             '#e2e8f0',
         muted:             '#94a3b8',
         iconColor:         '#64748b',
         inputBg:           'rgba(255, 255, 255, 0.05)',
-        inputBgHover:      'rgba(255, 255, 255, 0.1)',
         placeholder:       '#64748b',
         accountCardBg:     'rgba(255, 255, 255, 0.03)',
         accountCardBorder: 'rgba(255, 255, 255, 0.1)',
-        selectBtnBg:       'rgba(99, 102, 241, 0.1)',
-        selectBtnBorder:   'rgba(99, 102, 241, 0.3)',
+        selectBtnBg:       'rgba(99,102,241,0.1)',
+        selectBtnBorder:   'rgba(99,102,241,0.3)',
     },
     light: {
         bg:                '#f0f4ff',
@@ -558,24 +534,21 @@ const tokens = {
         blob2:             'radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)',
         blob3:             'radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%)',
         cardBg:            'rgba(255, 255, 255, 0.85)',
-        cardShadow:        '0 20px 60px rgba(99, 102, 241, 0.12)',
-        border:            'rgba(99, 102, 241, 0.15)',
-        borderHover:       'rgba(99, 102, 241, 0.3)',
+        cardShadow:        '0 20px 60px rgba(99,102,241,0.12)',
+        border:            'rgba(99,102,241,0.15)',
         text:              '#0f172a',
         logoText:          '#0f172a',
         label:             '#1e293b',
         muted:             '#64748b',
         iconColor:         '#94a3b8',
         inputBg:           'rgba(241, 245, 249, 0.8)',
-        inputBgHover:      'rgba(226, 232, 240, 0.9)',
         placeholder:       '#94a3b8',
         accountCardBg:     'rgba(241, 245, 249, 0.6)',
-        accountCardBorder: 'rgba(99, 102, 241, 0.12)',
-        selectBtnBg:       'rgba(99, 102, 241, 0.08)',
-        selectBtnBorder:   'rgba(99, 102, 241, 0.25)',
+        accountCardBorder: 'rgba(99,102,241,0.12)',
+        selectBtnBg:       'rgba(99,102,241,0.08)',
+        selectBtnBorder:   'rgba(99,102,241,0.25)',
     },
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = {
     container: {
@@ -585,330 +558,56 @@ const styles = {
         justifyContent: 'center',
         position: 'relative',
         overflow: 'hidden',
-        padding: '20px'
+        padding: '20px',
     },
-    bgAnimation: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        overflow: 'hidden'
-    },
-    circle1: {
-        position: 'absolute',
-        width: '500px',
-        height: '500px',
-        borderRadius: '50%',
-        top: '-250px',
-        right: '-250px',
-        animation: 'float 20s infinite ease-in-out'
-    },
-    circle2: {
-        position: 'absolute',
-        width: '400px',
-        height: '400px',
-        borderRadius: '50%',
-        bottom: '-200px',
-        left: '-200px',
-        animation: 'float 15s infinite ease-in-out reverse'
-    },
-    circle3: {
-        position: 'absolute',
-        width: '300px',
-        height: '300px',
-        borderRadius: '50%',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        animation: 'pulse 10s infinite ease-in-out'
-    },
-    content: {
-        position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        maxWidth: '900px'
-    },
-    logoSection: {
-        textAlign: 'center',
-        marginBottom: '40px'
-    },
-    logoIcon: {
-        width: '80px',
-        height: '80px',
-        margin: '0 auto 20px',
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-        borderRadius: '20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 10px 40px rgba(99,102,241,0.4)'
-    },
-    logo: {
-        fontSize: '32px',
-        fontWeight: '700',
-        margin: '0 0 8px 0',
-        letterSpacing: '-0.5px'
-    },
-    tagline: {
-        fontSize: '14px',
-        margin: 0
-    },
-    card: {
-        backdropFilter: 'blur(20px)',
-        borderRadius: '24px',
-        padding: '40px',
-    },
-    cardHeader: {
-        marginBottom: '30px',
-        position: 'relative'
-    },
-    backButton: {
-        position: 'absolute',
-        top: '-50px',
-        left: '0',
-        borderRadius: '8px',
-        padding: '8px 16px',
-        fontSize: '14px',
-        cursor: 'pointer',
-        transition: 'all 0.3s',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-    },
-    title: {
-        fontSize: '24px',
-        fontWeight: '600',
-        margin: '0 0 8px 0'
-    },
-    subtitle: {
-        fontSize: '14px',
-        margin: 0
-    },
-    accountTypeGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '20px',
-        marginBottom: '30px'
-    },
-    accountTypeCard: {
-        borderRadius: '16px',
-        padding: '30px',
-        cursor: 'pointer',
-        transition: 'all 0.3s',
-        textAlign: 'center',
-        position: 'relative'
-    },
-    accountTypeCardFeatured: {
-        border: '2px solid rgba(139, 92, 246, 0.3)',
-        background: 'rgba(139, 92, 246, 0.05)'
-    },
-    featuredBadge: {
-        position: 'absolute',
-        top: '16px',
-        right: '16px',
-        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-        color: '#fff',
-        fontSize: '10px',
-        fontWeight: '700',
-        padding: '4px 10px',
-        borderRadius: '12px',
-        letterSpacing: '0.5px'
-    },
-    accountTypeIcon: {
-        width: '64px',
-        height: '64px',
-        margin: '0 auto 20px',
-        background: 'rgba(99, 102, 241, 0.1)',
-        borderRadius: '16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    accountTypeTitle: {
-        fontSize: '20px',
-        fontWeight: '600',
-        margin: '0 0 8px 0'
-    },
-    accountTypeDescription: {
-        fontSize: '14px',
-        margin: '0 0 20px 0',
-        lineHeight: '1.5'
-    },
-    featureList: {
-        listStyle: 'none',
-        padding: 0,
-        margin: '0 0 24px 0',
-        textAlign: 'left'
-    },
-    featureItem: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        fontSize: '13px',
-        marginBottom: '10px'
-    },
-    selectButton: {
-        padding: '12px 20px',
-        borderRadius: '10px',
-        fontSize: '14px',
-        fontWeight: '600',
-        transition: 'all 0.3s'
-    },
-    socialButtons: {
-        marginBottom: '24px'
-    },
-    socialBtn: {
-        padding: '12px',
-        borderRadius: '12px',
-        fontSize: '14px',
-        fontWeight: '500',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        transition: 'all 0.3s'
-    },
-    divider: {
-        position: 'relative',
-        textAlign: 'center',
-        margin: '24px 0',
-    },
-    dividerText: {
-        position: 'absolute',
-        top: '-10px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        padding: '0 12px',
-        fontSize: '12px',
-    },
-    form: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px'
-    },
-    inputGroup: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-    },
-    label: {
-        fontSize: '14px',
-        fontWeight: '500',
-    },
-    inputWrapper: {
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center'
-    },
-    inputIcon: {
-        position: 'absolute',
-        left: '16px',
-        pointerEvents: 'none'
-    },
-    input: {
-        width: '100%',
-        padding: '14px 16px 14px 48px',
-        borderRadius: '12px',
-        fontSize: '15px',
-        outline: 'none',
-        transition: 'all 0.3s',
-        boxSizing: 'border-box',
-        fontFamily: 'inherit'
-    },
-    eyeBtn: {
-        position: 'absolute',
-        right: '12px',
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        padding: '8px',
-        display: 'flex',
-        alignItems: 'center',
-        borderRadius: '8px'
-    },
-    strengthContainer: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        marginTop: '4px'
-    },
-    strengthBar: {
-        flex: 1,
-        height: '4px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: '2px',
-        overflow: 'hidden'
-    },
-    strengthFill: {
-        height: '100%',
-        transition: 'all 0.3s',
-        borderRadius: '2px'
-    },
-    strengthLabel: {
-        fontSize: '12px',
-        fontWeight: '500',
-        minWidth: '50px'
-    },
-    error: {
-        background: 'rgba(239, 68, 68, 0.1)',
-        border: '1px solid rgba(239, 68, 68, 0.3)',
-        color: '#fca5a5',
-        padding: '12px 16px',
-        borderRadius: '12px',
-        fontSize: '14px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-    },
-    submitBtn: {
-        padding: '14px 24px',
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-        border: 'none',
-        borderRadius: '12px',
-        color: '#fff',
-        fontSize: '15px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-        transition: 'all 0.3s',
-        boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)'
-    },
-    submitBtnDisabled: {
-        opacity: 0.6,
-        cursor: 'not-allowed'
-    },
-    spinner: {
-        width: '20px',
-        height: '20px',
-        border: '2px solid rgba(255,255,255,0.3)',
-        borderTop: '2px solid #fff',
-        borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite'
-    },
-    terms: {
-        fontSize: '12px',
-        textAlign: 'center',
-        margin: '0'
-    },
-    termsLink: {
-        color: '#6366f1',
-        textDecoration: 'none',
-        cursor: 'pointer'
-    },
-    footer: {
-        marginTop: '24px',
-        textAlign: 'center'
-    },
-    footerText: {
-        fontSize: '14px',
-    },
-    link: {
-        color: '#6366f1',
-        fontWeight: '600',
-        cursor: 'pointer'
-    }
+    bgAnimation: { position: 'absolute', width: '100%', height: '100%', overflow: 'hidden' },
+    circle1: { position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', top: '-250px', right: '-250px', animation: 'float 20s infinite ease-in-out' },
+    circle2: { position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', bottom: '-200px', left: '-200px', animation: 'float 15s infinite ease-in-out reverse' },
+    circle3: { position: 'absolute', width: '300px', height: '300px', borderRadius: '50%', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', animation: 'pulse 10s infinite ease-in-out' },
+    content: { position: 'relative', zIndex: 1, width: '100%', maxWidth: '900px' },
+    logoSection: { textAlign: 'center', marginBottom: '40px' },
+    logoIcon: { width: '80px', height: '80px', margin: '0 auto 20px', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 40px rgba(99,102,241,0.4)' },
+    logo: { fontSize: '32px', fontWeight: '700', margin: '0 0 8px 0', letterSpacing: '-0.5px' },
+    tagline: { fontSize: '14px', margin: 0 },
+    card: { backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '40px' },
+    cardHeader: { marginBottom: '30px', position: 'relative' },
+    backButton: { position: 'absolute', top: '-50px', left: '0', borderRadius: '8px', padding: '8px 16px', fontSize: '14px', cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px' },
+    title: { fontSize: '24px', fontWeight: '600', margin: '0 0 8px 0' },
+    subtitle: { fontSize: '14px', margin: 0 },
+    accountTypeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '30px' },
+    accountTypeCard: { borderRadius: '16px', padding: '30px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'center', position: 'relative' },
+    accountTypeCardFeatured: { border: '2px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.05)' },
+    featuredBadge: { position: 'absolute', top: '16px', right: '16px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', fontSize: '10px', fontWeight: '700', padding: '4px 10px', borderRadius: '12px', letterSpacing: '0.5px' },
+    accountTypeIcon: { width: '64px', height: '64px', margin: '0 auto 20px', background: 'rgba(99,102,241,0.1)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    accountTypeTitle: { fontSize: '20px', fontWeight: '600', margin: '0 0 8px 0' },
+    accountTypeDescription: { fontSize: '14px', margin: '0 0 20px 0', lineHeight: '1.5' },
+    featureList: { listStyle: 'none', padding: 0, margin: '0 0 24px 0', textAlign: 'left' },
+    featureItem: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', marginBottom: '10px' },
+    selectButton: { padding: '12px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', transition: 'all 0.3s' },
+    socialButtons: { marginBottom: '24px' },
+    socialBtn: { padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s' },
+    divider: { position: 'relative', textAlign: 'center', margin: '24px 0' },
+    dividerText: { position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', padding: '0 12px', fontSize: '12px' },
+    form: { display: 'flex', flexDirection: 'column', gap: '20px' },
+    inputGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
+    label: { fontSize: '14px', fontWeight: '500' },
+    inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
+    inputIcon: { position: 'absolute', left: '16px', pointerEvents: 'none' },
+    input: { width: '100%', padding: '14px 16px 14px 48px', borderRadius: '12px', fontSize: '15px', outline: 'none', transition: 'all 0.3s', boxSizing: 'border-box', fontFamily: 'inherit' },
+    eyeBtn: { position: 'absolute', right: '12px', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', borderRadius: '8px' },
+    strengthContainer: { display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' },
+    strengthBar: { flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' },
+    strengthFill: { height: '100%', transition: 'all 0.3s', borderRadius: '2px' },
+    strengthLabel: { fontSize: '12px', fontWeight: '500', minWidth: '50px' },
+    error: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', padding: '12px 16px', borderRadius: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' },
+    submitBtn: { padding: '14px 24px', background: 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '15px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.3s', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' },
+    submitBtnDisabled: { opacity: 0.6, cursor: 'not-allowed' },
+    spinner: { width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+    terms: { fontSize: '12px', textAlign: 'center', margin: '0' },
+    termsLink: { color: '#6366f1', cursor: 'pointer' },
+    footer: { marginTop: '24px', textAlign: 'center' },
+    footerText: { fontSize: '14px' },
+    link: { color: '#6366f1', fontWeight: '600', cursor: 'pointer' },
 };
 
 export default Register;

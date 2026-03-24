@@ -1,0 +1,44 @@
+query ListAllTeams @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public as it lists public team information.") {
+  teams {
+    id
+    name
+    description
+    createdAt
+  }
+}
+
+mutation CreateNewNote($title: String!, $content: String!, $category: String) @auth(level: USER) {
+  note_insert(data: {
+    title: $title,
+    content: $content,
+    category: $category,
+    creatorId_expr: "auth.uid",
+    createdAt_expr: "request.time",
+    updatedAt_expr: "request.time"
+  }) {
+    id
+  }
+}
+
+query GetMyNotes @auth(level: USER) {
+  notes(where: { creatorId: { eq_expr: "auth.uid" } }) {
+    id
+    title
+    content
+    category
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpdateMyNote($noteId: UUID!, $newContent: String!) @auth(level: USER) {
+  note_update(
+    key: { id: $noteId },
+    data: {
+      content: $newContent,
+      updatedAt_expr: "request.time"
+    }
+  ) {
+    id
+  }
+}
