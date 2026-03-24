@@ -1,0 +1,98 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "Seed data is for development and testing purposes and will be protected during deployment.") {
+  user_insertMany(data: [
+    {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      displayName: "Alice Smith",
+      email: "alice@example.com",
+      createdAt: "2023-01-01T10:00:00Z"
+    },
+    {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      displayName: "Bob Johnson",
+      email: "bob@example.com",
+      createdAt: "2023-01-02T11:00:00Z"
+    }
+  ])
+  team_insertMany(data: [
+    {
+      id: "650e8400-e29b-41d4-a716-446655440000",
+      name: "Team Alpha",
+      createdAt: "2023-01-01T10:30:00Z",
+      description: "A dynamic team focusing on innovative projects."
+    },
+    {
+      id: "650e8400-e29b-41d4-a716-446655440001",
+      name: "Team Beta",
+      createdAt: "2023-01-02T11:30:00Z",
+      description: "Dedicated to cutting-edge research and development."
+    }
+  ])
+  folder_insertMany(data: [
+    {
+      id: "750e8400-e29b-41d4-a716-446655440000",
+      name: "Project Ideas",
+      createdAt: "2023-01-03T09:00:00Z",
+      description: "Folder for brainstorming new project concepts.",
+      teamId: "650e8400-e29b-41d4-a716-446655440000"
+    },
+    {
+      id: "750e8400-e29b-41d4-a716-446655440001",
+      name: "Research Documents",
+      createdAt: "2023-01-04T10:00:00Z",
+      description: "Contains all research-related documents.",
+      teamId: "650e8400-e29b-41d4-a716-446655440001"
+    }
+  ])
+  note_insertMany(data: [
+    {
+      id: "850e8400-e29b-41d4-a716-446655440000",
+      title: "New Project Proposal",
+      content: "Detailed proposal for Project X.",
+      createdAt: "2023-01-05T12:00:00Z",
+      updatedAt: "2023-01-05T12:00:00Z",
+      category: "Project",
+      creatorId: "550e8400-e29b-41d4-a716-446655440000",
+      teamId: "650e8400-e29b-41d4-a716-446655440000"
+    },
+    {
+      id: "850e8400-e29b-41d4-a716-446655440001",
+      title: "Market Analysis Report",
+      content: "Comprehensive report on current market trends.",
+      createdAt: "2023-01-06T14:00:00Z",
+      updatedAt: "2023-01-06T14:00:00Z",
+      category: "Research",
+      creatorId: "550e8400-e29b-41d4-a716-446655440001",
+      teamId: "650e8400-e29b-41d4-a716-446655440001"
+    }
+  ])
+  collaboration_insertMany(data: [
+    {
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      noteId: "850e8400-e29b-41d4-a716-446655440001",
+      permissionLevel: "EDITOR",
+      assignedAt: "2023-01-07T09:00:00Z"
+    },
+    {
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      noteId: "850e8400-e29b-41d4-a716-446655440000",
+      permissionLevel: "VIEWER",
+      assignedAt: "2023-01-08T10:00:00Z"
+    }
+  ])
+  comment_insertMany(data: [
+    {
+      content: "Great ideas in this proposal!",
+      createdAt: "2023-01-09T11:00:00Z",
+      targetSection: "Introduction",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      noteId: "850e8400-e29b-41d4-a716-446655440000"
+    },
+    {
+      content: "Need to verify these statistics.",
+      createdAt: "2023-01-10T13:00:00Z",
+      targetSection: "Data Analysis",
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      noteId: "850e8400-e29b-41d4-a716-446655440001"
+    }
+  ])
+}

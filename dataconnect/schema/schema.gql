@@ -1,0 +1,45 @@
+type User @table {
+  displayName: String!
+  email: String!
+  createdAt: Timestamp!
+  photoUrl: String
+}
+
+type Team @table {
+  name: String!
+  createdAt: Timestamp!
+  description: String
+}
+
+type Note @table {
+  title: String!
+  content: String!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+  category: String
+  creator: User
+  team: Team
+}
+
+type Folder @table {
+  name: String!
+  createdAt: Timestamp!
+  description: String
+  team: Team
+  parentFolder: Folder
+}
+
+type Collaboration @table(key: ["user", "note"]) {
+  user: User!
+  note: Note!
+  permissionLevel: String!
+  assignedAt: Timestamp!
+}
+
+type Comment @table {
+  content: String!
+  createdAt: Timestamp!
+  targetSection: String
+  user: User
+  note: Note
+}
