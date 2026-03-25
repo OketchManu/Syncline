@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { UserPlus, X, Search, Check, AlertCircle, Users, Shield, Briefcase, User, Crown } from 'lucide-react';
 
-const API_BASE   = 'http://localhost:3001/api';
-const API_ORIGIN = 'http://localhost:3001';
+const API_BASE   = 'https://syncline.onrender.com/api';
+const API_ORIGIN = 'https://syncline.onrender.com';
 
 const resolveAvatar = (a) => {
     if (!a) return null;
