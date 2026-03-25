@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
-const API_BASE = "https://syncline.onrender.com";
+const API_BASE = "https://syncline1.onrender.com";
 
 const authHeaders = () => ({
   "Content-Type": "application/json",

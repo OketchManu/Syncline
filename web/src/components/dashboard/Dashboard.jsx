@@ -549,7 +549,7 @@ const Dashboard = () => {
 
     useEffect(()=>{
         if (!isCompany || !user?.company_id) return;
-        fetch(`https://syncline.onrender.com/api/company/team`, { headers:{ Authorization:`Bearer ${localStorage.getItem('accessToken')}` } })
+        fetch(`https://syncline1.onrender.com/api/company/team`, { headers:{ Authorization:`Bearer ${localStorage.getItem('accessToken')}` } })
             .then(r=>r.json())
             .then(data=>{ if(data.company?.name) setCompanyName(data.company.name); if(data.company?.logo_url) setCompanyLogo(data.company.logo_url); })
             .catch(()=>{});
