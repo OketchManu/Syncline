@@ -1,6 +1,6 @@
 // web/src/services/api.js
 import axios from 'axios';
-import { auth } from '../firebase.js';
+import { auth } from '../../../src/firebase.js';
 
 const API_BASE_URL = 'https://syncline-1.onrender.com/api';
 
