@@ -4,7 +4,7 @@
 import axios from 'axios';
 import { auth } from "../../../src/firebase.js";
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://syncline-1.onrender.com/api';
 
 // Create axios instance with default config
 const api = axios.create({

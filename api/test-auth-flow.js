@@ -1,7 +1,7 @@
 // api/test-auth-flow.js
 const fetch = require('node-fetch');
 
-const API = 'http://localhost:3001/api';
+const API = 'https://syncline-1.onrender.com/api';
 
 async function testAuthFlow() {
     console.log('🧪 Testing Complete Auth Flow\n');
