@@ -25,7 +25,5 @@ Thumbs.db
 .idea/
 
 # Firebase / API
-firebase.json
-api.js
 
 serviceAccountKey.json

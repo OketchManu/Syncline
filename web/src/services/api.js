@@ -1,40 +1,28 @@
 // web/src/services/api.js
-// API service for making HTTP requests to backend
-
 import axios from 'axios';
-import { auth } from "../../../src/firebase.js";
+import { auth } from '../firebase.js';
 
 const API_BASE_URL = 'https://syncline-1.onrender.com/api';
 
-// Create axios instance with default config
 const api = axios.create({
     baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json'
-    }
+    headers: { 'Content-Type': 'application/json' }
 });
 
-// ─── Request interceptor — always attach a fresh Firebase ID token ────────────
+// ─── Request interceptor — attach fresh Firebase ID token ────────────────────
 api.interceptors.request.use(
     async (config) => {
         const fbUser = auth.currentUser;
         if (fbUser) {
-            // forceRefresh=false uses cached token unless it's expired
             const token = await fbUser.getIdToken(false);
             config.headers['Authorization'] = `Bearer ${token}`;
-        } else {
-            // Fallback to localStorage token for non-Firebase flows
-            const token = localStorage.getItem('accessToken');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
         }
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// ─── Response interceptor — retry once with a fresh token on 401 ─────────────
+// ─── Response interceptor — retry once on 401 ────────────────────────────────
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -44,262 +32,68 @@ api.interceptors.response.use(
             const fbUser = auth.currentUser;
             if (fbUser) {
                 try {
-                    const token = await fbUser.getIdToken(true); // force refresh
+                    const token = await fbUser.getIdToken(true);
                     originalRequest.headers['Authorization'] = `Bearer ${token}`;
                     return api(originalRequest);
-                } catch (_) {
-                    // Token refresh failed — user will be signed out by onAuthStateChanged
-                }
-            } else {
-                // Non-Firebase flow: clear stored tokens and redirect
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('refreshToken');
-                localStorage.removeItem('user');
-                window.location.href = '/login';
+                } catch (_) {}
             }
         }
         return Promise.reject(error);
     }
 );
 
-// ═══════════════════════════════════════════════════════════════
-// AUTH ENDPOINTS
-// ═══════════════════════════════════════════════════════════════
-
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authAPI = {
-    login: (email, password) =>
-        api.post('/auth/login', { email, password }),
-
-    register: (email, password, fullName, accountType = 'individual', companyName = null) =>
-        api.post('/auth/register', {
-            email,
-            password,
-            fullName,
-            accountType,
-            companyName
-        }),
-
-    refreshToken: (refreshToken) =>
-        api.post('/auth/refresh', { refreshToken }),
-
-    getCurrentUser: () =>
-        api.get('/auth/me'),
-
-    // Alias kept for compatibility
-    me: () =>
-        api.get('/auth/me'),
-
-    logout: () =>
-        api.post('/auth/logout'),
-
-    // Sync Firebase-authenticated user with the backend
-    firebaseSync: (data) =>
-        api.post('/auth/firebase-sync', data),
+    me:            ()     => api.get('/auth/me'),
+    register:      (data) => api.post('/auth/register', data),
+    firebaseSync:  (data) => api.post('/auth/firebase-sync', data),
+    logout:        ()     => api.post('/auth/logout'),
 };
 
-// ═══════════════════════════════════════════════════════════════
-// TASK ENDPOINTS
-// ═══════════════════════════════════════════════════════════════
-
+// ─── Tasks ────────────────────────────────────────────────────────────────────
 export const taskAPI = {
-    getAll: (filters = {}) => {
-        const params = new URLSearchParams();
-        Object.keys(filters).forEach(key => {
-            if (filters[key]) params.append(key, filters[key]);
-        });
-        return api.get(`/tasks?${params.toString()}`);
-    },
-
-    getById: (id) =>
-        api.get(`/tasks/${id}`),
-
-    getMy: () =>
-        api.get('/tasks/my'),
-
-    getStats: (userId = null) =>
-        api.get(`/tasks/stats${userId ? `?userId=${userId}` : ''}`),
-
-    getOverdue: () =>
-        api.get('/tasks/overdue'),
-
-    create: (taskData) =>
-        api.post('/tasks', taskData),
-
-    update: (id, updates) =>
-        api.put(`/tasks/${id}`, updates),
-
-    flag: (id, reason) =>
-        api.patch(`/tasks/${id}/flag`, { reason }),
-
-    unflag: (id) =>
-        api.patch(`/tasks/${id}/unflag`),
-
-    delete: (id) =>
-        api.delete(`/tasks/${id}`)
+    getAll:  (filters = {}) => api.get('/tasks', { params: filters }),
+    getById: (id)           => api.get(`/tasks/${id}`),
+    create:  (data)         => api.post('/tasks', data),
+    update:  (id, data)     => api.put(`/tasks/${id}`, data),
+    delete:  (id)           => api.delete(`/tasks/${id}`),
+    flag:    (id, reason)   => api.patch(`/tasks/${id}/flag`, { reason }),
+    unflag:  (id)           => api.patch(`/tasks/${id}/unflag`),
 };
 
-// ═══════════════════════════════════════════════════════════════
-// USER ENDPOINTS
-// ═══════════════════════════════════════════════════════════════
-
+// ─── Users ────────────────────────────────────────────────────────────────────
 export const userAPI = {
-    getAll: () =>
-        api.get('/users'),
-
-    getById: (id) =>
-        api.get(`/users/${id}`),
-
-    getOnline: () =>
-        api.get('/users/online'),
-
-    getProfile: () =>
-        api.get('/user/profile'),
-
-    // Update name and/or avatar photo
-    updateProfile: (data) => {
+    updateProfile:  (data) => {
         if (data instanceof FormData) {
-            return api.put('/users/me', data, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            return api.put('/users/me', data, { headers: { 'Content-Type': 'multipart/form-data' } });
         }
         return api.put('/users/me', data);
     },
-
-    // Change password
-    changePassword: (data) =>
-        api.put('/users/me/password', data),
-
-    // Delete account
-    deleteAccount: (data) =>
-        api.delete('/users/me', { data }),
+    changePassword: (data) => api.put('/users/me/password', data),
+    deleteAccount:  (data) => api.delete('/users/me', { data }),
 };
 
-// ═══════════════════════════════════════════════════════════════
-// COMPANY MANAGEMENT ENDPOINTS
-// ═══════════════════════════════════════════════════════════════
-
+// ─── Company ──────────────────────────────────────────────────────────────────
 export const companyAPI = {
-    // Company registration & details
-    register: (data) =>
-        api.post('/company/register', data),
-
-    getDetails: () =>
-        api.get('/company/details'),
-
-    updateDetails: (data) =>
-        api.patch('/company/details', data),
-
-    // Team management
-    getTeam: (filters = {}) =>
-        api.get('/company/team', { params: filters }),
-
-    inviteMember: (data) =>
-        api.post('/company/team/invite', data),
-
-    updateMemberRole: (userId, role) =>
-        api.patch(`/company/team/${userId}/role`, { role }),
-
-    updateMemberStatus: (userId, isActive) =>
-        api.patch(`/company/team/${userId}/status`, { is_active: isActive }),
-
-    removeMember: (userId) =>
-        api.delete(`/company/team/${userId}`),
-
-    // Join flow
-    join: (code) =>
-        api.post(`/company/join/${code}`),
-
-    myStatus: () =>
-        api.get('/company/my-status'),
-
-    // Join requests (incoming requests to join the company)
-    getJoinRequests: () =>
-        api.get('/company/join-requests'),
-
-    resolveRequest: (id, action) =>
-        api.patch(`/company/join-requests/${id}/${action}`),
-
-    // Invitations
-    getInvitations: () =>
-        api.get('/company/invitations'),
-
-    deleteInvitation: (id) =>
-        api.delete(`/company/invitations/${id}`),
-
-    // Departments
-    getDepartments: () =>
-        api.get('/company/departments'),
-
-    createDepartment: (data) =>
-        api.post('/company/departments', data),
-
-    updateDepartment: (deptId, data) =>
-        api.patch(`/company/departments/${deptId}`, data),
-
-    deleteDepartment: (deptId) =>
-        api.delete(`/company/departments/${deptId}`),
-
-    // Analytics & Performance
-    getAnalytics: (period = 30) =>
-        api.get('/company/analytics', { params: { period } }),
-
-    getPerformance: (departmentId = null) =>
-        api.get('/company/performance', { params: { department_id: departmentId } })
+    getTeam:          ()           => api.get('/company/team'),
+    updateDetails:    (data)       => api.patch('/company/details', data),
+    getJoinRequests:  ()           => api.get('/company/join-requests'),
+    resolveRequest:   (id, action) => api.patch(`/company/join-requests/${id}/${action}`),
+    join:             (code)       => api.post(`/company/join/${code}`),
+    myStatus:         ()           => api.get('/company/my-status'),
+    updateMemberRole: (id, role)   => api.patch(`/company/team/${id}/role`, { role }),
+    removeMember:     (id)         => api.delete(`/company/team/${id}`),
+    getInvitations:   ()           => api.get('/company/invitations'),
+    deleteInvitation: (id)         => api.delete(`/company/invitations/${id}`),
 };
 
-// ═══════════════════════════════════════════════════════════════
-// TASK ASSIGNMENT & REPORTS ENDPOINTS
-// ═══════════════════════════════════════════════════════════════
-
-export const taskReportsAPI = {
-    // Task assignment
-    assignTask: (taskId, data) =>
-        api.post(`/tasks/${taskId}/assign`, data),
-
-    getAssignments: (taskId) =>
-        api.get(`/tasks/${taskId}/assignments`),
-
-    // Progress tracking
-    submitProgress: (taskId, data) =>
-        api.post(`/tasks/${taskId}/progress`, data),
-
-    getProgress: (taskId) =>
-        api.get(`/tasks/${taskId}/progress`),
-
-    // Report management
-    requestReport: (taskId, data) =>
-        api.post(`/tasks/${taskId}/request-report`, data),
-
-    getMyReportRequests: () =>
-        api.get('/tasks/my-report-requests'),
-
-    submitReport: (taskId, data) =>
-        api.post(`/tasks/${taskId}/reports`, data),
-
-    getReports: (taskId) =>
-        api.get(`/tasks/${taskId}/reports`),
-
-    getMyReports: () =>
-        api.get('/tasks/my-reports'),
-
-    reviewReport: (reportId, data) =>
-        api.patch(`/reports/${reportId}/review`, data),
-
-    // User overview
-    getUserOverview: (userId) =>
-        api.get(`/tasks/user/${userId}/overview`)
-};
-
-// ═══════════════════════════════════════════════════════════════
-// STANDALONE REPORT ENDPOINTS
-// ═══════════════════════════════════════════════════════════════
-
+// ─── Reports ──────────────────────────────────────────────────────────────────
 export const reportAPI = {
-    getAll:  ()         => api.get('/task-reports'),
-    create:  (data)     => api.post('/task-reports', data),
-    approve: (id, data) => api.patch(`/task-reports/${id}/approve`, data),
-    reject:  (id, data) => api.patch(`/task-reports/${id}/reject`, data),
-    delete:  (id)       => api.delete(`/task-reports/${id}`),
+    getAll:  ()           => api.get('/task-reports'),
+    create:  (data)       => api.post('/task-reports', data),
+    approve: (id, data)   => api.patch(`/task-reports/${id}/approve`, data),
+    reject:  (id, data)   => api.patch(`/task-reports/${id}/reject`, data),
+    delete:  (id)         => api.delete(`/task-reports/${id}`),
 };
 
 export default api;
