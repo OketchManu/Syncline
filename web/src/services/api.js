@@ -2,7 +2,7 @@
 // API service for making HTTP requests to backend
 
 import axios from 'axios';
-import { auth } from '../firebase';
+import { auth } from "../../../src/firebase.js";
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
