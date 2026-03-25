@@ -24,7 +24,7 @@ export const useAuth = () => {
     return context;
 };
 
-const API_URL = 'https://your-backend-domain.com/api';
+const API_URL = 'https://syncline1.onrender.com/api';
 
 // ─── Normalise user object from backend ───────────────────────────────────────
 const normaliseUser = (raw) => {

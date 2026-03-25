@@ -433,7 +433,7 @@ const ReportManagement = ({ dark = true }) => {
 
             {/* Toast */}
             {toast && (
-                <div style={{ position: 'fixed', top: '20px', right: '24px', zIndex: 3000, background: toast.type === 'error' ? t.dangerBg : t.successBg, border: `1px solid ${toast.type === 'error' ? t.dangerBorder : t.successBorder}`, color: toast.type === 'error' ? t.dangerText : t.successText, padding: '12px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 3000 }}>
+                <div style={{ position: 'fixed', top: '20px', right: '24px', zIndex: 3000, background: toast.type === 'error' ? t.dangerBg : t.successBg, border: `1px solid ${toast.type === 'error' ? t.dangerBorder : t.successBorder}`, color: toast.type === 'error' ? t.dangerText : t.successText, padding: '12px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
                     {toast.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />} {toast.msg}
                 </div>
             )}
