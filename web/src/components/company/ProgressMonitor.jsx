@@ -7,8 +7,8 @@ import {
     BarChart2, Target
 } from 'lucide-react';
 
-const API_BASE   = 'http://localhost:3001/api';
-const API_ORIGIN = 'http://localhost:3001';
+const API_BASE   = 'https://syncline.onrender.com/api';
+const API_ORIGIN = 'https://syncline.onrender.com';
 
 const themes = {
     dark: {
