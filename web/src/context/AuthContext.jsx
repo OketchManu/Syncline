@@ -2,19 +2,19 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
-    auth,
-    googleProvider,
-    signInWithPopup,
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    signOut,
-    sendEmailVerification,
-    sendPasswordResetEmail,
-    updatePassword,
-    reauthenticateWithCredential,
-    EmailAuthProvider,
-    onAuthStateChanged,
-} from '../firebase';
+  auth,
+  googleProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  onAuthStateChanged
+} from '../../../src/firebase.js';
 
 const AuthContext = createContext();
 
@@ -24,7 +24,7 @@ export const useAuth = () => {
     return context;
 };
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'https://your-backend-domain.com/api';
 
 // ─── Normalise user object from backend ───────────────────────────────────────
 const normaliseUser = (raw) => {

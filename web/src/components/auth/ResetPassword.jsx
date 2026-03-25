@@ -11,8 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Zap, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
-import { auth } from '../../firebase';
-import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
+import { auth } from "../../../../src/firebase.js";
 
 const rules = [
     { label: 'At least 8 characters', test: p => p.length >= 8 },
@@ -67,6 +66,7 @@ const ResetPassword = () => {
         (async () => {
             try {
                 // verifyPasswordResetCode resolves to the email linked to the code.
+                // eslint-disable-next-line no-undef
                 const resolvedEmail = await verifyPasswordResetCode(auth, oobCode);
                 setEmail(resolvedEmail);
             } catch {
@@ -90,6 +90,7 @@ const ResetPassword = () => {
 
         setLoading(true);
         try {
+            // eslint-disable-next-line no-undef
             await confirmPasswordReset(auth, oobCode, password);
             setDone(true);
         } catch (err) {
