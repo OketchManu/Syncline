@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { companyAPI } from '../../services/api';
 import { Zap, CheckCircle2, XCircle, Loader, Building2 } from 'lucide-react';
 
-const API_BASE = 'https://syncline.onrender.com';
+const API_BASE = 'https://syncline1.onrender.com';
 
 const roleConfig = {
     owner:   { label: 'Owner',   color: '#f59e0b', icon: '👑' },
