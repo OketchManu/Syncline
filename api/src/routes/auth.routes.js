@@ -1,379 +1,162 @@
 // api/src/routes/auth.routes.js
-const express = require('express');
-const router = express.Router();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
+const express  = require('express');
+const router   = express.Router();
+const crypto   = require('crypto');
 const { runQuery, getOne } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
-// ─────────────────────────────────────────────────────────────────
-// JWT HELPER FUNCTIONS
-// ─────────────────────────────────────────────────────────────────
-
-function generateAccessToken(userId, email, role, companyId, accountType) {
-    return jwt.sign(
-        {
-            userId,
-            email,
-            role,
-            company_id: companyId || null,
-            account_type: accountType || 'individual'
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-    );
-}
-
-function generateRefreshToken(userId) {
-    return jwt.sign(
-        { userId, type: 'refresh' },
-        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-        { expiresIn: '30d' }
-    );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// HELPER: Generate unique invite code
-// ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateInviteCode() {
-    return crypto.randomBytes(4).toString('hex').toUpperCase();
+    return 'SYNC-' + crypto.randomBytes(3).toString('hex').toUpperCase();
 }
-
-// ─────────────────────────────────────────────────────────────────
-// HELPER: Sanitize user object for response
-// ─────────────────────────────────────────────────────────────────
 
 function sanitizeUser(user) {
     if (!user) return null;
-    
+    const accountType = user.account_type === 'company' ? 'company' : 'personal';
     return {
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name || user.fullName,
-        role: user.role || 'member',
-        accountType: user.account_type || user.accountType || 'individual',
-        companyId: user.company_id || user.companyId || null,
-        avatar: user.avatar_url || user.avatar || null,
-        isActive: user.is_active !== 0,
-        createdAt: user.created_at || user.createdAt,
-        lastSeen: user.last_seen || user.lastSeen
+        id:           user.id,
+        email:        user.email,
+        fullName:     user.full_name || user.fullName,
+        full_name:    user.full_name || user.fullName,
+        role:         user.role         || 'member',
+        accountType,
+        account_type: accountType,
+        companyId:    user.company_id   || null,
+        company_id:   user.company_id   || null,
+        orgId:        user.org_id       || null,
+        org_id:       user.org_id       || null,
+        avatar:       user.avatar_url   || null,
+        avatar_url:   user.avatar_url   || null,
+        firebaseUid:  user.firebase_uid || null,
+        isActive:     user.is_active !== 0,
+        createdAt:    user.created_at,
+        lastSeen:     user.last_seen,
     };
 }
 
-// ─────────────────────────────────────────────────────────────────
-// POST /api/auth/register
-// Supports both individual and company accounts
-// ─────────────────────────────────────────────────────────────────
+async function createCompany(userId, { companyName, industry, size, description, website }) {
+    const inviteCode = generateInviteCode();
+    const companyResult = await runQuery(
+        `INSERT INTO companies
+            (name, owner_id, invite_code, industry, size, description, website, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [companyName, userId, inviteCode, industry||null, size||null, description||null, website||null]
+    );
+    const companyId = companyResult.id;
+    await runQuery('UPDATE users SET company_id = ?, org_id = ? WHERE id = ?', [companyId, companyId, userId]);
+    try {
+        await runQuery(
+            `INSERT INTO company_members (company_id, user_id, role, status, joined_at)
+             VALUES (?, ?, 'owner', 'active', CURRENT_TIMESTAMP)`,
+            [companyId, userId]
+        );
+    } catch (_) {}
+    return companyId;
+}
 
+// ─── POST /api/auth/register ──────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
     try {
         const {
-            email,
-            password,
-            fullName,
-            accountType,
-            companyName,
-            industry,
-            size,
-            description,
-            website
+            email, password, fullName,
+            firebaseUid, accountType,
+            companyName, industry, size, description, website,
+            avatar,
         } = req.body;
 
-        console.log('📝 Registration request:', { email, accountType, companyName });
+        console.log('Register:', { email, accountType, hasFirebaseUid: !!firebaseUid });
 
-        // Validate required fields
-        if (!email || !password || !fullName) {
-            return res.status(400).json({
-                error: 'Email, password, and full name are required'
-            });
+        if (!email || !fullName) {
+            return res.status(400).json({ error: 'Email and full name are required' });
+        }
+        if (!firebaseUid && !password) {
+            return res.status(400).json({ error: 'Either firebaseUid or password is required' });
+        }
+        if (password && password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
 
-        if (password.length < 6) {
-            return res.status(400).json({
-                error: 'Password must be at least 6 characters long'
-            });
-        }
+        const resolvedType = accountType === 'company' ? 'company' : 'personal';
+        const role         = resolvedType === 'company' ? 'owner' : 'member';
 
-        // Validate company-specific requirements
-        if (accountType === 'company' && !companyName) {
-            return res.status(400).json({
-                error: 'Company name is required for company accounts'
-            });
-        }
-
-        // Check if user already exists
-        const existingUser = await getOne(
-            'SELECT id FROM users WHERE email = ?',
-            [email]
+        // Check existing
+        const existing = await getOne(
+            'SELECT * FROM users WHERE email = ? OR (firebase_uid IS NOT NULL AND firebase_uid = ?)',
+            [email, firebaseUid || '']
         );
 
-        if (existingUser) {
-            return res.status(409).json({
-                error: 'User with this email already exists'
-            });
+        if (existing) {
+            if (firebaseUid && !existing.firebase_uid) {
+                await runQuery('UPDATE users SET firebase_uid = ? WHERE id = ?', [firebaseUid, existing.id]);
+                existing.firebase_uid = firebaseUid;
+            }
+            let company = null;
+            if (existing.company_id) {
+                company = await getOne('SELECT id, name, invite_code FROM companies WHERE id = ?', [existing.company_id]);
+            }
+            return res.json({ user: { ...sanitizeUser(existing), company: company || undefined } });
         }
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Hash password if provided
+        let passwordHash = null;
+        if (password) {
+            const bcrypt = require('bcryptjs');
+            passwordHash = await bcrypt.hash(password, 10);
+        }
 
-        // Determine account type and role
-        const userAccountType = accountType === 'company' ? 'company' : 'individual';
-        const userRole = accountType === 'company' ? 'owner' : 'member';
-
-        console.log('👤 Creating user:', { email, accountType: userAccountType, role: userRole });
-
-        // Create user (without company_id initially)
+        // Create user
         const userResult = await runQuery(
-            `INSERT INTO users (
-                email, 
-                password_hash, 
-                full_name, 
-                account_type, 
-                role, 
-                is_active,
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`,
-            [email, hashedPassword, fullName, userAccountType, userRole]
+            `INSERT INTO users
+                (email, password_hash, full_name, account_type, role,
+                 firebase_uid, avatar_url, is_active, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+            [email, passwordHash, fullName, resolvedType, role, firebaseUid||null, avatar||null]
         );
-
         const userId = userResult.id;
+
+        // Create company if needed
         let companyId = null;
-
-        // If company account, create company and link to user
-        if (accountType === 'company') {
-            const inviteCode = generateInviteCode();
-
-            console.log('🏢 Creating company:', { name: companyName, inviteCode });
-
-            const companyResult = await runQuery(
-                `INSERT INTO companies (
-                    name, 
-                    owner_id, 
-                    invite_code,
-                    industry,
-                    size,
-                    description,
-                    website,
-                    created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                [
-                    companyName,
-                    userId,
-                    inviteCode,
-                    industry || null,
-                    size || null,
-                    description || null,
-                    website || null
-                ]
-            );
-
-            companyId = companyResult.id;
-
-            console.log('🔗 Linking user to company:', { userId, companyId });
-
-            // Update user with company_id
-            await runQuery(
-                'UPDATE users SET company_id = ? WHERE id = ?',
-                [companyId, userId]
-            );
+        if (resolvedType === 'company' && companyName) {
+            companyId = await createCompany(userId, { companyName, industry, size, description, website });
         }
 
-        // Fetch complete user data (with company_id if applicable)
-        const user = await getOne(
-            `SELECT 
-                id, 
-                email, 
-                full_name, 
-                role, 
-                account_type, 
-                company_id,
-                avatar_url,
-                is_active,
-                created_at
-            FROM users 
-            WHERE id = ?`,
-            [userId]
-        );
-
-        console.log('✅ User created:', { id: user.id, email: user.email, company_id: user.company_id });
-
-        // Generate JWT tokens with company_id
-        const accessToken = generateAccessToken(
-            userId,
-            email,
-            userRole,
-            companyId,
-            userAccountType
-        );
-
-        const refreshToken = generateRefreshToken(userId);
-
-        // Get company info if company account
+        const newUser = await getOne('SELECT * FROM users WHERE id = ?', [userId]);
         let company = null;
         if (companyId) {
-            company = await getOne(
-                'SELECT id, name, invite_code, industry, size, description, website FROM companies WHERE id = ?',
-                [companyId]
-            );
-            console.log('🏢 Company details:', company);
+            company = await getOne('SELECT id, name, invite_code FROM companies WHERE id = ?', [companyId]);
         }
 
-        res.status(201).json({
+        console.log('User created:', { id: userId, email });
+        return res.status(201).json({
             message: 'User registered successfully',
-            user: {
-                ...sanitizeUser(user),
-                company: company || undefined
-            },
-            accessToken,
-            refreshToken
+            user: { ...sanitizeUser(newUser), company: company || undefined },
         });
 
     } catch (error) {
-        console.error('❌ Registration error:', error);
-        res.status(500).json({
-            error: 'Registration failed',
-            details: error.message
-        });
+        console.error('Registration error:', error);
+        res.status(500).json({ error: 'Registration failed', details: error.message });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// POST /api/auth/login
-// Returns user with company info and proper JWT
-// ─────────────────────────────────────────────────────────────────
-
-router.post('/login', async (req, res) => {
+// ─── POST /api/auth/firebase-sync ────────────────────────────────────────────
+router.post('/firebase-sync', authenticateToken, async (req, res) => {
     try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({
-                error: 'Email and password are required'
-            });
+        if (req.user && req.user.id) {
+            return res.json({ user: req.user });
         }
-
-        console.log('🔐 Login attempt:', email);
-
-        // Get user with all fields
-        const user = await getOne(
-            `SELECT 
-                id, 
-                email, 
-                password_hash,
-                full_name, 
-                role, 
-                account_type, 
-                company_id,
-                avatar_url,
-                is_active,
-                created_at,
-                last_seen
-            FROM users 
-            WHERE email = ?`,
-            [email]
-        );
-
-        if (!user) {
-            return res.status(401).json({
-                error: 'Invalid email or password'
-            });
-        }
-
-        // Check if account is active
-        if (user.is_active === 0) {
-            return res.status(403).json({
-                error: 'Account is deactivated. Please contact support.'
-            });
-        }
-
-        // Verify password
-        const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-        if (!isPasswordValid) {
-            return res.status(401).json({
-                error: 'Invalid email or password'
-            });
-        }
-
-        console.log('✅ Login successful:', { email, company_id: user.company_id });
-
-        // Update last seen
-        await runQuery(
-            'UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?',
-            [user.id]
-        );
-
-        // Generate tokens with company_id
-        const accessToken = generateAccessToken(
-            user.id,
-            user.email,
-            user.role,
-            user.company_id,
-            user.account_type
-        );
-
-        const refreshToken = generateRefreshToken(user.id);
-
-        // Get company info if user has company
-        let company = null;
-        if (user.company_id) {
-            company = await getOne(
-                'SELECT id, name, invite_code, industry, size, description, website FROM companies WHERE id = ?',
-                [user.company_id]
-            );
-        }
-
-        res.json({
-            message: 'Login successful',
-            user: {
-                ...sanitizeUser(user),
-                company: company || undefined
-            },
-            accessToken,
-            refreshToken
-        });
-
+        res.status(404).json({ error: 'User not found' });
     } catch (error) {
-        console.error('❌ Login error:', error);
-        res.status(500).json({
-            error: 'Login failed',
-            details: error.message
-        });
+        res.status(500).json({ error: 'Sync failed', details: error.message });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// GET /api/auth/me
-// Get current user info
-// ─────────────────────────────────────────────────────────────────
-
+// ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 router.get('/me', authenticateToken, async (req, res) => {
     try {
-        console.log('👤 Get /me for user:', req.user.id);
+        const user = await getOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-        const user = await getOne(
-            `SELECT 
-                id, 
-                email, 
-                full_name, 
-                role, 
-                account_type, 
-                company_id,
-                avatar_url,
-                is_active,
-                created_at,
-                last_seen
-            FROM users 
-            WHERE id = ?`,
-            [req.user.id]
-        );
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Get company info if user has company
         let company = null;
         if (user.company_id) {
             company = await getOne(
@@ -381,111 +164,26 @@ router.get('/me', authenticateToken, async (req, res) => {
                 [user.company_id]
             );
         }
-
-        res.json({
-            user: {
-                ...sanitizeUser(user),
-                company: company || undefined
-            }
-        });
-
+        res.json({ user: { ...sanitizeUser(user), company: company || undefined } });
     } catch (error) {
-        console.error('❌ Get user error:', error);
-        res.status(500).json({
-            error: 'Failed to get user data',
-            details: error.message
-        });
+        console.error('/me error:', error);
+        res.status(500).json({ error: 'Failed to get user', details: error.message });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// POST /api/auth/refresh
-// Refresh access token
-// ─────────────────────────────────────────────────────────────────
-
-router.post('/refresh', async (req, res) => {
-    try {
-        const { refreshToken } = req.body;
-
-        if (!refreshToken) {
-            return res.status(400).json({
-                error: 'Refresh token is required'
-            });
-        }
-
-        // Verify refresh token
-        const decoded = jwt.verify(
-            refreshToken,
-            process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
-        );
-
-        if (decoded.type !== 'refresh') {
-            return res.status(403).json({
-                error: 'Invalid token type'
-            });
-        }
-
-        // Get fresh user data
-        const user = await getOne(
-            `SELECT 
-                id, 
-                email, 
-                role, 
-                account_type, 
-                company_id,
-                is_active
-            FROM users 
-            WHERE id = ?`,
-            [decoded.userId]
-        );
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        if (user.is_active === 0) {
-            return res.status(403).json({
-                error: 'Account is deactivated'
-            });
-        }
-
-        console.log('🔄 Refreshing token for:', { email: user.email, company_id: user.company_id });
-
-        // Generate new access token with fresh company_id
-        const accessToken = generateAccessToken(
-            user.id,
-            user.email,
-            user.role,
-            user.company_id,
-            user.account_type
-        );
-
-        res.json({ accessToken });
-
-    } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({
-                error: 'Refresh token expired. Please login again.'
-            });
-        }
-        console.error('❌ Refresh token error:', error);
-        res.status(403).json({
-            error: 'Invalid refresh token',
-            details: error.message
-        });
-    }
+// ─── POST /api/auth/logout ────────────────────────────────────────────────────
+router.post('/logout', (req, res) => {
+    res.json({ message: 'Logged out successfully.' });
 });
 
-// ─────────────────────────────────────────────────────────────────
-// POST /api/auth/logout
-// Logout user
-// ─────────────────────────────────────────────────────────────────
+// ─── POST /api/auth/refresh — kept for backwards compat ──────────────────────
+router.post('/refresh', (req, res) => {
+    res.status(410).json({ error: 'Token refresh is handled automatically by Firebase.' });
+});
 
-router.post('/logout', authenticateToken, (req, res) => {
-    console.log('👋 User logged out:', req.user.email);
-    res.json({
-        message: 'Logged out successfully. Please delete your token on the client side.'
-    });
+// ─── POST /api/auth/login — kept for backwards compat ────────────────────────
+router.post('/login', (req, res) => {
+    res.status(410).json({ error: 'Login is now handled by Firebase on the client.' });
 });
 
 module.exports = router;
