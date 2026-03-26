@@ -1,3 +1,4 @@
+// api/src/routes/company.routes.js
 const express = require('express');
 const router = express.Router();
 router.use(express.json());
@@ -193,17 +194,8 @@ db.run(`ALTER TABLE companies ADD COLUMN website      TEXT`,  [], () => {});
 db.run(`ALTER TABLE companies ADD COLUMN description  TEXT`,  [], () => {});
 db.run(`ALTER TABLE companies ADD COLUMN logo_url     TEXT`,  [], () => {});
 
-// Back-fill invite codes for companies that don't have one yet
-(async () => {
-    try {
-        const companies = await getAll('SELECT id FROM companies WHERE invite_code IS NULL');
-        for (const c of companies) {
-            const code = generateInviteCode();
-            await runQuery('UPDATE companies SET invite_code = ? WHERE id = ?', [code, c.id]);
-            console.log(`✅ Back-filled invite code for company ${c.id}: ${code}`);
-        }
-    } catch (_) {}
-})();
+// NOTE: Backfill is now in api/src/config/backfill.js and runs after database initialization
+// in api/src/server.js — NOT here, to avoid race conditions.
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/company/team
@@ -505,7 +497,7 @@ router.get('/my-status', authenticateToken, async (req, res) => {
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
+// ────────────────────���────────────────────────────────────────────
 // GET /api/company/join-requests  ← ADDED (CompanyOnboarding JoinRequestsPanel)
 // ─────────────────────────────────────────────────────────────────
 router.get('/join-requests', authenticateToken, requireRole('owner', 'admin', 'manager'), async (req, res) => {
