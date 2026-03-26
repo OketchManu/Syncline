@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Zap, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
-import { auth } from "../../../../src/firebase.js";
+import { auth } from "../firebase.js";
 
 const rules = [
     { label: 'At least 8 characters', test: p => p.length >= 8 },
