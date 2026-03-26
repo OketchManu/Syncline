@@ -6,6 +6,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { initializeDatabase } = require('./config/database');
+const { backfillInviteCodes } = require('./config/backfill');
 const { initializeWebSocket } = require('./config/websocket');
 
 const app = express();
@@ -150,6 +151,7 @@ app.use((err, req, res, next) => {
 async function startServer() {
     try {
         await initializeDatabase();
+        await backfillInviteCodes();
 
         const server = http.createServer(app);
         initializeWebSocket(server);
