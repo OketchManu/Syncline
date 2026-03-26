@@ -87,13 +87,13 @@ router.post('/register', async (req, res) => {
         // Generate JWT tokens
         const accessToken = jwt.sign(
             { userId, accountType: userAccountType },
-            process.env.JWT_SECRET || 'your-secret-key',
+            process.env.JWT_SECRET || 'Here',
             { expiresIn: '24h' }
         );
 
         const refreshToken = jwt.sign(
             { userId },
-            process.env.JWT_REFRESH_SECRET || 'your-refresh-secret',
+            process.env.JWT_REFRESH_SECRET || 'Here',
             { expiresIn: '7d' }
         );
 
@@ -183,13 +183,13 @@ router.post('/login', async (req, res) => {
         // Generate tokens
         const accessToken = jwt.sign(
             { userId: user.id, accountType: user.accountType },
-            process.env.JWT_SECRET || 'your-secret-key',
+            process.env.JWT_SECRET || 'Here',
             { expiresIn: '24h' }
         );
 
         const refreshToken = jwt.sign(
             { userId: user.id },
-            process.env.JWT_REFRESH_SECRET || 'your-refresh-secret',
+            process.env.JWT_REFRESH_SECRET || 'Here',
             { expiresIn: '7d' }
         );
 
@@ -230,7 +230,7 @@ router.get('/me', async (req, res) => {
             return res.status(401).json({ error: 'No token provided' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'Here');
 
         const user = await getOne(
             `SELECT 
@@ -281,7 +281,7 @@ router.post('/refresh', async (req, res) => {
         // Verify refresh token
         const decoded = jwt.verify(
             refreshToken,
-            process.env.JWT_REFRESH_SECRET || 'your-refresh-secret'
+            process.env.JWT_REFRESH_SECRET || 'Here'
         );
 
         // Get user account type
@@ -297,7 +297,7 @@ router.post('/refresh', async (req, res) => {
         // Generate new access token
         const accessToken = jwt.sign(
             { userId: decoded.userId, accountType: user.account_type },
-            process.env.JWT_SECRET || 'your-secret-key',
+            process.env.JWT_SECRET || 'Here',
             { expiresIn: '24h' }
         );
 

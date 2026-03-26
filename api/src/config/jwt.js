@@ -1,7 +1,7 @@
 // api/src/config/jwt.js
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET          = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET          = process.env.JWT_SECRET || 'Here';
 const JWT_EXPIRES_IN      = '7d';
 const REFRESH_TOKEN_EXPIRES_IN = '30d';
 
