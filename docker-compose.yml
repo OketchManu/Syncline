@@ -10,7 +10,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: /data/syncline.db
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_SECRET: 31f6c5b25e63cbd9939d39885e338aa02b2434ca7191f23b0d25ce4ef56777f2
     volumes:
       - ./database:/data
     networks:

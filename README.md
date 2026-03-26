@@ -348,7 +348,7 @@ The full schema is in `database/schema.sql`.
 ```env
 PORT=3001
 DATABASE_URL=../database/syncline.db
-JWT_SECRET=your-secret-key-change-this-in-production
+JWT_SECRET= 31f6c5b25e63cbd9939d39885e338aa02b2434ca7191f23b0d25ce4ef56777f2
 NODE_ENV=development
 ```
 

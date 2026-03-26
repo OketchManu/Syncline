@@ -41,7 +41,7 @@ POST {{baseUrl}}/api/auth/refresh
 Content-Type: application/json
 
 {
-  "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+  "refreshToken": "Here"
 }
 
 ### Logout
