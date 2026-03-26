@@ -2,20 +2,27 @@
 const admin = require('firebase-admin');
 const { db } = require('../config/database');
 
-// ─── Initialise Firebase Admin (once) ────────────────────────────────────────
 if (!admin.apps.length) {
     try {
-        const serviceAccount = require('../../serviceAccountKey.json');
+        // Try secret file first (Render's secure file storage)
+        const serviceAccount = require('/etc/secrets/serviceAccountKey.json');
         admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-        console.log('✅ Firebase Admin initialised (service account file)');
+        console.log('✅ Firebase Admin initialised (secret file)');
     } catch (_) {
-        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-            console.log('✅ Firebase Admin initialised (env variable)');
-        } else {
+        try {
+            // Fallback: try env variable
+            if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+                const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+                admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+                console.log('✅ Firebase Admin initialised (env variable)');
+            } else {
+                throw new Error('No Firebase credentials found');
+            }
+        } catch (err) {
+            // Last resort - won't work without credentials
+            console.error('❌ Firebase Admin init failed:', err.message);
             admin.initializeApp();
-            console.log('✅ Firebase Admin initialised (application default credentials)');
+            console.log('⚠️  Firebase Admin initialised (application default - auth will fail)');
         }
     }
 }
