@@ -1,4 +1,4 @@
-// api/src/server.js (FIRST 15 LINES)
+// api/src/server.js
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -6,14 +6,17 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
-// ✅ Initialize Firebase FIRST
+// ✅ Initialize Firebase FIRST, before anything else
 const { initializeFirebase } = require('./config/firebase');
 initializeFirebase();
 
 // ✅ Import backfill function
 const { backfillInviteCodes } = require('./config/backfill');
 
+// ✅ Import database initialization
 const { initializeDatabase } = require('./config/database');
+
+// ✅ Import WebSocket initialization
 const { initializeWebSocket } = require('./config/websocket');
 
 const app = express();
