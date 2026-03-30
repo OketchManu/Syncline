@@ -26,5 +26,3 @@ Thumbs.db
 
 # Firebase / API
 # Firebase Service Account Key
-api/serviceAccountKey.json
-**/serviceAccountKey.json
