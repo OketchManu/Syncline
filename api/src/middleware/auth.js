@@ -8,11 +8,13 @@ if (!admin.apps.length) {
         const serviceAccount = require('../../serviceAccountKey.json');
         admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
         console.log('✅ Firebase Admin initialised (service account file)');
+        console.log('   Service account project_id:', serviceAccount.project_id);
     } catch (_) {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
             admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
             console.log('✅ Firebase Admin initialised (env variable)');
+            console.log('   Service account project_id:', serviceAccount.project_id);
         } else {
             admin.initializeApp();
             console.log('✅ Firebase Admin initialised (application default credentials)');
@@ -31,12 +33,12 @@ async function authenticateToken(req, res, next) {
 
     const idToken = authHeader.split('Bearer ')[1];
     console.log('🔍 Received token (first 50 chars):', idToken.substring(0, 50) + '...');
-    console.log('🔍 Token length:', idToken.length);
 
     try {
         console.log('🔐 Attempting to verify Firebase ID token...');
         const decoded = await admin.auth().verifyIdToken(idToken);
         console.log('✅ Token verified! Firebase UID:', decoded.uid);
+        console.log('   Token claims - aud (project):', decoded.aud);
 
         const user = await new Promise((resolve, reject) => {
             db.get(
@@ -73,7 +75,9 @@ async function authenticateToken(req, res, next) {
         console.error('❌ Auth middleware error:');
         console.error('   Error code:', error.code);
         console.error('   Error message:', error.message);
-        console.error('   Full error:', error);
+        if (error.code === 'auth/argument-error') {
+            console.error('   → This usually means: project ID mismatch or corrupted token');
+        }
 
         if (error.code === 'auth/id-token-expired' || error.code === 'auth/id-token-revoked') {
             console.warn('⚠️  Token expired or revoked');
