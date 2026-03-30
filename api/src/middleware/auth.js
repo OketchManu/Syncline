@@ -2,27 +2,20 @@
 const admin = require('firebase-admin');
 const { db } = require('../config/database');
 
+// ─── Initialise Firebase Admin (once) ────────────────────────────────────────
 if (!admin.apps.length) {
     try {
-        // Try secret file first (Render's secure file storage)
-        const serviceAccount = require('/etc/secrets/serviceAccountKey.json');
+        const serviceAccount = require('../../serviceAccountKey.json');
         admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-        console.log('✅ Firebase Admin initialised (secret file)');
+        console.log('✅ Firebase Admin initialised (service account file)');
     } catch (_) {
-        try {
-            // Fallback: try env variable
-            if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-                const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-                admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-                console.log('✅ Firebase Admin initialised (env variable)');
-            } else {
-                throw new Error('No Firebase credentials found');
-            }
-        } catch (err) {
-            // Last resort - won't work without credentials
-            console.error('❌ Firebase Admin init failed:', err.message);
+        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+            console.log('✅ Firebase Admin initialised (env variable)');
+        } else {
             admin.initializeApp();
-            console.log('⚠️  Firebase Admin initialised (application default - auth will fail)');
+            console.log('✅ Firebase Admin initialised (application default credentials)');
         }
     }
 }
@@ -32,13 +25,18 @@ async function authenticateToken(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.warn('⚠️  No Bearer token in Authorization header');
         return res.status(401).json({ error: 'Access token required' });
     }
 
     const idToken = authHeader.split('Bearer ')[1];
+    console.log('🔍 Received token (first 50 chars):', idToken.substring(0, 50) + '...');
+    console.log('🔍 Token length:', idToken.length);
 
     try {
+        console.log('🔐 Attempting to verify Firebase ID token...');
         const decoded = await admin.auth().verifyIdToken(idToken);
+        console.log('✅ Token verified! Firebase UID:', decoded.uid);
 
         const user = await new Promise((resolve, reject) => {
             db.get(
@@ -51,8 +49,11 @@ async function authenticateToken(req, res, next) {
         });
 
         if (!user) {
+            console.warn('⚠️  User not found in database for Firebase UID:', decoded.uid);
             return res.status(404).json({ error: 'User not found. Please complete registration.' });
         }
+
+        console.log('✅ User found in database:', user.email);
 
         req.user = {
             id:           user.id,
@@ -69,14 +70,20 @@ async function authenticateToken(req, res, next) {
 
         next();
     } catch (error) {
-        console.error('Auth middleware error:', error.code || error.message);
+        console.error('❌ Auth middleware error:');
+        console.error('   Error code:', error.code);
+        console.error('   Error message:', error.message);
+        console.error('   Full error:', error);
 
         if (error.code === 'auth/id-token-expired' || error.code === 'auth/id-token-revoked') {
+            console.warn('⚠️  Token expired or revoked');
             return res.status(401).json({ error: 'Token expired. Please sign in again.' });
         }
         if (error.code === 'auth/argument-error' || error.code === 'auth/invalid-id-token') {
+            console.warn('⚠️  Invalid token format or structure');
             return res.status(403).json({ error: 'Invalid token.' });
         }
+        console.warn('⚠️  Generic authentication failure');
         return res.status(403).json({ error: 'Authentication failed.' });
     }
 }
