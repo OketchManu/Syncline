@@ -8,185 +8,215 @@ const { db, initializeDatabase } = require('./database');
 // Add new migrations to the BOTTOM of this array only.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
-  {
-    name: 'create companies table',
-    sql: `
-      CREATE TABLE IF NOT EXISTS companies (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        name        TEXT    NOT NULL,
-        owner_id    INTEGER,
-        invite_code TEXT    UNIQUE,
-        industry    TEXT,
-        size        TEXT,
-        description TEXT,
-        website     TEXT,
-        logo_url    TEXT,
-        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at  DATETIME
-      )
-    `,
-  },
-  {
-    name: 'create company_members table',
-    sql: `
-      CREATE TABLE IF NOT EXISTS company_members (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_id INTEGER NOT NULL,
-        user_id    INTEGER NOT NULL,
-        role       TEXT    DEFAULT 'member',
-        status     TEXT    DEFAULT 'active',
-        joined_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(company_id, user_id)
-      )
-    `,
-  },
-  {
-    name: 'create join_requests table',
-    sql: `
-      CREATE TABLE IF NOT EXISTS join_requests (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_id INTEGER NOT NULL,
-        user_id    INTEGER NOT NULL,
-        status     TEXT    DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `,
-  },
-  {
-    name: 'create invitations table',
-    sql: `
-      CREATE TABLE IF NOT EXISTS invitations (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_id INTEGER,
-        email      TEXT,
-        role       TEXT    DEFAULT 'member',
-        token      TEXT    UNIQUE,
-        status     TEXT    DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME
-      )
-    `,
-  },
-  {
-    name: 'create task_reports table',
-    sql: `
-      CREATE TABLE IF NOT EXISTS task_reports (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id      INTEGER,
-        submitted_by INTEGER,
-        title        TEXT,
-        summary      TEXT,
-        hours_spent  REAL,
-        blockers     TEXT,
-        next_steps   TEXT,
-        status       TEXT DEFAULT 'pending',
-        feedback     TEXT,
-        created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `,
-  },
-  // ── Column additions (ALTER TABLE — safe if column already exists) ──────────
-  {
-    name: 'users — add account_type',
-    sql: `ALTER TABLE users ADD COLUMN account_type TEXT DEFAULT 'personal'`,
-  },
-  {
-    name: 'users — add role',
-    sql: `ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'`,
-  },
-  {
-    name: 'users — add firebase_uid',
-    sql: `ALTER TABLE users ADD COLUMN firebase_uid TEXT`,
-  },
-  {
-    name: 'users — add avatar_url',
-    sql: `ALTER TABLE users ADD COLUMN avatar_url TEXT`,
-  },
-  {
-    name: 'users — add company_id',
-    sql: `ALTER TABLE users ADD COLUMN company_id INTEGER`,
-  },
-  {
-    name: 'users — add org_id',
-    sql: `ALTER TABLE users ADD COLUMN org_id INTEGER`,
-  },
-  {
-    name: 'users — add is_active',
-    sql: `ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1`,
-  },
-  {
-    name: 'users — add join_status',
-    sql: `ALTER TABLE users ADD COLUMN join_status TEXT DEFAULT 'active'`,
-  },
-  {
-    name: 'users — add last_seen',
-    sql: `ALTER TABLE users ADD COLUMN last_seen DATETIME`,
-  },
-  {
-    name: 'users — add updated_at',
-    sql: `ALTER TABLE users ADD COLUMN updated_at DATETIME`,
-  },
-  {
-    name: 'users — add full_name',
-    sql: `ALTER TABLE users ADD COLUMN full_name TEXT`,
-  },
-  {
-    name: 'companies — add invite_code index',
-    sql: `CREATE INDEX IF NOT EXISTS idx_companies_invite_code ON companies(invite_code)`,
-  },
-  {
-    name: 'users — add firebase_uid index',
-    sql: `CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid) WHERE firebase_uid IS NOT NULL`,
-  },
-  {
-    name: 'users — add email index',
-    sql: `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
-  },
-  {
-    name: 'tasks — add created_by index',
-    sql: `CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by)`,
-  },
-  {
-    name: 'tasks — add company_id index',
-    sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id)`,
-  },
+    {
+        name: 'create companies table',
+        sql: `
+            CREATE TABLE IF NOT EXISTS companies (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT    NOT NULL,
+                owner_id    INTEGER,
+                invite_code TEXT    UNIQUE,
+                industry    TEXT,
+                size        TEXT,
+                description TEXT,
+                website     TEXT,
+                logo_url    TEXT,
+                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at  DATETIME
+            )
+        `,
+    },
+    {
+        name: 'create company_members table',
+        sql: `
+            CREATE TABLE IF NOT EXISTS company_members (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                user_id    INTEGER NOT NULL,
+                role       TEXT    DEFAULT 'member',
+                status     TEXT    DEFAULT 'active',
+                joined_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(company_id, user_id)
+            )
+        `,
+    },
+    {
+        name: 'create join_requests table',
+        sql: `
+            CREATE TABLE IF NOT EXISTS join_requests (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                user_id    INTEGER NOT NULL,
+                status     TEXT    DEFAULT 'pending',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `,
+    },
+    {
+        name: 'create invitations table',
+        sql: `
+            CREATE TABLE IF NOT EXISTS invitations (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER,
+                email      TEXT,
+                role       TEXT    DEFAULT 'member',
+                token      TEXT    UNIQUE,
+                status     TEXT    DEFAULT 'pending',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME
+            )
+        `,
+    },
+    {
+        name: 'create task_reports table',
+        sql: `
+            CREATE TABLE IF NOT EXISTS task_reports (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id      INTEGER,
+                submitted_by INTEGER,
+                title        TEXT,
+                summary      TEXT,
+                hours_spent  REAL,
+                blockers     TEXT,
+                next_steps   TEXT,
+                status       TEXT DEFAULT 'pending',
+                feedback     TEXT,
+                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `,
+    },
+    // ── users column additions ─────────────────────────────────────────────────
+    {
+        name: 'users — add account_type',
+        sql: `ALTER TABLE users ADD COLUMN account_type TEXT DEFAULT 'personal'`,
+    },
+    {
+        name: 'users — add role',
+        sql: `ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'`,
+    },
+    {
+        name: 'users — add firebase_uid',
+        sql: `ALTER TABLE users ADD COLUMN firebase_uid TEXT`,
+    },
+    {
+        name: 'users — add avatar_url',
+        sql: `ALTER TABLE users ADD COLUMN avatar_url TEXT`,
+    },
+    {
+        name: 'users — add company_id',
+        sql: `ALTER TABLE users ADD COLUMN company_id INTEGER`,
+    },
+    {
+        name: 'users — add org_id',
+        sql: `ALTER TABLE users ADD COLUMN org_id INTEGER`,
+    },
+    {
+        name: 'users — add is_active',
+        sql: `ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1`,
+    },
+    {
+        name: 'users — add join_status',
+        sql: `ALTER TABLE users ADD COLUMN join_status TEXT DEFAULT 'active'`,
+    },
+    {
+        name: 'users — add last_seen',
+        sql: `ALTER TABLE users ADD COLUMN last_seen DATETIME`,
+    },
+    {
+        name: 'users — add updated_at',
+        sql: `ALTER TABLE users ADD COLUMN updated_at DATETIME`,
+    },
+    {
+        name: 'users — add full_name',
+        sql: `ALTER TABLE users ADD COLUMN full_name TEXT`,
+    },
+    // ── tasks column additions ─────────────────────────────────────────────────
+    {
+        name: 'tasks — add company_id',
+        sql: `ALTER TABLE tasks ADD COLUMN company_id INTEGER`,
+    },
+    {
+        name: 'tasks — add org_id',
+        sql: `ALTER TABLE tasks ADD COLUMN org_id INTEGER`,
+    },
+    {
+        name: 'tasks — add assignee_id',
+        sql: `ALTER TABLE tasks ADD COLUMN assignee_id INTEGER`,
+    },
+    {
+        name: 'tasks — add flagged',
+        sql: `ALTER TABLE tasks ADD COLUMN flagged INTEGER DEFAULT 0`,
+    },
+    {
+        name: 'tasks — add flag_reason',
+        sql: `ALTER TABLE tasks ADD COLUMN flag_reason TEXT`,
+    },
+    {
+        name: 'tasks — add deadline',
+        sql: `ALTER TABLE tasks ADD COLUMN deadline DATETIME`,
+    },
+    {
+        name: 'tasks — add updated_at',
+        sql: `ALTER TABLE tasks ADD COLUMN updated_at DATETIME`,
+    },
+    // ── indexes ────────────────────────────────────────────────────────────────
+    {
+        name: 'companies — add invite_code index',
+        sql: `CREATE INDEX IF NOT EXISTS idx_companies_invite_code ON companies(invite_code)`,
+    },
+    {
+        name: 'users — add firebase_uid index',
+        sql: `CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid) WHERE firebase_uid IS NOT NULL`,
+    },
+    {
+        name: 'users — add email index',
+        sql: `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
+    },
+    {
+        name: 'tasks — add created_by index',
+        sql: `CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by)`,
+    },
+    {
+        name: 'tasks — add company_id index',
+        sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id)`,
+    },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
 function runMigrations() {
-  return new Promise((resolve) => {
-    console.log('🔄 Running schema migrations...');
+    return new Promise((resolve) => {
+        console.log('🔄 Running schema migrations...');
 
-    let index = 0;
+        let index = 0;
 
-    function next() {
-      if (index >= MIGRATIONS.length) {
-        console.log('✅ All migrations complete');
-        resolve();
-        return;
-      }
+        function next() {
+            if (index >= MIGRATIONS.length) {
+                console.log('✅ All migrations complete');
+                resolve();
+                return;
+            }
 
-      const migration = MIGRATIONS[index++];
+            const migration = MIGRATIONS[index++];
 
-      db.run(migration.sql.trim(), (err) => {
-        if (!err) {
-          console.log(`  ✅ Applied: ${migration.name}`);
-        } else if (
-          err.message.includes('duplicate column') ||
-          err.message.includes('already exists') ||
-          err.message.includes('UNIQUE constraint') // index already exists
-        ) {
-          // Already applied on a previous deploy — silently skip
-        } else {
-          // Log but never crash the server — migrations are best-effort
-          console.warn(`  ⚠️  Skipped [${migration.name}]: ${err.message}`);
+            db.run(migration.sql.trim(), (err) => {
+                if (!err) {
+                    console.log(`  ✅ Applied: ${migration.name}`);
+                } else if (
+                    err.message.includes('duplicate column') ||
+                    err.message.includes('already exists') ||
+                    err.message.includes('UNIQUE constraint')
+                ) {
+                    // Already applied on a previous deploy — silently skip
+                } else {
+                    // Log but never crash the server
+                    console.warn(`  ⚠️  Skipped [${migration.name}]: ${err.message}`);
+                }
+                next();
+            });
         }
-        next();
-      });
-    }
 
-    next();
-  });
+        next();
+    });
 }
 
 module.exports = { runMigrations };
@@ -194,9 +224,9 @@ module.exports = { runMigrations };
 // ─── Allow running as a standalone CLI script ─────────────────────────────────
 // Usage: node api/src/config/migrate.js
 if (require.main === module) {
-  (async () => {
-    await initializeDatabase();
-    await runMigrations();
-    process.exit(0);
-  })();
+    (async () => {
+        await initializeDatabase();
+        await runMigrations();
+        process.exit(0);
+    })();
 }
