@@ -34,21 +34,30 @@ const normaliseUser = (raw) => {
         ...raw,
         accountType,
         account_type: accountType,
-        orgId:      raw.orgId      ?? raw.org_id      ?? null,
-        org_id:     raw.org_id     ?? raw.orgId       ?? null,
-        companyId:  raw.companyId  ?? raw.company_id  ?? null,
-        company_id: raw.company_id ?? raw.companyId   ?? null,
+        fullName:     raw.fullName     ?? raw.full_name     ?? null,
+        full_name:    raw.full_name    ?? raw.fullName      ?? null,
+        companyId:    raw.companyId    ?? raw.company_id    ?? null,
+        company_id:   raw.company_id   ?? raw.companyId     ?? null,
+        orgId:        raw.orgId        ?? raw.org_id        ?? null,
+        org_id:       raw.org_id       ?? raw.orgId         ?? null,
     };
 };
 
 const setAxiosToken = async (firebaseUser) => {
     if (!firebaseUser) {
         delete axios.defaults.headers.common['Authorization'];
+        console.log('🔓 Cleared Authorization header (no Firebase user)');
         return null;
     }
-    const token = await firebaseUser.getIdToken();
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    return token;
+    try {
+        const token = await firebaseUser.getIdToken(true); // Force refresh
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        console.log('🔐 Set Authorization header with Firebase ID token (length:', token.length, ')');
+        return token;
+    } catch (err) {
+        console.error('❌ Failed to get Firebase ID token:', err.message);
+        throw err;
+    }
 };
 
 export const AuthProvider = ({ children }) => {
@@ -58,28 +67,46 @@ export const AuthProvider = ({ children }) => {
     const [authError,    setAuthError]    = useState(null);
 
     const syncBackendUser = useCallback(async (fbUser, registrationPayload = null) => {
+        console.log('📡 syncBackendUser called with:', { 
+            fbUid: fbUser?.uid, 
+            hasRegistrationPayload: !!registrationPayload 
+        });
+
+        // ✅ CRITICAL: Set token BEFORE making any API requests
         await setAxiosToken(fbUser);
 
         if (registrationPayload) {
+            console.log('📝 Registering new user...');
             const res = await axios.post(`${API_URL}/auth/register`, {
                 ...registrationPayload,
                 firebaseUid: fbUser.uid,
                 email:       fbUser.email,
             });
+            console.log('✅ Registration response:', { userId: res.data.user?.id });
             return normaliseUser(res.data.user);
         }
 
         try {
+            console.log('🔍 Fetching user from /api/auth/me...');
             const res = await axios.get(`${API_URL}/auth/me`);
+            console.log('✅ /api/auth/me success:', { userId: res.data.user?.id, email: res.data.user?.email });
             return normaliseUser(res.data.user);
         } catch (err) {
+            console.error('❌ /api/auth/me failed:', { 
+                status: err.response?.status, 
+                error: err.response?.data?.error,
+                message: err.message 
+            });
+
             if (err.response?.status === 404) {
+                console.log('📝 User not found, creating via firebase-sync...');
                 const res = await axios.post(`${API_URL}/auth/firebase-sync`, {
                     email:       fbUser.email,
                     fullName:    fbUser.displayName || fbUser.email.split('@')[0],
                     firebaseUid: fbUser.uid,
                     avatar:      fbUser.photoURL || null,
                 });
+                console.log('✅ firebase-sync response:', { userId: res.data.user?.id });
                 return normaliseUser(res.data.user);
             }
             throw err;
@@ -87,19 +114,26 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
+        console.log('🔌 Setting up Firebase auth listener...');
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+            console.log('🔄 Auth state changed:', { uid: fbUser?.uid, email: fbUser?.email });
+            
             setFirebaseUser(fbUser);
             if (fbUser) {
                 if (!user) {
                     try {
+                        console.log('👤 No user in state, syncing with backend...');
                         const backendUser = await syncBackendUser(fbUser);
+                        console.log('✅ Backend sync successful:', { userId: backendUser?.id });
                         setUser(backendUser);
                     } catch (err) {
-                        console.error('AuthContext: failed to sync user with backend:', err);
+                        console.error('❌ AuthContext: failed to sync user with backend:', err);
+                        console.error('   Stack:', err.stack);
                         setUser(null);
                     }
                 }
             } else {
+                console.log('🚪 User logged out');
                 delete axios.defaults.headers.common['Authorization'];
                 setUser(null);
             }
@@ -107,21 +141,31 @@ export const AuthProvider = ({ children }) => {
         });
 
         const tokenInterval = setInterval(async () => {
-            if (auth.currentUser) await setAxiosToken(auth.currentUser);
-        }, 55 * 60 * 1000);
+            if (auth.currentUser) {
+                console.log('🔄 Refreshing Firebase ID token...');
+                await setAxiosToken(auth.currentUser);
+            }
+        }, 55 * 60 * 1000); // Every 55 minutes
 
-        return () => { unsubscribe(); clearInterval(tokenInterval); };
+        return () => { 
+            console.log('🧹 Cleaning up auth listener');
+            unsubscribe(); 
+            clearInterval(tokenInterval); 
+        };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const login = async (email, password) => {
         setAuthError(null);
         try {
+            console.log('🔐 Logging in with email:', email);
             const credential  = await signInWithEmailAndPassword(auth, email, password);
             const backendUser = await syncBackendUser(credential.user);
+            console.log('✅ Login successful:', { userId: backendUser?.id });
             setUser(backendUser);
             return { success: true };
         } catch (err) {
             const message = firebaseErrorMessage(err.code) || err.message;
+            console.error('❌ Login failed:', message);
             setAuthError(message);
             return { success: false, error: message };
         }
@@ -130,6 +174,7 @@ export const AuthProvider = ({ children }) => {
     const register = async (email, password, fullName, accountType = 'personal', companyName = null, extraCompanyFields = null) => {
         setAuthError(null);
         try {
+            console.log('📝 Registering new user:', { email, accountType });
             const credential = await createUserWithEmailAndPassword(auth, email, password);
             const fbUser     = credential.user;
             sendEmailVerification(fbUser).catch(() => {});
@@ -139,10 +184,12 @@ export const AuthProvider = ({ children }) => {
                 companyName,
                 ...(extraCompanyFields || {}),
             });
+            console.log('✅ Registration successful:', { userId: backendUser?.id });
             setUser(backendUser);
             return { success: true, emailVerificationSent: true };
         } catch (err) {
             const message = firebaseErrorMessage(err.code) || err.message;
+            console.error('❌ Registration failed:', message);
             setAuthError(message);
             return { success: false, error: message };
         }
@@ -151,11 +198,13 @@ export const AuthProvider = ({ children }) => {
     const loginWithGoogle = async (accountType = 'personal', companyName = null) => {
         setAuthError(null);
         try {
+            console.log('🔐 Logging in with Google:', { accountType });
             const result    = await signInWithPopup(auth, googleProvider);
             const fbUser    = result.user;
             const isNewUser = result._tokenResponse?.isNewUser ?? false;
             let backendUser;
             if (isNewUser) {
+                console.log('📝 New Google user, creating account...');
                 backendUser = await syncBackendUser(fbUser, {
                     fullName:    fbUser.displayName || fbUser.email.split('@')[0],
                     avatar:      fbUser.photoURL    || null,
@@ -164,30 +213,43 @@ export const AuthProvider = ({ children }) => {
                     googleLogin: true,
                 });
             } else {
+                console.log('👤 Existing Google user, syncing...');
                 backendUser = await syncBackendUser(fbUser);
             }
+            console.log('✅ Google login successful:', { userId: backendUser?.id });
             setUser(backendUser);
             return { success: true };
         } catch (err) {
             if (err.code === 'auth/popup-closed-by-user') return { success: false, error: null };
             const message = firebaseErrorMessage(err.code) || err.message;
+            console.error('❌ Google login failed:', message);
             setAuthError(message);
             return { success: false, error: message };
         }
     };
 
     const logout = async () => {
-        await signOut(auth);
-        delete axios.defaults.headers.common['Authorization'];
-        setUser(null);
+        try {
+            console.log('🚪 Logging out...');
+            await signOut(auth);
+            console.log('✅ Logged out');
+            return { success: true };
+        } catch (err) {
+            console.error('❌ Logout failed:', err.message);
+            return { success: false, error: err.message };
+        }
     };
 
     const resetPassword = async (email) => {
         try {
+            console.log('📧 Sending password reset email to:', email);
             await sendPasswordResetEmail(auth, email);
+            console.log('✅ Password reset email sent');
             return { success: true };
         } catch (err) {
-            return { success: false, error: firebaseErrorMessage(err.code) || err.message };
+            const message = firebaseErrorMessage(err.code) || err.message;
+            console.error('❌ Reset password failed:', message);
+            return { success: false, error: message };
         }
     };
 
@@ -195,12 +257,16 @@ export const AuthProvider = ({ children }) => {
         const fbUser = auth.currentUser;
         if (!fbUser) return { success: false, error: 'Not authenticated.' };
         try {
+            console.log('🔐 Changing password...');
             const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
             await reauthenticateWithCredential(fbUser, credential);
             await updatePassword(fbUser, newPassword);
+            console.log('✅ Password changed');
             return { success: true };
         } catch (err) {
-            return { success: false, error: firebaseErrorMessage(err.code) || err.message };
+            const message = firebaseErrorMessage(err.code) || err.message;
+            console.error('❌ Change password failed:', message);
+            return { success: false, error: message };
         }
     };
 
@@ -208,7 +274,9 @@ export const AuthProvider = ({ children }) => {
         const fbUser = auth.currentUser;
         if (!fbUser) return { success: false, error: 'Not signed in.' };
         try {
+            console.log('📧 Resending verification email...');
             await sendEmailVerification(fbUser);
+            console.log('✅ Verification email sent');
             return { success: true };
         } catch (err) {
             return { success: false, error: err.message };
@@ -238,16 +306,11 @@ const firebaseErrorMessage = (code) => {
     const map = {
         'auth/user-not-found':         'No account found with this email.',
         'auth/wrong-password':         'Incorrect password.',
-        'auth/email-already-in-use':   'An account with this email already exists.',
         'auth/weak-password':          'Password must be at least 6 characters.',
-        'auth/invalid-email':          'Please enter a valid email address.',
-        'auth/too-many-requests':      'Too many attempts. Please try again later.',
-        'auth/network-request-failed': 'Network error. Check your connection.',
-        'auth/invalid-credential':     'Incorrect email or password.',
-        'auth/requires-recent-login':  'Please sign in again to do this.',
-        'auth/popup-blocked':          'Pop-up was blocked. Please allow pop-ups for this site.',
-        'auth/account-exists-with-different-credential':
-            'An account already exists with this email using a different sign-in method.',
+        'auth/email-already-in-use':   'Email is already registered.',
+        'auth/invalid-email':          'Invalid email address.',
+        'auth/popup-closed-by-user':   'Sign-in popup was closed.',
+        'auth/account-exists-with-different-credential': 'An account already exists with this email.',
     };
     return map[code] || null;
 };
