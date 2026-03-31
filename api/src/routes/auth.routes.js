@@ -91,7 +91,6 @@ router.post('/register', async (req, res) => {
         );
 
         if (existing) {
-            // Link firebase_uid if missing
             if (firebaseUid && !existing.firebase_uid) {
                 await runQuery(
                     'UPDATE users SET firebase_uid = ? WHERE id = ?',
@@ -154,13 +153,9 @@ router.post('/register', async (req, res) => {
 });
 
 // ─── POST /api/auth/firebase-sync ─────────────────────────────────────────────
-// Called by the frontend when /api/auth/me returns 404 — the user is authenticated
-// in Firebase but has no row in the database yet (e.g. first Google sign-in).
-// We verify the token ourselves here because authenticateToken returns 404 before
-// req.user is populated, which is exactly the case we need to handle.
 router.post('/firebase-sync', async (req, res) => {
     try {
-        // ── 1. Verify the Firebase ID token manually ──────────────────────────
+        // ── 1. Verify the Firebase ID token ──────────────────────────────────
         const authHeader = req.headers.authorization || '';
         if (!authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ error: 'Missing Authorization header' });
@@ -180,20 +175,38 @@ router.post('/firebase-sync', async (req, res) => {
         }
 
         const firebaseUid = decoded.uid;
-        const email       = decoded.email       || req.body.email       || null;
-        const displayName = decoded.name        || req.body.fullName     || email?.split('@')[0] || 'User';
-        const avatarUrl   = decoded.picture     || req.body.avatar       || null;
+
+        // ── 2. Always guarantee a non-null email ──────────────────────────────
+        // SQLite users.email is NOT NULL — fall back to a derived address so the
+        // INSERT never fails, even if Google withholds the real email.
+        const email = decoded.email
+            || req.body?.email
+            || `${firebaseUid}@firebase.local`;
+
+        const displayName = decoded.name
+            || req.body?.fullName
+            || email.split('@')[0]
+            || 'User';
+
+        const avatarUrl = decoded.picture || req.body?.avatar || null;
 
         console.log('🔄 firebase-sync for UID:', firebaseUid, '| email:', email);
 
-        // ── 2. Check if user already exists ───────────────────────────────────
-        const existing = await getOne(
-            'SELECT * FROM users WHERE firebase_uid = ? OR (email = ? AND email IS NOT NULL)',
-            [firebaseUid, email]
+        // ── 3. Check if user already exists (by UID first, then email) ────────
+        let existing = await getOne(
+            'SELECT * FROM users WHERE firebase_uid = ?',
+            [firebaseUid]
         );
 
+        if (!existing && decoded.email) {
+            existing = await getOne(
+                'SELECT * FROM users WHERE email = ?',
+                [decoded.email]
+            );
+        }
+
         if (existing) {
-            // Make sure firebase_uid is linked (covers email-match case)
+            // Link firebase_uid if it was missing
             if (!existing.firebase_uid) {
                 await runQuery(
                     'UPDATE users SET firebase_uid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
@@ -217,14 +230,30 @@ router.post('/firebase-sync', async (req, res) => {
             });
         }
 
-        // ── 3. Create a new user row ───────────────────────────────────────────
-        const userResult = await runQuery(
-            `INSERT INTO users
-                (email, full_name, account_type, role,
-                 firebase_uid, avatar_url, is_active, created_at)
-             VALUES (?, ?, 'personal', 'member', ?, ?, 1, CURRENT_TIMESTAMP)`,
-            [email, displayName, firebaseUid, avatarUrl]
-        );
+        // ── 4. Create new user row ────────────────────────────────────────────
+        let userResult;
+        try {
+            userResult = await runQuery(
+                `INSERT INTO users
+                    (email, full_name, account_type, role,
+                     firebase_uid, avatar_url, is_active, created_at)
+                 VALUES (?, ?, 'personal', 'member', ?, ?, 1, CURRENT_TIMESTAMP)`,
+                [email, displayName, firebaseUid, avatarUrl]
+            );
+        } catch (insertErr) {
+            // Race condition — another request already created this user
+            if (insertErr.message.includes('UNIQUE constraint')) {
+                const raceUser = await getOne(
+                    'SELECT * FROM users WHERE firebase_uid = ? OR email = ?',
+                    [firebaseUid, email]
+                );
+                if (raceUser) {
+                    console.log('✅ firebase-sync: race condition resolved for:', email);
+                    return res.json({ user: sanitizeUser(raceUser), created: false });
+                }
+            }
+            throw insertErr;
+        }
 
         const newUser = await getOne('SELECT * FROM users WHERE id = ?', [userResult.id]);
 
@@ -235,7 +264,8 @@ router.post('/firebase-sync', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ firebase-sync error:', error);
+        console.error('❌ firebase-sync error:', error.message);
+        console.error(error.stack);
         res.status(500).json({ error: 'Sync failed', details: error.message });
     }
 });
