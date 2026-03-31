@@ -1,7 +1,7 @@
 // web/src/services/websocket.js
 // WebSocket service for real-time updates
 
-const WS_URL = 'ws://localhost:3001/ws';
+const WS_URL = import.meta.env.VITE_WS_URL || 'wss://syncline-1.onrender.com/ws';
 
 class WebSocketService {
     constructor() {
