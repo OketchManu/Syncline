@@ -174,6 +174,10 @@ const MIGRATIONS = [
         name: 'tasks — add company_id index',
         sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id)`,
     },
+    {
+        name: 'users — drop users_new if exists from failed migration',
+        sql: `DROP TABLE IF EXISTS users_new`,
+    },
     // ── fix NOT NULL on password_hash ──────────────────────────────────────────
     // SQLite cannot ALTER COLUMN, so we rename the old table, recreate it
     // correctly, copy all data across, then drop the old table.
