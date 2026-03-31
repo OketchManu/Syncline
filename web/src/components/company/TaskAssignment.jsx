@@ -52,10 +52,14 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
     const [error,          setError]          = useState('');
     const [success,        setSuccess]        = useState('');
 
-    const authHeaders = useCallback(() => ({
+   const authHeaders = useCallback(async () => {
+    const { auth } = await import('../../firebase.js');
+    const token = await auth.currentUser?.getIdToken();
+    return {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-    }), []);
+        Authorization: `Bearer ${token}`,
+    };
+}, []);
 
     useEffect(() => {
         const loadData = async () => {

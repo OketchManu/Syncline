@@ -8,12 +8,14 @@ import {
 } from "lucide-react";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
-const API_BASE = "https://syncline-1.onrender.com/api";
-
-const authHeaders = () => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-});
+const authHeaders = useCallback(async () => {
+    const { auth } = await import('../../firebase.js');
+    const token = await auth.currentUser?.getIdToken();
+    return {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+    };
+}, []);
 
 const authHeadersMultipart = () => ({
   Authorization: `Bearer ${localStorage.getItem("accessToken")}`,

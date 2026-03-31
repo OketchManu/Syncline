@@ -533,10 +533,14 @@ const TeamManagement = ({ dark = true }) => {
         setTimeout(() => setToast(null), 3500);
     }, []);
 
-    const authHeaders = useCallback(() => ({
+    const authHeaders = useCallback(async () => {
+    const { auth } = await import('../../firebase.js');
+    const token = await auth.currentUser?.getIdToken();
+    return {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-    }), []);
+        Authorization: `Bearer ${token}`,
+    };
+}, []);
 
     const fetchMembers = useCallback(async () => {
         try {
@@ -564,7 +568,7 @@ const TeamManagement = ({ dark = true }) => {
 
     const fetchTasks = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE}/tasks`, { headers: authHeaders() });
+            const res = await fetch(`${API_BASE}/tasks`, { headers: await authHeaders() });
             if (!res.ok) return;
             const data = await res.json();
             setTasks(data.tasks || []);

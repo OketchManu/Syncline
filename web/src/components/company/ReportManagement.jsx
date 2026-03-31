@@ -336,8 +336,14 @@ const ReportManagement = ({ dark = true }) => {
     const isCompanyAccount = user?.account_type === 'company' || user?.accountType === 'company';
     const canReview = isCompanyAccount && ['owner', 'admin', 'manager'].includes(user?.role);
 
-    const authHeaders = useCallback(() => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('accessToken')}` }), []);
-
+   const authHeaders = useCallback(async () => {
+    const { auth } = await import('../../firebase.js');
+    const token = await auth.currentUser?.getIdToken();
+    return {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+    };
+}, []);
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
     const fetchReports = useCallback(async () => {
