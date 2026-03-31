@@ -306,4 +306,24 @@ router.post('/login', (req, res) => {
     res.status(410).json({ error: 'Login is now handled by Firebase on the client.' });
 });
 
+// ─── TEMP: Fix localhost avatar URLs in DB ────────────────────────────────────
+// Visit: POST /api/auth/fix-avatar-urls  (delete this route after running once)
+router.post('/fix-avatar-urls', async (req, res) => {
+    try {
+        await runQuery(
+            `UPDATE users 
+             SET avatar_url = REPLACE(avatar_url, 'http://localhost:3001', 'https://syncline-1.onrender.com')
+             WHERE avatar_url LIKE 'http://localhost:3001%'`
+        );
+        await runQuery(
+            `UPDATE companies
+             SET logo_url = REPLACE(logo_url, 'http://localhost:3001', 'https://syncline-1.onrender.com')
+             WHERE logo_url LIKE 'http://localhost:3001%'`
+        );
+        res.json({ message: '✅ URLs fixed' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
