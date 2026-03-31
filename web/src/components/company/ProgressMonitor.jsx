@@ -198,9 +198,14 @@ const ProgressMonitor = ({ dark = true }) => {
     const [period,  setPeriod]  = useState('all');   // all | week | month
     const [sortBy,  setSortBy]  = useState('rate');  // rate | total | overdue | name
 
-    const authHeaders = useCallback(() => ({
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-    }), []);
+   const authHeaders = useCallback(async () => {
+    const { auth } = await import('../../firebase.js');
+    const token = await auth.currentUser?.getIdToken();
+    return {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+    };
+}, []);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
