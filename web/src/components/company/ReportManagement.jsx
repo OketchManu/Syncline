@@ -9,7 +9,7 @@ import {
     AlertTriangle, ClipboardList, MessageSquare, Building2
 } from 'lucide-react';
 
-const API_BASE   = 'https://syncline-1.onrender.com';
+const API_BASE   = 'https://syncline-1.onrender.com/api';
 const API_ORIGIN = 'https://syncline-1.onrender.com'; // ← ADDED: for resolving relative avatar URLs
 
 const themes = {
