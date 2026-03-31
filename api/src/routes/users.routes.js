@@ -86,7 +86,8 @@ router.put('/me', upload.single('avatar'), async (req, res) => {
 
         if (req.file) {
             // File uploaded via multer
-            avatarUrl = `/uploads/avatars/${req.file.filename}`;
+           const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
+            avatarUrl = `${BASE_URL}/uploads/avatars/${req.file.filename}`;
         } else if (req.body.removeAvatar === true || req.body.removeAvatar === 'true') {
             removeAvatar = true;
         }
