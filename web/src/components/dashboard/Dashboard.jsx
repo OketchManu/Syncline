@@ -17,7 +17,7 @@ import {
     UserPlus
 } from 'lucide-react';
 
-const API_ORIGIN = 'http://localhost:3001';
+const API_ORIGIN = import.meta.env.VITE_API_URL || 'https://syncline-1.onrender.com';
 
 const resolveAvatar = (avatar) => {
     if (!avatar) return null;
