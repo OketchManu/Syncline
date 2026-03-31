@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { taskAPI, userAPI } from '../../services/api';
+import { auth } from '../../firebase.js';
 import wsService from '../../services/websocket';
 import CompanyOnboarding from '../company/CompanyOnboarding';
 import TeamManagement    from '../company/TeamManagement';
@@ -550,10 +551,19 @@ const Dashboard = () => {
 
     useEffect(()=>{
         if (!isCompany || !user?.company_id) return;
-        fetch(`https://syncline-1.onrender.com/api/company/team`, { headers:{ Authorization:`Bearer ${localStorage.getItem('accessToken')}` } })
-            .then(r=>r.json())
-            .then(data=>{ if(data.company?.name) setCompanyName(data.company.name); if(data.company?.logo_url) setCompanyLogo(data.company.logo_url); })
-            .catch(()=>{});
+        const loadCompany = async () => {
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                if (!token) return;
+                const res = await fetch(`https://syncline-1.onrender.com/api/company/team`, {
+                    headers:{ Authorization:`Bearer ${token}` }
+                });
+                const data = await res.json();
+                if(data.company?.name) setCompanyName(data.company.name);
+                if(data.company?.logo_url) setCompanyLogo(data.company.logo_url);
+            } catch(err) { console.error('Load company:', err); }
+        };
+        loadCompany();
     },[isCompany,user?.company_id]);
 
     useEffect(()=>{
