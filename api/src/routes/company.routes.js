@@ -737,7 +737,8 @@ router.patch('/details', uploadLogo, authenticateToken, requireRole('owner', 'ad
         // If a logo file was uploaded, build its public URL
         let logoUrl = null;
         if (req.file) {
-            logoUrl = `http://localhost:3001/uploads/logos/${req.file.filename}`;
+           const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
+logoUrl = `${BASE_URL}/uploads/logos/${req.file.filename}`;
         }
 
         await runQuery(
