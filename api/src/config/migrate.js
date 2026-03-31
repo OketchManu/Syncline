@@ -241,6 +241,19 @@ const MIGRATIONS = [
         name: 'users — restore email index after rebuild',
         sql: `CREATE INDEX IF NOT EXISTS idx_users_email_after_rebuild ON users(email)`,
     },
+
+    {
+        name: 'users — fix localhost avatar_url to use Render URL',
+        sql: `UPDATE users 
+              SET avatar_url = REPLACE(avatar_url, 'http://localhost:3001', 'https://syncline-1.onrender.com')
+              WHERE avatar_url LIKE 'http://localhost:3001%'`,
+    },
+    {
+        name: 'users — fix localhost logo_url in companies to use Render URL',
+        sql: `UPDATE companies 
+              SET logo_url = REPLACE(logo_url, 'http://localhost:3001', 'https://syncline-1.onrender.com')
+              WHERE logo_url LIKE 'http://localhost:3001%'`,
+    },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
