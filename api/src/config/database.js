@@ -223,4 +223,40 @@ function closeDatabase() {
 
 function getDatabase() { return db; }
 
-module.exports = { db, getDatabase, initializeDatabase, runQuery, getOne, getAll, closeDatabase };
+// ─── Reset stale database ─────────────────────────────────────────────────────
+// Deletes the DB file if it was created with the old broken schema (password_hash NOT NULL).
+// Runs once on startup. Safe to run on every deploy.
+async function resetDatabaseIfStale() {
+    return new Promise((resolve) => {
+        db.get(`PRAGMA table_info(users)`, [], (err, row) => {
+            // If we can't read the schema, skip reset
+            if (err) { resolve(); return; }
+        });
+
+        db.all(`PRAGMA table_info(users)`, [], (err, rows) => {
+            if (err || !rows) { resolve(); return; }
+
+            const passwordCol = rows.find(r => r.name === 'password_hash');
+            if (passwordCol && passwordCol.notnull === 1) {
+                // Stale schema detected — delete the DB file and reconnect
+                console.log('⚠️  Stale schema detected (password_hash NOT NULL). Resetting database...');
+                db.close(() => {
+                    fs.unlink(DB_PATH, (unlinkErr) => {
+                        if (unlinkErr) {
+                            console.error('❌ Could not delete stale DB:', unlinkErr.message);
+                        } else {
+                            console.log('✅ Stale database deleted. Fresh DB will be created.');
+                        }
+                        // Re-require to reconnect — easiest way to restart the module
+                        console.log('🔄 Restarting process to reconnect to fresh DB...');
+                        process.exit(0); // Render will auto-restart the service
+                    });
+                });
+            } else {
+                resolve(); // Schema is fine
+            }
+        });
+    });
+}
+
+module.exports = { db, getDatabase, initializeDatabase, resetDatabaseIfStale, runQuery, getOne, getAll, closeDatabase }; 

@@ -21,6 +21,7 @@ const { runMigrations } = require('./config/migrate');
 
 // ✅ Import WebSocket initialization
 const { initializeWebSocket } = require('./config/websocket');
+const { resetDatabaseIfStale } = require('./config/database');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -174,6 +175,7 @@ app.use((err, req, res, next) => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function startServer() {
   try {
+    await resetDatabaseIfStale();
     await initializeDatabase();  // create tables if they don't exist
     await runMigrations();       // add any missing columns / tables to existing DB
     await backfillInviteCodes(); // backfill invite codes for companies
