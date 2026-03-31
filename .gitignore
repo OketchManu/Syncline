@@ -24,5 +24,4 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 
-# Firebase / API
-# Firebase Service Account Key
+database/syncline.db
