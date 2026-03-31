@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { auth } from "../../firebase.js";
 import {
   Building2, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft,
   Globe, Users, Upload, X, Edit2,
@@ -7,19 +8,8 @@ import {
   RefreshCw, UserPlus, Shield, Briefcase, UserCheck, Trash2
 } from "lucide-react";
 
-// ─── API helpers ──────────────────────────────────────────────────────────────
-const authHeaders = useCallback(async () => {
-    const { auth } = await import('../../firebase.js');
-    const token = await auth.currentUser?.getIdToken();
-    return {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-    };
-}, []);
-
-const authHeadersMultipart = () => ({
-  Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-});
+const API_BASE   = "https://syncline-1.onrender.com/api";
+const API_ORIGIN = "https://syncline-1.onrender.com";
 
 // ─── Theme tokens ─────────────────────────────────────────────────────────────
 const DARK = {
@@ -105,6 +95,18 @@ const ROLE_META = {
   member:  { icon: UserCheck, color: "#10b981", label: "Member"  },
 };
 
+// ─── Shared auth helper (module-level, not a hook) ────────────────────────────
+async function getAuthHeaders(multipart = false) {
+  const token = await auth.currentUser?.getIdToken();
+  if (multipart) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 // ─── Atoms ────────────────────────────────────────────────────────────────────
 const Spinner = ({ size = 16, color = "#6366f1" }) => (
   <div style={{
@@ -116,8 +118,7 @@ const Spinner = ({ size = 16, color = "#6366f1" }) => (
 
 const Avatar = ({ name, avatar, size = 36, tk }) => {
   const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
- const API_ORIGIN = import.meta.env.VITE_API_URL || 'https://syncline-1.onrender.com';
-const avatarSrc = avatar?.startsWith("http") ? avatar : avatar ? `${API_ORIGIN}${avatar}` : null;
+  const avatarSrc = avatar?.startsWith("http") ? avatar : avatar ? `${API_ORIGIN}${avatar}` : null;
   return avatarSrc
     ? <img src={avatarSrc} alt={name} style={{ width: size, height: size, borderRadius: size / 2.5, objectFit: "cover", flexShrink: 0 }} />
     : (
@@ -307,14 +308,9 @@ const LogoUploader = ({ preview, onChange, tk }) => {
 };
 
 // ─── SetupWizard ──────────────────────────────────────────────────────────────
-// When opened from the Edit button, if the company already has name+industry
-// (saved at registration), we show a compact editor:
-//   • Logo upload (primary — this is what they're here for)
-//   • Editable fields pre-filled from registration
-// If the company has NO details yet, the full 4-step wizard is shown instead.
 const SetupWizard = ({ existingCompany, onComplete, tk }) => {
   const hasCore = !!(existingCompany?.name && existingCompany?.industry);
-  const [step, setStep]   = useState(hasCore ? 0 : 1); // 0 = compact, 1-4 = wizard
+  const [step, setStep]   = useState(hasCore ? 0 : 1);
   const [saving, setSave] = useState(false);
   const [error, setError] = useState(null);
 
@@ -364,11 +360,11 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
         Object.entries(form).forEach(([k, v]) => v && body.append(k, v));
         body.append("logo", logoFile);
         res = await fetch(`${API_BASE}/company/details`, {
-          method: "PATCH", headers: authHeadersMultipart(), body,
+          method: "PATCH", headers: await getAuthHeaders(true), body,
         });
       } else {
         res = await fetch(`${API_BASE}/company/details`, {
-          method: "PATCH", headers: authHeaders(),
+          method: "PATCH", headers: await getAuthHeaders(),
           body: JSON.stringify(form),
         });
       }
@@ -383,11 +379,9 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
     }
   };
 
-  // ── COMPACT EDITOR (company has details from registration) ──────────────────
   if (step === 0) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {/* Logo — primary focus */}
         <div style={{ padding: "18px 20px", background: tk.accentBg, border: `1px solid ${tk.accentBorder}`, borderRadius: 14 }}>
           <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: tk.text }}>Company Logo</p>
           <p style={{ margin: "0 0 14px", fontSize: 12, color: tk.subtle }}>Add your logo to make your workspace feel like home.</p>
@@ -404,7 +398,7 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
             style={inputStyle} onFocus={iF} onBlur={iB} />
         </Field>
 
-        <div style={{ display: "grid",gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
           <Field label="Industry" tk={tk}>
             <select value={form.industry} onChange={e => set("industry", e.target.value)}
               style={{ ...inputStyle, background: "rgba(255,255,255,0.04)", cursor: "pointer" }}
@@ -449,10 +443,8 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
     );
   }
 
-  // ── FULL 4-STEP WIZARD (no details yet) ────────────────────────────────────
   return (
     <div>
-      {/* Step progress */}
       <div style={{ display: "flex", alignItems: "center", marginBottom: 32 }}>
         {STEPS.map((s, i) => (
           <div key={s.id} style={{ display: "flex", alignItems: "center", flex: i < STEPS.length - 1 ? 1 : "none" }}>
@@ -511,7 +503,7 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
               <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: tk.text }}>Your industry</h3>
               <p style={{ margin: 0, fontSize: 13, color: tk.subtle }}>Helps us tailor features to your workflow.</p>
             </div>
-            <div style={{ display: "grid",gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 110px), 1fr))', gap: 7 }}>
+            <div style={{ display: "grid", gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 110px), 1fr))', gap: 7 }}>
               {INDUSTRIES.map(ind => {
                 const active = form.industry === ind;
                 return (
@@ -594,7 +586,6 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
         )}
       </div>
 
-      {/* Navigation */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 28, paddingTop: 20, borderTop: `1px solid ${tk.border}` }}>
         <GhostBtn disabled={step === 1} onClick={() => { setStep(s => s - 1); setError(null); }} tk={tk}>
           <ChevronLeft size={14} /> Back
@@ -614,7 +605,6 @@ const SetupWizard = ({ existingCompany, onComplete, tk }) => {
   );
 };
 
-
 // ─── CompanyCard ──────────────────────────────────────────────────────────────
 const CompanyCard = ({ company, companyName, canEdit, onEdit, tk }) => {
   const inviteCode = company?.invite_code;
@@ -623,7 +613,6 @@ const CompanyCard = ({ company, companyName, canEdit, onEdit, tk }) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 20, overflow: "hidden" }}>
-        {/* Banner */}
         <div style={{ height: 110, background: tk.bannerBg, position: "relative" }}>
           <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle, ${tk.bannerDot} 1px, transparent 1px)`, backgroundSize: "20px 20px" }} />
           {canEdit && (
@@ -641,7 +630,6 @@ const CompanyCard = ({ company, companyName, canEdit, onEdit, tk }) => {
         </div>
 
         <div style={{ padding: "0 24px 26px" }}>
-          {/* Logo */}
           <div style={{
             width: 72, height: 72, borderRadius: 20,
             background: "linear-gradient(135deg, #312e81, #7c3aed)",
@@ -670,8 +658,7 @@ const CompanyCard = ({ company, companyName, canEdit, onEdit, tk }) => {
             )}
           </div>
 
-          {/* Stats */}
-          <div style={{ display: "grid",gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 90px), 1fr))', gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 90px), 1fr))', gap: 8 }}>
             {[
               { label: "Industry",  value: company?.industry     || "—" },
               { label: "Team Size", value: company?.size         || "—" },
@@ -686,7 +673,6 @@ const CompanyCard = ({ company, companyName, canEdit, onEdit, tk }) => {
         </div>
       </div>
 
-      {/* Invite section */}
       {inviteCode ? (
         <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -752,7 +738,6 @@ const MembersList = ({ members, canEdit, onRemove, onRoleChange, tk }) => {
                 {m.email}
               </p>
             </div>
-            {/* Role badge / selector */}
             {canEdit ? (
               <select
                 value={m.role}
@@ -812,7 +797,7 @@ const JoinRequestsPanel = ({ onAccepted, tk }) => {
 
   const load = useCallback(async () => {
     try {
-      const res  = await fetch(`${API_BASE}/company/join-requests`, { headers: authHeaders() });
+      const res  = await fetch(`${API_BASE}/company/join-requests`, { headers: await getAuthHeaders() });
       const data = await res.json();
       if (res.ok) setRequests(Array.isArray(data.requests) ? data.requests : []);
     } catch (_) {}
@@ -825,7 +810,7 @@ const JoinRequestsPanel = ({ onAccepted, tk }) => {
     setBusy(b => ({ ...b, [id]: true }));
     try {
       const res  = await fetch(`${API_BASE}/company/join-requests/${id}/${action}`, {
-        method: "PATCH", headers: authHeaders(),
+        method: "PATCH", headers: await getAuthHeaders(),
       });
       const data = await res.json();
       const type = action === "accept" ? "success" : "error";
@@ -985,14 +970,14 @@ const JoinForm = ({ code, setCode, loading, error, onJoin, tk }) => (
   </div>
 );
 
-// ─── JoinView (personal accounts only) ───────────────────────────────────────
+// ─── JoinView ─────────────────────────────────────────────────────────────────
 const JoinView = ({ tk }) => {
   const { updateUser } = useAuth();
-  const [code,         setCode]         = useState("");
-  const [loading,      setLoading]      = useState(false);
-  const [checking,     setChecking]     = useState(true);
-  const [error,        setError]        = useState(null);
-  const [joinStatus,   setJoinStatus]   = useState(null);
+  const [code,          setCode]          = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [checking,      setChecking]      = useState(true);
+  const [error,         setError]         = useState(null);
+  const [joinStatus,    setJoinStatus]    = useState(null);
   const [joinedCompany, setJoinedCompany] = useState(null);
 
   useEffect(() => {
@@ -1004,7 +989,7 @@ const JoinView = ({ tk }) => {
   useEffect(() => {
     (async () => {
       try {
-        const res  = await fetch(`${API_BASE}/company/my-status`, { headers: authHeaders() });
+        const res  = await fetch(`${API_BASE}/company/my-status`, { headers: await getAuthHeaders() });
         const data = await res.json();
         if (res.ok && data.status) {
           setJoinStatus(data.status);
@@ -1017,12 +1002,11 @@ const JoinView = ({ tk }) => {
     })();
   }, [updateUser]);
 
-  // Poll while pending
   useEffect(() => {
     if (joinStatus !== "pending") return;
     const interval = setInterval(async () => {
       try {
-        const res  = await fetch(`${API_BASE}/company/my-status`, { headers: authHeaders() });
+        const res  = await fetch(`${API_BASE}/company/my-status`, { headers: await getAuthHeaders() });
         const data = await res.json();
         if (res.ok && data.status && data.status !== joinStatus) {
           setJoinStatus(data.status);
@@ -1041,7 +1025,7 @@ const JoinView = ({ tk }) => {
     setLoading(true); setError(null);
     try {
       const res  = await fetch(`${API_BASE}/company/join/${trimmed}`, {
-        method: "POST", headers: authHeaders(),
+        method: "POST", headers: await getAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Invalid invite code");
@@ -1136,7 +1120,7 @@ export default function CompanyOnboarding({ dark: darkProp }) {
     if (!isCompanyAccount || !user?.company_id) { setLoading(false); return; }
     setLoading(true); setFetchErr(null);
     try {
-      const res  = await fetch(`${API_BASE}/company/team`, { headers: authHeaders() });
+      const res  = await fetch(`${API_BASE}/company/team`, { headers: await getAuthHeaders() });
       const data = await res.json();
       if (res.ok) {
         setCompany(data.company || null);
@@ -1153,28 +1137,23 @@ export default function CompanyOnboarding({ dark: darkProp }) {
 
   useEffect(() => { fetchTeam(); }, [fetchTeam]);
 
-  const handleWizardComplete = (c) => {
-    // Use the returned company object directly — don't re-fetch which can
-    // race against the DB write and show stale data.
+  const handleWizardComplete = async (c) => {
     setCompany(c);
     setEditing(false);
     if (updateUser) updateUser({ company_id: c.id });
     showToast("Company details saved!");
-    // Refresh members list only (not company object)
-    fetch(`${API_BASE}/company/team`, { headers: authHeaders() })
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data.members)) setMembers(data.members);
-        // Only update company if the returned object has more data than what we already have
-        if (data.company && data.company.invite_code) setCompany(prev => ({ ...data.company, ...c }));
-      })
-      .catch(() => {});
+    try {
+      const res  = await fetch(`${API_BASE}/company/team`, { headers: await getAuthHeaders() });
+      const data = await res.json();
+      if (Array.isArray(data.members)) setMembers(data.members);
+      if (data.company && data.company.invite_code) setCompany(prev => ({ ...data.company, ...c }));
+    } catch (_) {}
   };
 
   const handleRoleChange = async (userId, role) => {
     try {
       const res  = await fetch(`${API_BASE}/company/team/${userId}/role`, {
-        method: "PATCH", headers: authHeaders(),
+        method: "PATCH", headers: await getAuthHeaders(),
         body: JSON.stringify({ role }),
       });
       const data = await res.json();
@@ -1189,7 +1168,7 @@ export default function CompanyOnboarding({ dark: darkProp }) {
   const handleRemoveMember = async (userId) => {
     try {
       const res  = await fetch(`${API_BASE}/company/team/${userId}`, {
-        method: "DELETE", headers: authHeaders(),
+        method: "DELETE", headers: await getAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -1230,7 +1209,6 @@ export default function CompanyOnboarding({ dark: darkProp }) {
 
       <div style={{ maxWidth: 600, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
 
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
             <div style={{
@@ -1264,7 +1242,6 @@ export default function CompanyOnboarding({ dark: darkProp }) {
           )}
         </div>
 
-        {/* Fetch error */}
         {fetchErr && (
           <AlertBox type="warning" tk={tk}>
             <AlertCircle size={14} style={{ flexShrink: 0 }} />
@@ -1279,20 +1256,14 @@ export default function CompanyOnboarding({ dark: darkProp }) {
           </AlertBox>
         )}
 
-        {/* ── COMPANY ACCOUNT ── */}
         {isCompanyAccount && (
           <>
             {editing ? (
-              /* ── Edit wizard ── */
               <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 20, padding: "26px 28px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
                   <div>
-                    <h2 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: tk.text }}>
-                      {"Edit Company Details"}
-                    </h2>
-                    <p style={{ margin: 0, fontSize: 12, color: tk.subtle }}>
-                      {"Update your company information."}
-                    </p>
+                    <h2 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: tk.text }}>Edit Company Details</h2>
+                    <p style={{ margin: 0, fontSize: 12, color: tk.subtle }}>Update your company information.</p>
                   </div>
                   <button onClick={() => setEditing(false)} style={{
                     background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 9,
@@ -1306,7 +1277,6 @@ export default function CompanyOnboarding({ dark: darkProp }) {
               </div>
             ) : (
               <>
-                {/* ── Prompt to complete setup if no industry/size yet ── */}
                 {!company?.industry && (
                   <AlertBox type="info" tk={tk}>
                     <Sparkles size={14} style={{ flexShrink: 0 }} />
@@ -1323,7 +1293,6 @@ export default function CompanyOnboarding({ dark: darkProp }) {
                   </AlertBox>
                 )}
 
-                {/* ── Company card + invite ── */}
                 <CompanyCard
                   company={company}
                   companyName={companyName}
@@ -1332,7 +1301,6 @@ export default function CompanyOnboarding({ dark: darkProp }) {
                   tk={tk}
                 />
 
-                {/* ── Team members ── */}
                 <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 16, padding: "20px 22px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1358,7 +1326,6 @@ export default function CompanyOnboarding({ dark: darkProp }) {
                   />
                 </div>
 
-                {/* ── Join requests (admin/manager only) ── */}
                 {canEdit && (
                   <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 16, padding: "20px 22px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
@@ -1373,7 +1340,6 @@ export default function CompanyOnboarding({ dark: darkProp }) {
           </>
         )}
 
-        {/* ── PERSONAL ACCOUNT ── */}
         {!isCompanyAccount && <JoinView tk={tk} />}
 
       </div>
