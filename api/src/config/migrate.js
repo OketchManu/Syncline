@@ -1,12 +1,6 @@
 // api/src/config/migrate.js
-// Runs automatically on every server start (safe — skips already-applied migrations).
-// Can also be run manually: node api/src/config/migrate.js
-
 const { db, initializeDatabase } = require('./database');
 
-// ─── Migration list ───────────────────────────────────────────────────────────
-// Add new migrations to the BOTTOM of this array only.
-// Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
     {
         name: 'create companies table',
@@ -180,6 +174,69 @@ const MIGRATIONS = [
         name: 'tasks — add company_id index',
         sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id)`,
     },
+    // ── fix NOT NULL on password_hash ──────────────────────────────────────────
+    // SQLite cannot ALTER COLUMN, so we rename the old table, recreate it
+    // correctly, copy all data across, then drop the old table.
+    {
+        name: 'users — fix password_hash NOT NULL constraint',
+        sql: `
+            CREATE TABLE IF NOT EXISTS users_new (
+                id            INTEGER  PRIMARY KEY AUTOINCREMENT,
+                email         TEXT     UNIQUE NOT NULL,
+                password_hash TEXT,
+                full_name     TEXT,
+                account_type  TEXT     DEFAULT 'personal',
+                role          TEXT     DEFAULT 'member',
+                firebase_uid  TEXT     UNIQUE,
+                avatar_url    TEXT,
+                company_id    INTEGER,
+                org_id        INTEGER,
+                is_active     INTEGER  DEFAULT 1,
+                join_status   TEXT     DEFAULT 'active',
+                created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_seen     DATETIME,
+                updated_at    DATETIME
+            )
+        `,
+    },
+    {
+        name: 'users — copy data into users_new',
+        sql: `
+            INSERT OR IGNORE INTO users_new
+                (id, email, password_hash, full_name, account_type, role,
+                 firebase_uid, avatar_url, company_id, org_id, is_active,
+                 join_status, created_at, last_seen, updated_at)
+            SELECT
+                id, email, password_hash, full_name, account_type, role,
+                firebase_uid, avatar_url, company_id, org_id, is_active,
+                join_status, created_at, last_seen, updated_at
+            FROM users
+        `,
+    },
+    {
+        name: 'users — drop old users table',
+        sql: `DROP TABLE IF EXISTS users_old`,
+    },
+    {
+        name: 'users — rename users to users_old',
+        sql: `ALTER TABLE users RENAME TO users_old`,
+    },
+    {
+        name: 'users — rename users_new to users',
+        sql: `ALTER TABLE users_new RENAME TO users`,
+    },
+    {
+        name: 'users — drop users_old',
+        sql: `DROP TABLE IF EXISTS users_old`,
+    },
+    {
+        name: 'users — restore firebase_uid index after rebuild',
+        sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid_unique ON users(firebase_uid) WHERE firebase_uid IS NOT NULL`,
+    },
+    {
+        name: 'users — restore email index after rebuild',
+        sql: `CREATE INDEX IF NOT EXISTS idx_users_email_after_rebuild ON users(email)`,
+    },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -206,9 +263,8 @@ function runMigrations() {
                     err.message.includes('already exists') ||
                     err.message.includes('UNIQUE constraint')
                 ) {
-                    // Already applied on a previous deploy — silently skip
+                    // Already applied — silently skip
                 } else {
-                    // Log but never crash the server
                     console.warn(`  ⚠️  Skipped [${migration.name}]: ${err.message}`);
                 }
                 next();
@@ -221,8 +277,7 @@ function runMigrations() {
 
 module.exports = { runMigrations };
 
-// ─── Allow running as a standalone CLI script ─────────────────────────────────
-// Usage: node api/src/config/migrate.js
+// ─── CLI usage ────────────────────────────────────────────────────────────────
 if (require.main === module) {
     (async () => {
         await initializeDatabase();
