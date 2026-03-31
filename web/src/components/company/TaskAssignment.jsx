@@ -1,5 +1,6 @@
 // web/src/components/company/TaskAssignment.jsx
 import React, { useState, useEffect, useCallback } from 'react';
+import { auth } from '../../firebase.js';
 import { UserPlus, X, Search, Check, AlertCircle, Users, Shield, Briefcase, User, Crown } from 'lucide-react';
 
 const API_BASE   = 'https://syncline-1.onrender.com/api';
@@ -52,32 +53,39 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
     const [error,          setError]          = useState('');
     const [success,        setSuccess]        = useState('');
 
-   const authHeaders = useCallback(async () => {
-    const { auth } = await import('../../firebase.js');
-    const token = await auth.currentUser?.getIdToken();
-    return {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-    };
-}, []);
+    const authHeaders = useCallback(async () => {
+        const { auth } = await import('../../firebase.js');
+        const token = await auth.currentUser?.getIdToken();
+        return {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        };
+    }, []);
 
     useEffect(() => {
         const loadData = async () => {
             setMembersLoading(true);
             try {
-                // ← FIXED: assignments endpoint is /task-reports/:id/assignments (not /tasks/:id/assignments)
-                // Also falls back gracefully: if no assignments yet, pre-selects task.assignee_id
+                // Get auth headers
+                const headers = await authHeaders();
+                
+                // Fetch team members and current assignments
                 const [mRes, aRes] = await Promise.all([
-                    fetch(`${API_BASE}/company/team?active=true`, { headers: authHeaders() }),
+                    fetch(`${API_BASE}/company/team?active=true`, { headers }),
                     task?.id
-                        ? fetch(`${API_BASE}/task-reports/${task.id}/assignments`, { headers: authHeaders() })
+                        ? fetch(`${API_BASE}/task-reports/${task.id}/assignments`, { headers })
                         : Promise.resolve(null),
                 ]);
-                if (mRes.ok) { const d = await mRes.json(); setMembers(d.members || []); }
+                
+                if (mRes.ok) { 
+                    const d = await mRes.json(); 
+                    setMembers(d.members || []); 
+                }
+                
                 if (aRes?.ok) {
                     const d = await aRes.json();
                     const ids = (d.assignments || []).map(a => a.user_id);
-                    // ← ADDED: if no assignments yet, fall back to task.assignee_id so the current assignee shows pre-selected
+                    // If no assignments yet, fall back to task.assignee_id so the current assignee shows pre-selected
                     if (ids.length > 0) {
                         setSelectedUsers(ids);
                     } else if (task?.assignee_id) {
@@ -88,8 +96,8 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
                     setSelectedUsers([task.assignee_id]);
                 }
             } catch (err) {
-                console.error(err);
-                // ← ADDED: graceful fallback when assignments endpoint fails
+                console.error('Error loading task assignment data:', err);
+                // Graceful fallback when assignments endpoint fails
                 if (task?.assignee_id) setSelectedUsers([task.assignee_id]);
             }
             setMembersLoading(false);
@@ -101,20 +109,48 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
         setSelectedUsers(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
 
     const handleAssign = async () => {
-        if (selectedUsers.length === 0) { setError('Please select at least one team member'); return; }
-        setLoading(true); setError(''); setSuccess('');
+        if (selectedUsers.length === 0) { 
+            setError('Please select at least one team member'); 
+            return; 
+        }
+        
+        setLoading(true); 
+        setError(''); 
+        setSuccess('');
+        
         try {
-            // ← FIXED: POST to /task-reports/:id/assign (not /tasks/:id/assign)
+            // Get auth headers
+            const headers = await authHeaders();
+            
+            // POST to /task-reports/:id/assign
             const res = await fetch(`${API_BASE}/task-reports/${task.id}/assign`, {
                 method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({ user_ids: selectedUsers, require_report: requireReport }),
+                headers,
+                body: JSON.stringify({ 
+                    user_ids: selectedUsers, 
+                    require_report: requireReport 
+                }),
             });
+            
             const data = await res.json();
-            if (!res.ok) { setError(data.error || 'Failed to assign task'); setLoading(false); return; }
+            
+            if (!res.ok) { 
+                setError(data.error || 'Failed to assign task'); 
+                setLoading(false); 
+                return; 
+            }
+            
             setSuccess(`Task assigned to ${selectedUsers.length} member(s)!`);
-            setTimeout(() => { if (onAssigned) onAssigned(); onClose(); }, 1200);
-        } catch (err) { setError(err.message); }
+            
+            setTimeout(() => { 
+                if (onAssigned) onAssigned(); 
+                onClose(); 
+            }, 1200);
+        } catch (err) { 
+            console.error('Error assigning task:', err);
+            setError(err.message || 'Failed to assign task'); 
+        }
+        
         setLoading(false);
     };
 
@@ -140,67 +176,191 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
                             <p style={{ margin: '2px 0 0', fontSize: '12px', color: t.textMuted, maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task?.title}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex' }}><X size={15} /></button>
+                    <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex' }}>
+                        <X size={15} />
+                    </button>
                 </div>
 
                 {/* Body */}
                 <div style={{ padding: '18px 22px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {error   && <div style={{ background: t.errorBg,   border: `1px solid ${t.errorBorder}`,   color: t.errorText,   padding: '9px 13px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '7px' }}><AlertCircle size={14} /> {error}</div>}
-                    {success && <div style={{ background: t.successBg, border: `1px solid ${t.successBorder}`, color: t.successText, padding: '9px 13px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '7px' }}><Check size={14} /> {success}</div>}
+                    {error && (
+                        <div style={{ background: t.errorBg, border: `1px solid ${t.errorBorder}`, color: t.errorText, padding: '9px 13px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                            <AlertCircle size={14} /> {error}
+                        </div>
+                    )}
+                    
+                    {success && (
+                        <div style={{ background: t.successBg, border: `1px solid ${t.successBorder}`, color: t.successText, padding: '9px 13px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                            <Check size={14} /> {success}
+                        </div>
+                    )}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px' }}>
                         <Search size={14} color={t.textMuted} />
-                        <input type="text" placeholder="Search team members…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                            style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
-                        {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', display: 'flex', padding: 0 }}><X size={12} /></button>}
+                        <input 
+                            type="text" 
+                            placeholder="Search team members…" 
+                            value={searchQuery} 
+                            onChange={e => setSearchQuery(e.target.value)}
+                            style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} 
+                        />
+                        {searchQuery && (
+                            <button 
+                                onClick={() => setSearchQuery('')} 
+                                style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', display: 'flex', padding: 0 }}
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: t.textMuted }}>{selectedUsers.length} selected</span>
-                        {selectedUsers.length > 0 && <button onClick={() => setSelectedUsers([])} style={{ background: 'none', border: 'none', color: t.accentText, fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '500' }}>Clear all</button>}
+                        <span style={{ fontSize: '12px', color: t.textMuted }}>
+                            {selectedUsers.length} selected
+                        </span>
+                        {selectedUsers.length > 0 && (
+                            <button 
+                                onClick={() => setSelectedUsers([])} 
+                                style={{ background: 'none', border: 'none', color: t.accentText, fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '500', fontFamily: 'inherit' }}
+                            >
+                                Clear all
+                            </button>
+                        )}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto' }}>
                         {membersLoading ? (
-                            <div style={{ display: 'flex', justifyContent: 'center', padding: '28px' }}><Spinner size={22} /></div>
+                            <div style={{ display: 'flex', justifyContent: 'center', padding: '28px' }}>
+                                <Spinner size={22} />
+                            </div>
                         ) : filteredMembers.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '28px', color: t.textMuted, fontSize: '13px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                <Users size={28} /> No members found
+                                <Users size={28} /> 
+                                <span>No members found</span>
                             </div>
-                        ) : filteredMembers.map(member => {
-                            const selected  = selectedUsers.includes(member.id);
-                            const name      = member.full_name || member.fullName || member.email;
-                            const avatarSrc = resolveAvatar(member.avatar || member.avatar_url);
-                            const roleInfo  = roleConfig[member.role] || roleConfig.member;
-                            return (
-                                <div key={member.id} onClick={() => toggleUser(member.id)}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', background: selected ? t.accentBg : t.surfaceCard, border: `1px solid ${selected ? t.accentBorder : t.border}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                                    <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: selected ? '#6366f1' : t.inputBg, border: `2px solid ${selected ? '#6366f1' : t.borderMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-                                        {selected && <Check size={11} color="#fff" strokeWidth={3} />}
+                        ) : (
+                            filteredMembers.map(member => {
+                                const selected  = selectedUsers.includes(member.id);
+                                const name      = member.full_name || member.fullName || member.email;
+                                const avatarSrc = resolveAvatar(member.avatar || member.avatar_url);
+                                const roleInfo  = roleConfig[member.role] || roleConfig.member;
+                                
+                                return (
+                                    <div 
+                                        key={member.id} 
+                                        onClick={() => toggleUser(member.id)}
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '12px', 
+                                            padding: '10px 13px', 
+                                            background: selected ? t.accentBg : t.surfaceCard, 
+                                            border: `1px solid ${selected ? t.accentBorder : t.border}`, 
+                                            borderRadius: '10px', 
+                                            cursor: 'pointer', 
+                                            transition: 'all 0.15s' 
+                                        }}
+                                    >
+                                        <div style={{ 
+                                            width: '18px', 
+                                            height: '18px', 
+                                            borderRadius: '5px', 
+                                            background: selected ? '#6366f1' : t.inputBg, 
+                                            border: `2px solid ${selected ? '#6366f1' : t.borderMid}`, 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center', 
+                                            flexShrink: 0, 
+                                            transition: 'all 0.15s' 
+                                        }}>
+                                            {selected && <Check size={11} color="#fff" strokeWidth={3} />}
+                                        </div>
+                                        
+                                        <div style={{ 
+                                            width: '36px', 
+                                            height: '36px', 
+                                            borderRadius: '50%', 
+                                            overflow: 'hidden', 
+                                            flexShrink: 0, 
+                                            background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center', 
+                                            fontSize: '14px', 
+                                            fontWeight: '700', 
+                                            color: '#fff' 
+                                        }}>
+                                            {avatarSrc ? (
+                                                <img src={avatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                name.charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                        
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ 
+                                                margin: 0, 
+                                                fontSize: '13px', 
+                                                fontWeight: '600', 
+                                                color: t.textPrimary, 
+                                                overflow: 'hidden', 
+                                                textOverflow: 'ellipsis', 
+                                                whiteSpace: 'nowrap' 
+                                            }}>
+                                                {name}
+                                            </p>
+                                            <p style={{ margin: '1px 0 0', fontSize: '11px', color: t.textMuted }}>
+                                                {member.email}
+                                            </p>
+                                        </div>
+                                        
+                                        <span style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '3px', 
+                                            padding: '2px 7px', 
+                                            borderRadius: '20px', 
+                                            fontSize: '10px', 
+                                            fontWeight: '600', 
+                                            background: `${roleInfo.color}20`, 
+                                            color: roleInfo.color, 
+                                            flexShrink: 0 
+                                        }}>
+                                            {roleInfo.icon} {roleInfo.label}
+                                        </span>
                                     </div>
-                                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#fff' }}>
-                                        {avatarSrc ? <img src={avatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
-                                        <p style={{ margin: '1px 0 0', fontSize: '11px', color: t.textMuted }}>{member.email}</p>
-                                    </div>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: '600', background: `${roleInfo.color}20`, color: roleInfo.color, flexShrink: 0 }}>
-                                        {roleInfo.icon} {roleInfo.label}
-                                    </span>
-                                </div>
-                            );
-                        })}
+                                );
+                            })
+                        )}
                     </div>
 
                     <div style={{ padding: '12px 14px', background: t.surfaceCard, border: `1px solid ${t.border}`, borderRadius: '10px' }}>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }} onClick={() => setRequireReport(!requireReport)}>
-                            <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: requireReport ? '#6366f1' : t.inputBg, border: `2px solid ${requireReport ? '#6366f1' : t.borderMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px', transition: 'all 0.15s' }}>
+                        <label 
+                            style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }} 
+                            onClick={() => setRequireReport(!requireReport)}
+                        >
+                            <div style={{ 
+                                width: '18px', 
+                                height: '18px', 
+                                borderRadius: '5px', 
+                                background: requireReport ? '#6366f1' : t.inputBg, 
+                                border: `2px solid ${requireReport ? '#6366f1' : t.borderMid}`, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                flexShrink: 0, 
+                                marginTop: '1px', 
+                                transition: 'all 0.15s' 
+                            }}>
                                 {requireReport && <Check size={11} color="#fff" strokeWidth={3} />}
                             </div>
                             <div>
-                                <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: t.textPrimary }}>Require completion report</p>
-                                <p style={{ margin: '2px 0 0', fontSize: '11px', color: t.textMuted }}>Team members must submit a report when this task is completed</p>
+                                <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: t.textPrimary }}>
+                                    Require completion report
+                                </p>
+                                <p style={{ margin: '2px 0 0', fontSize: '11px', color: t.textMuted }}>
+                                    Team members must submit a report when this task is completed
+                                </p>
                             </div>
                         </label>
                     </div>
@@ -208,12 +368,47 @@ const TaskAssignmentModal = ({ task, onClose, onAssigned, dark = true }) => {
 
                 {/* Footer */}
                 <div style={{ padding: '14px 22px', borderTop: `1px solid ${t.border}`, display: 'flex', gap: '10px' }}>
-                    <button onClick={onClose} disabled={loading}
-                        style={{ flex: 1, padding: '10px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
+                    <button 
+                        onClick={onClose} 
+                        disabled={loading}
+                        style={{ 
+                            flex: 1, 
+                            padding: '10px', 
+                            background: t.inputBg, 
+                            border: `1px solid ${t.border}`, 
+                            borderRadius: '9px', 
+                            color: t.textSecondary, 
+                            fontSize: '13px', 
+                            fontWeight: '500', 
+                            cursor: 'pointer',
+                            fontFamily: 'inherit'
+                        }}
+                    >
                         Cancel
                     </button>
-                    <button onClick={handleAssign} disabled={loading || selectedUsers.length === 0}
-                        style={{ flex: 2, padding: '10px', background: loading || !selectedUsers.length ? t.inputBg : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '9px', color: loading || !selectedUsers.length ? t.textMuted : '#fff', fontSize: '13px', fontWeight: '600', cursor: !selectedUsers.length ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: !selectedUsers.length ? 0.6 : 1, boxShadow: !selectedUsers.length ? 'none' : '0 3px 12px rgba(99,102,241,0.35)' }}>
+                    
+                    <button 
+                        onClick={handleAssign} 
+                        disabled={loading || selectedUsers.length === 0}
+                        style={{ 
+                            flex: 2, 
+                            padding: '10px', 
+                            background: loading || !selectedUsers.length ? t.inputBg : 'linear-gradient(135deg,#6366f1,#8b5cf6)', 
+                            border: 'none', 
+                            borderRadius: '9px', 
+                            color: loading || !selectedUsers.length ? t.textMuted : '#fff', 
+                            fontSize: '13px', 
+                            fontWeight: '600', 
+                            cursor: !selectedUsers.length ? 'not-allowed' : 'pointer', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '8px', 
+                            opacity: !selectedUsers.length ? 0.6 : 1, 
+                            boxShadow: !selectedUsers.length ? 'none' : '0 3px 12px rgba(99,102,241,0.35)',
+                            fontFamily: 'inherit'
+                        }}
+                    >
                         {loading ? <Spinner size={14} color="#6366f1" /> : <UserPlus size={14} />}
                         {loading ? 'Assigning…' : `Assign to ${selectedUsers.length} member${selectedUsers.length !== 1 ? 's' : ''}`}
                     </button>

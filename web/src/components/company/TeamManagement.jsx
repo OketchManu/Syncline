@@ -1,6 +1,7 @@
 ﻿// web/src/components/dashboard/TeamManagement.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { auth } from '../../firebase.js';
 import {
     Users, UserPlus, Shield, Search, X,
     Mail, Crown, Briefcase, User, CheckCircle2,
@@ -45,8 +46,14 @@ const themes = {
     }
 };
 
-const API_BASE = 'https://syncline-1.onrender.com/api';
+const API_BASE   = 'https://syncline-1.onrender.com/api';
 const API_ORIGIN = 'https://syncline-1.onrender.com';
+
+// ─── Auth helper (plain async function — not a hook) ──────────────────────────
+async function getAuthHeaders() {
+    const token = await auth.currentUser?.getIdToken();
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
 
 const resolveAvatar = (avatar) => {
     if (!avatar) return null;
@@ -55,10 +62,10 @@ const resolveAvatar = (avatar) => {
 };
 
 const roleConfig = {
-    owner:   { label: 'Owner',   color: '#f59e0b', bg: 'rgba(245,158,11,0.15)',   icon: <Crown size={11} />, rank: 4 },
-    admin:   { label: 'Admin',   color: '#6366f1', bg: 'rgba(99,102,241,0.15)',   icon: <Shield size={11} />, rank: 3 },
-    manager: { label: 'Manager', color: '#10b981', bg: 'rgba(16,185,129,0.15)',   icon: <Briefcase size={11} />, rank: 2 },
-    member:  { label: 'Member',  color: '#94a3b8', bg: 'rgba(148,163,184,0.15)',  icon: <User size={11} />, rank: 1 },
+    owner:   { label: 'Owner',   color: '#f59e0b', bg: 'rgba(245,158,11,0.15)',  icon: <Crown size={11} />,    rank: 4 },
+    admin:   { label: 'Admin',   color: '#6366f1', bg: 'rgba(99,102,241,0.15)',  icon: <Shield size={11} />,   rank: 3 },
+    manager: { label: 'Manager', color: '#10b981', bg: 'rgba(16,185,129,0.15)',  icon: <Briefcase size={11} />,rank: 2 },
+    member:  { label: 'Member',  color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', icon: <User size={11} />,     rank: 1 },
 };
 
 const StatusAlert = ({ t, type, children }) => {
@@ -99,11 +106,10 @@ const Spinner = ({ size = 16, color = '#6366f1' }) => (
 
 // ─── Invite Member Modal ──────────────────────────────────────────────────────
 const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
-    const [email, setEmail]     = useState('');
-    const [role, setRole]       = useState('member');
+    const [email,   setEmail]   = useState('');
+    const [role,    setRole]    = useState('member');
     const [loading, setLoading] = useState(false);
-    const [status, setStatus]   = useState(null);
-
+    const [status,  setStatus]  = useState(null);
     const allowedRoles = currentUserRole === 'owner' ? ['admin', 'manager', 'member'] : ['member'];
 
     const handleSubmit = async () => {
@@ -126,9 +132,7 @@ const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
                     </div>
                     <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex' }}><X size={15} /></button>
                 </div>
-
                 {status && <div style={{ marginBottom: '16px' }}><StatusAlert t={t} type={status.type}>{status.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />} {status.msg}</StatusAlert></div>}
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div>
                         <label style={{ fontSize: '12px', fontWeight: '500', color: t.textSecondary, display: 'block', marginBottom: '5px' }}>Email Address</label>
@@ -138,17 +142,14 @@ const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
                                 style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
                         </div>
                     </div>
-
                     <div>
                         <label style={{ fontSize: '12px', fontWeight: '500', color: t.textSecondary, display: 'block', marginBottom: '5px' }}>Role</label>
-                        <select value={role} onChange={e => setRole(e.target.value)}
-                            style={{ width: '100%', padding: '10px 13px', background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: '9px', fontSize: '13px', color: t.selectText, cursor: 'pointer', outline: 'none' }}>
+                        <select value={role} onChange={e => setRole(e.target.value)} style={{ width: '100%', padding: '10px 13px', background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: '9px', fontSize: '13px', color: t.selectText, cursor: 'pointer', outline: 'none' }}>
                             {allowedRoles.map(r => (
                                 <option key={r} value={r}>{roleConfig[r].label} — {r === 'admin' ? 'Full access except billing' : r === 'manager' ? 'Manage tasks & view reports' : 'Access own tasks only'}</option>
                             ))}
                         </select>
                     </div>
-
                     <div style={{ padding: '12px 14px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '10px' }}>
                         <p style={{ margin: 0, fontSize: '12px', color: t.accentText, lineHeight: 1.6 }}>
                             {role === 'admin' && '🛡️ Admins can manage users, assign tasks, view all reports, and access company analytics.'}
@@ -156,11 +157,9 @@ const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
                             {role === 'member' && '👤 Members can view and update their own assigned tasks and submit task reports.'}
                         </p>
                     </div>
-
                     <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                         <button onClick={onClose} style={{ flex: 1, padding: '10px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
-                        <button onClick={handleSubmit} disabled={loading}
-                            style={{ flex: 2, padding: '10px', background: loading ? t.inputBg : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '9px', color: loading ? t.textMuted : '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: loading ? 0.7 : 1, boxShadow: loading ? 'none' : '0 3px 12px rgba(99,102,241,0.35)' }}>
+                        <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, padding: '10px', background: loading ? t.inputBg : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '9px', color: loading ? t.textMuted : '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: loading ? 0.7 : 1, boxShadow: loading ? 'none' : '0 3px 12px rgba(99,102,241,0.35)' }}>
                             {loading ? <Spinner size={14} color="#6366f1" /> : <Send size={14} />}
                             {loading ? 'Sending…' : 'Send Invitation'}
                         </button>
@@ -173,10 +172,9 @@ const InviteModal = ({ t, onClose, onInvite, currentUserRole }) => {
 
 // ─── Change Role Modal ────────────────────────────────────────────────────────
 const ChangeRoleModal = ({ t, member, onClose, onSave, currentUserRole }) => {
-    const [role, setRole]       = useState(member.role);
+    const [role,    setRole]    = useState(member.role);
     const [loading, setLoading] = useState(false);
-    const [status, setStatus]   = useState(null);
-
+    const [status,  setStatus]  = useState(null);
     const availableRoles = currentUserRole === 'owner' ? ['admin', 'manager', 'member'] : ['manager', 'member'];
 
     const handleSave = async () => {
@@ -185,7 +183,7 @@ const ChangeRoleModal = ({ t, member, onClose, onSave, currentUserRole }) => {
         const err = await onSave(member.id, role);
         setLoading(false);
         if (err) setStatus({ type: 'error', msg: err });
-        else { onClose(); }
+        else onClose();
     };
 
     return (
@@ -195,7 +193,6 @@ const ChangeRoleModal = ({ t, member, onClose, onSave, currentUserRole }) => {
                     <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: t.textPrimary }}>Change Role</h2>
                     <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex' }}><X size={15} /></button>
                 </div>
-
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: t.surfaceCard, border: `1px solid ${t.border}`, borderRadius: '12px', marginBottom: '18px' }}>
                     <Avatar user={member} size={40} />
                     <div>
@@ -203,34 +200,27 @@ const ChangeRoleModal = ({ t, member, onClose, onSave, currentUserRole }) => {
                         <p style={{ margin: '2px 0 0', fontSize: '12px', color: t.textMuted }}>{member.email}</p>
                     </div>
                 </div>
-
                 {status && <div style={{ marginBottom: '14px' }}><StatusAlert t={t} type={status.type}><AlertCircle size={14} /> {status.msg}</StatusAlert></div>}
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
                     {availableRoles.map(r => {
                         const cfg = roleConfig[r];
                         return (
-                            <button key={r} onClick={() => setRole(r)}
-                                style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: role === r ? t.accentBg : t.surfaceCard, border: `1px solid ${role === r ? t.accentBorder : t.border}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.15s', textAlign: 'left' }}>
+                            <button key={r} onClick={() => setRole(r)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: role === r ? t.accentBg : t.surfaceCard, border: `1px solid ${role === r ? t.accentBorder : t.border}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.15s', textAlign: 'left' }}>
                                 <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: cfg.color, flexShrink: 0 }}>
                                     {React.cloneElement(cfg.icon, { size: 15 })}
                                 </div>
                                 <div style={{ flex: 1 }}>
                                     <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: t.textPrimary }}>{cfg.label}</p>
-                                    <p style={{ margin: '1px 0 0', fontSize: '11px', color: t.textMuted }}>
-                                        {r === 'admin' ? 'Full access except billing' : r === 'manager' ? 'Manage tasks & department' : 'Own tasks only'}
-                                    </p>
+                                    <p style={{ margin: '1px 0 0', fontSize: '11px', color: t.textMuted }}>{r === 'admin' ? 'Full access except billing' : r === 'manager' ? 'Manage tasks & department' : 'Own tasks only'}</p>
                                 </div>
                                 {role === r && <Check size={15} color="#6366f1" />}
                             </button>
                         );
                     })}
                 </div>
-
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={onClose} style={{ flex: 1, padding: '10px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
-                    <button onClick={handleSave} disabled={loading}
-                        style={{ flex: 2, padding: '10px', background: loading ? t.inputBg : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '9px', color: loading ? t.textMuted : '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', opacity: loading ? 0.7 : 1 }}>
+                    <button onClick={handleSave} disabled={loading} style={{ flex: 2, padding: '10px', background: loading ? t.inputBg : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '9px', color: loading ? t.textMuted : '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', opacity: loading ? 0.7 : 1 }}>
                         {loading ? <Spinner size={14} color="#6366f1" /> : <Shield size={14} />}
                         {loading ? 'Saving…' : 'Save Role'}
                     </button>
@@ -254,12 +244,11 @@ const RemoveModal = ({ t, member, onClose, onConfirm, loading }) => (
                 </div>
             </div>
             <p style={{ fontSize: '14px', color: t.textSecondary, margin: '0 0 24px', lineHeight: '1.6' }}>
-                Are you sure you want to remove <strong style={{ color: t.textPrimary }}>{member.fullName || member.email}</strong> from the company? Their account will remain but they'll lose access to all company data.
+                Are you sure you want to remove <strong style={{ color: t.textPrimary }}>{member.fullName || member.email}</strong> from the company?
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button onClick={onClose} disabled={loading} style={{ padding: '10px 20px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
-                <button onClick={onConfirm} disabled={loading}
-                    style={{ padding: '10px 20px', background: t.dangerBtn, border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '7px', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 12px rgba(220,38,38,0.4)' }}>
+                <button onClick={onConfirm} disabled={loading} style={{ padding: '10px 20px', background: t.dangerBtn, border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '7px', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 12px rgba(220,38,38,0.4)' }}>
                     <UserMinus size={14} />{loading ? 'Removing…' : 'Yes, Remove'}
                 </button>
             </div>
@@ -269,14 +258,13 @@ const RemoveModal = ({ t, member, onClose, onConfirm, loading }) => (
 
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
-    const memberTasks  = tasks.filter(tk => tk.assignee_id === member.id || tk.created_by === member.id);
-    const completed    = memberTasks.filter(tk => tk.status === 'completed').length;
-    const inProgress   = memberTasks.filter(tk => tk.status === 'in_progress').length;
-    const overdue      = memberTasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length;
+    const memberTasks    = tasks.filter(tk => tk.assignee_id === member.id || tk.created_by === member.id);
+    const completed      = memberTasks.filter(tk => tk.status === 'completed').length;
+    const inProgress     = memberTasks.filter(tk => tk.status === 'in_progress').length;
+    const overdue        = memberTasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length;
     const completionRate = memberTasks.length > 0 ? Math.round((completed / memberTasks.length) * 100) : 0;
-
-    const statusColor   = { pending: '#f59e0b', in_progress: '#3b82f6', completed: '#10b981', blocked: '#ef4444' };
-    const priorityColor = { low: '#64748b', medium: '#f59e0b', high: '#ef4444', urgent: '#dc2626' };
+    const statusColor    = { pending: '#f59e0b', in_progress: '#3b82f6', completed: '#10b981', blocked: '#ef4444' };
+    const priorityColor  = { low: '#64748b', medium: '#f59e0b', high: '#ef4444', urgent: '#dc2626' };
 
     return (
         <div style={{ position: 'fixed', inset: 0, background: t.overlayBg, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500, padding: '16px' }} onClick={onClose}>
@@ -290,7 +278,6 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
                     </div>
                     <button onClick={onClose} style={{ background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', padding: '7px', display: 'flex', alignSelf: 'flex-start' }}><X size={15} /></button>
                 </div>
-
                 <div className="tm-member-stats" style={{ padding: '18px 24px', borderBottom: `1px solid ${t.border}` }}>
                     {[
                         { label: 'Total Tasks', value: memberTasks.length, color: '#6366f1' },
@@ -304,7 +291,6 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
                         </div>
                     ))}
                 </div>
-
                 <div style={{ padding: '14px 24px', borderBottom: `1px solid ${t.border}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                         <span style={{ fontSize: '12px', color: t.textSecondary, fontWeight: '500' }}>Completion Rate</span>
@@ -314,7 +300,6 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
                         <div style={{ height: '100%', width: `${completionRate}%`, background: completionRate >= 70 ? '#10b981' : completionRate >= 40 ? '#f59e0b' : '#ef4444', borderRadius: '3px', transition: 'width 0.5s ease' }} />
                     </div>
                 </div>
-
                 <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px' }}>
                     <h4 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '600', color: t.textSecondary }}>ASSIGNED TASKS ({memberTasks.length})</h4>
                     {memberTasks.length === 0
@@ -325,17 +310,11 @@ const MemberDetailPanel = ({ t, member, tasks, onClose }) => {
                                 <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 13px', background: isOverdue ? t.dangerBg : t.surfaceCard, border: `1px solid ${isOverdue ? t.dangerBorder : t.border}`, borderRadius: '9px', marginBottom: '7px', gap: '10px' }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <p style={{ margin: 0, fontSize: '13px', fontWeight: '500', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</p>
-                                        {task.deadline && <p style={{ margin: '2px 0 0', fontSize: '11px', color: isOverdue ? t.dangerText : t.textMuted }}>
-                                            {isOverdue ? '⚠️ Overdue: ' : '📅 '}{new Date(task.deadline).toLocaleDateString()}
-                                        </p>}
+                                        {task.deadline && <p style={{ margin: '2px 0 0', fontSize: '11px', color: isOverdue ? t.dangerText : t.textMuted }}>{isOverdue ? '⚠️ Overdue: ' : '📅 '}{new Date(task.deadline).toLocaleDateString()}</p>}
                                     </div>
                                     <div style={{ display: 'flex', gap: '5px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                        <span style={{ padding: '2px 7px', borderRadius: '12px', fontSize: '10px', fontWeight: '600', background: `${statusColor[task.status]}22`, color: statusColor[task.status] }}>
-                                            {task.status.replace('_', ' ')}
-                                        </span>
-                                        <span style={{ padding: '2px 7px', borderRadius: '12px', fontSize: '10px', fontWeight: '600', background: `${priorityColor[task.priority]}22`, color: priorityColor[task.priority] }}>
-                                            {task.priority}
-                                        </span>
+                                        <span style={{ padding: '2px 7px', borderRadius: '12px', fontSize: '10px', fontWeight: '600', background: `${statusColor[task.status]}22`, color: statusColor[task.status] }}>{task.status.replace('_', ' ')}</span>
+                                        <span style={{ padding: '2px 7px', borderRadius: '12px', fontSize: '10px', fontWeight: '600', background: `${priorityColor[task.priority]}22`, color: priorityColor[task.priority] }}>{task.priority}</span>
                                     </div>
                                 </div>
                             );
@@ -362,33 +341,24 @@ const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onR
     const completed      = memberTasks.filter(tk => tk.status === 'completed').length;
     const overdue        = memberTasks.filter(tk => tk.deadline && new Date(tk.deadline) < new Date() && tk.status !== 'completed').length;
     const completionRate = memberTasks.length > 0 ? Math.round((completed / memberTasks.length) * 100) : 0;
-
-    const isSelf        = member.id === currentUser.id;
-    const canManage     = ['owner', 'admin'].includes(currentUser.role) && !isSelf;
-    const canRoleChange = canManage && member.role !== 'owner';
-    const joinedDate    = member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
+    const isSelf         = member.id === currentUser.id;
+    const canManage      = ['owner', 'admin'].includes(currentUser.role) && !isSelf;
+    const canRoleChange  = canManage && member.role !== 'owner';
+    const joinedDate     = member.createdAt ? new Date(member.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
 
     return (
         <div className="tm-member-row" style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '13px', transition: 'border-color 0.15s', position: 'relative' }}
             onMouseEnter={e => e.currentTarget.style.borderColor = t.borderMid}
             onMouseLeave={e => e.currentTarget.style.borderColor = t.border}>
-
             <Avatar user={member} size={42} />
-
             <div className="tm-member-name-col">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {member.fullName || 'No name'}
-                    </p>
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.fullName || 'No name'}</p>
                     {isSelf && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '8px', background: t.accentBg, color: t.accentText, fontWeight: '600', flexShrink: 0 }}>You</span>}
                 </div>
                 <p style={{ margin: '2px 0 0', fontSize: '12px', color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</p>
             </div>
-
-            <div className="tm-member-role-col">
-                <RoleBadge role={member.role} />
-            </div>
-
+            <div className="tm-member-role-col"><RoleBadge role={member.role} /></div>
             <div className="tm-member-task-stats">
                 <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '16px', fontWeight: '700', color: t.textPrimary }}>{memberTasks.length}</div>
@@ -414,45 +384,36 @@ const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onR
                     </div>
                 </div>
             </div>
-
             <div className="tm-member-joined-col">
                 <p style={{ margin: 0, fontSize: '11px', color: t.textMuted }}>Joined</p>
                 <p style={{ margin: '1px 0 0', fontSize: '12px', color: t.textSecondary, fontWeight: '500' }}>{joinedDate}</p>
             </div>
-
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: member.isActive !== false ? '#10b981' : '#ef4444', flexShrink: 0 }} title={member.isActive !== false ? 'Active' : 'Deactivated'} />
-
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <button onClick={() => onInspect(member)}
-                    style={{ padding: '6px 12px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '7px', color: t.accentText, fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <button onClick={() => onInspect(member)} style={{ padding: '6px 12px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '7px', color: t.accentText, fontSize: '12px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <Eye size={12} /> View
                 </button>
-
                 {canManage && (
                     <div style={{ position: 'relative' }} ref={menuRef}>
-                        <button onClick={() => setMenuOpen(!menuOpen)}
-                            style={{ padding: '6px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '7px', color: t.textMuted, cursor: 'pointer', display: 'flex' }}>
+                        <button onClick={() => setMenuOpen(!menuOpen)} style={{ padding: '6px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '7px', color: t.textMuted, cursor: 'pointer', display: 'flex' }}>
                             <MoreVertical size={14} />
                         </button>
                         {menuOpen && (
                             <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, width: '180px', background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: '11px', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', zIndex: 100, overflow: 'hidden' }}>
                                 {canRoleChange && (
-                                    <button onClick={() => { setMenuOpen(false); onChangeRole(member); }}
-                                        style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', textAlign: 'left' }}
+                                    <button onClick={() => { setMenuOpen(false); onChangeRole(member); }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', textAlign: 'left' }}
                                         onMouseEnter={e => e.currentTarget.style.background = t.surfaceHover}
                                         onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                                         <Shield size={14} color={t.textMuted} /> Change Role
                                     </button>
                                 )}
-                                <button onClick={() => { setMenuOpen(false); onDeactivate(member); }}
-                                    style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: t.warnText, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', textAlign: 'left' }}
+                                <button onClick={() => { setMenuOpen(false); onDeactivate(member); }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: t.warnText, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', textAlign: 'left' }}
                                     onMouseEnter={e => e.currentTarget.style.background = t.surfaceHover}
                                     onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                                     <Ban size={14} /> {member.isActive !== false ? 'Deactivate' : 'Reactivate'}
                                 </button>
                                 <div style={{ borderTop: `1px solid ${t.border}`, margin: '4px 0' }} />
-                                <button onClick={() => { setMenuOpen(false); onRemove(member); }}
-                                    style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: t.dangerText, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', textAlign: 'left' }}
+                                <button onClick={() => { setMenuOpen(false); onRemove(member); }} style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: t.dangerText, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', textAlign: 'left' }}
                                     onMouseEnter={e => e.currentTarget.style.background = t.dangerBg}
                                     onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                                     <UserMinus size={14} /> Remove
@@ -468,11 +429,7 @@ const MemberRow = ({ t, member, currentUser, tasks, onInspect, onChangeRole, onR
 
 // ─── Pending Invitations Panel ────────────────────────────────────────────────
 const InvitationsPanel = ({ t, invitations, onResend, onRevoke, loading }) => {
-    if (!invitations.length) return (
-        <div style={{ textAlign: 'center', padding: '32px', color: t.textMuted, fontSize: '13px' }}>
-            No pending invitations
-        </div>
-    );
+    if (!invitations.length) return <div style={{ textAlign: 'center', padding: '32px', color: t.textMuted, fontSize: '13px' }}>No pending invitations</div>;
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {invitations.map(inv => (
@@ -489,12 +446,10 @@ const InvitationsPanel = ({ t, invitations, onResend, onRevoke, loading }) => {
                     </div>
                     <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: t.warnBg, color: t.warnText }}>Pending</span>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                        <button onClick={() => onResend(inv)} disabled={loading}
-                            style={{ padding: '5px 10px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '7px', color: t.accentText, fontSize: '11px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button onClick={() => onResend(inv)} disabled={loading} style={{ padding: '5px 10px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '7px', color: t.accentText, fontSize: '11px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <RefreshCw size={11} /> Resend
                         </button>
-                        <button onClick={() => onRevoke(inv)} disabled={loading}
-                            style={{ padding: '5px 10px', background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, borderRadius: '7px', color: t.dangerText, fontSize: '11px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button onClick={() => onRevoke(inv)} disabled={loading} style={{ padding: '5px 10px', background: t.dangerBg, border: `1px solid ${t.dangerBorder}`, borderRadius: '7px', color: t.dangerText, fontSize: '11px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <X size={11} /> Revoke
                         </button>
                     </div>
@@ -509,22 +464,20 @@ const TeamManagement = ({ dark = true }) => {
     const { user } = useAuth();
     const t = dark ? themes.dark : themes.light;
 
-    const [members, setMembers]               = useState([]);
-    const [invitations, setInvitations]       = useState([]);
-    const [tasks, setTasks]                   = useState([]);
-    const [loading, setLoading]               = useState(true);
-    const [actionLoading, setActionLoading]   = useState(false);
-    const [error, setError]                   = useState(null);
-    const [toast, setToast]                   = useState(null);
-
-    const [tab, setTab]                       = useState('members');
-    const [search, setSearch]                 = useState('');
-    const [roleFilter, setRoleFilter]         = useState('all');
-
-    const [showInvite, setShowInvite]         = useState(false);
-    const [changeRoleMember, setChangeRoleMember] = useState(null);
-    const [removeMember, setRemoveMember]     = useState(null);
-    const [inspectMember, setInspectMember]   = useState(null);
+    const [members,           setMembers]           = useState([]);
+    const [invitations,       setInvitations]       = useState([]);
+    const [tasks,             setTasks]             = useState([]);
+    const [loading,           setLoading]           = useState(true);
+    const [actionLoading,     setActionLoading]     = useState(false);
+    const [error,             setError]             = useState(null);
+    const [toast,             setToast]             = useState(null);
+    const [tab,               setTab]               = useState('members');
+    const [search,            setSearch]            = useState('');
+    const [roleFilter,        setRoleFilter]        = useState('all');
+    const [showInvite,        setShowInvite]        = useState(false);
+    const [changeRoleMember,  setChangeRoleMember]  = useState(null);
+    const [removeMember,      setRemoveMember]      = useState(null);
+    const [inspectMember,     setInspectMember]     = useState(null);
 
     const canManage = ['owner', 'admin'].includes(user?.role);
 
@@ -533,47 +486,37 @@ const TeamManagement = ({ dark = true }) => {
         setTimeout(() => setToast(null), 3500);
     }, []);
 
-    const authHeaders = useCallback(async () => {
-    const { auth } = await import('../../firebase.js');
-    const token = await auth.currentUser?.getIdToken();
-    return {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-    };
-}, []);
-
     const fetchMembers = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE}/company/team`, { headers: authHeaders() });
+            const res = await fetch(`${API_BASE}/company/team`, { headers: await getAuthHeaders() });
             if (!res.ok) throw new Error('Failed to fetch team');
             const data = await res.json();
-            const normalized = (data.members || []).map(m => ({
+            setMembers((data.members || []).map(m => ({
                 ...m,
-                fullName: m.fullName || m.full_name || null,
-                isActive: m.isActive !== undefined ? m.isActive : m.is_active !== 0,
+                fullName:  m.fullName || m.full_name || null,
+                isActive:  m.isActive !== undefined ? m.isActive : m.is_active !== 0,
                 createdAt: m.createdAt || m.created_at,
-            }));
-            setMembers(normalized);
+            })));
         } catch (err) { setError(err.message); }
-    }, [authHeaders]);
+    }, []);
 
     const fetchInvitations = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE}/company/invitations`, { headers: authHeaders() });
+            const res = await fetch(`${API_BASE}/company/invitations`, { headers: await getAuthHeaders() });
             if (!res.ok) return;
             const data = await res.json();
             setInvitations(data.invitations || []);
         } catch (_) {}
-    }, [authHeaders]);
+    }, []);
 
     const fetchTasks = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE}/tasks`, { headers: await authHeaders() });
+            const res = await fetch(`${API_BASE}/tasks`, { headers: await getAuthHeaders() });
             if (!res.ok) return;
             const data = await res.json();
             setTasks(data.tasks || []);
         } catch (_) {}
-    }, [authHeaders]);
+    }, []);
 
     useEffect(() => {
         const load = async () => {
@@ -586,7 +529,7 @@ const TeamManagement = ({ dark = true }) => {
 
     const handleInvite = async ({ email, role }) => {
         try {
-            const res = await fetch(`${API_BASE}/company/team/invite`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ email, role }) });
+            const res  = await fetch(`${API_BASE}/company/team/invite`, { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ email, role }) });
             const data = await res.json();
             if (!res.ok) return data.error || 'Failed to send invitation';
             await fetchInvitations();
@@ -597,7 +540,7 @@ const TeamManagement = ({ dark = true }) => {
 
     const handleChangeRole = async (userId, role) => {
         try {
-            const res = await fetch(`${API_BASE}/company/team/${userId}/role`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ role }) });
+            const res  = await fetch(`${API_BASE}/company/team/${userId}/role`, { method: 'PATCH', headers: await getAuthHeaders(), body: JSON.stringify({ role }) });
             const data = await res.json();
             if (!res.ok) return data.error || 'Failed to update role';
             setMembers(prev => prev.map(m => m.id === userId ? { ...m, role } : m));
@@ -610,7 +553,7 @@ const TeamManagement = ({ dark = true }) => {
         if (!removeMember) return;
         setActionLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/company/team/${removeMember.id}`, { method: 'DELETE', headers: authHeaders() });
+            const res = await fetch(`${API_BASE}/company/team/${removeMember.id}`, { method: 'DELETE', headers: await getAuthHeaders() });
             if (!res.ok) { const d = await res.json(); showToast(d.error || 'Failed to remove', 'error'); }
             else { setMembers(prev => prev.filter(m => m.id !== removeMember.id)); showToast(`${removeMember.fullName || removeMember.email} removed`); }
         } catch (err) { showToast(err.message, 'error'); }
@@ -621,7 +564,7 @@ const TeamManagement = ({ dark = true }) => {
     const handleDeactivate = async (member) => {
         const newState = member.isActive === false ? true : false;
         try {
-            const res = await fetch(`${API_BASE}/company/team/${member.id}/status`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ isActive: newState }) });
+            const res = await fetch(`${API_BASE}/company/team/${member.id}/status`, { method: 'PATCH', headers: await getAuthHeaders(), body: JSON.stringify({ isActive: newState }) });
             if (!res.ok) { showToast('Failed to update status', 'error'); return; }
             setMembers(prev => prev.map(m => m.id === member.id ? { ...m, isActive: newState } : m));
             showToast(`${member.fullName || member.email} ${newState ? 'reactivated' : 'deactivated'}`);
@@ -630,7 +573,7 @@ const TeamManagement = ({ dark = true }) => {
 
     const handleResendInvite = async (inv) => {
         try {
-            const res = await fetch(`${API_BASE}/company/team/invite`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ email: inv.email, role: inv.role }) });
+            const res = await fetch(`${API_BASE}/company/team/invite`, { method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ email: inv.email, role: inv.role }) });
             if (!res.ok) { showToast('Failed to resend', 'error'); return; }
             showToast(`Invitation resent to ${inv.email}`);
         } catch (err) { showToast(err.message, 'error'); }
@@ -638,7 +581,7 @@ const TeamManagement = ({ dark = true }) => {
 
     const handleRevokeInvite = async (inv) => {
         try {
-            const res = await fetch(`${API_BASE}/company/invitations/${inv.id || inv.token}`, { method: 'DELETE', headers: authHeaders() });
+            const res = await fetch(`${API_BASE}/company/invitations/${inv.id || inv.token}`, { method: 'DELETE', headers: await getAuthHeaders() });
             if (!res.ok) { showToast('Failed to revoke', 'error'); return; }
             setInvitations(prev => prev.filter(i => i.id !== inv.id && i.token !== inv.token));
             showToast('Invitation revoked');
@@ -669,12 +612,7 @@ const TeamManagement = ({ dark = true }) => {
         return matchSearch && matchRole;
     });
 
-    const stats = {
-        total:   members.length,
-        active:  members.filter(m => m.isActive !== false).length,
-        admins:  members.filter(m => ['owner', 'admin'].includes(m.role)).length,
-        pending: invitations.length,
-    };
+    const stats = { total: members.length, active: members.filter(m => m.isActive !== false).length, admins: members.filter(m => ['owner', 'admin'].includes(m.role)).length, pending: invitations.length };
 
     if (loading) return (
         <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
@@ -687,106 +625,46 @@ const TeamManagement = ({ dark = true }) => {
     return (
         <div style={{ padding: '24px 20px', maxWidth: '1400px', margin: '0 auto', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
             <style>{`
-                @keyframes spin     { to { transform: rotate(360deg); } }
-                @keyframes slideIn  { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-
-                /* ── Member row layout ── */
-                .tm-member-row {
-                    display: flex;
-                    align-items: center;
-                    gap: 14px;
-                    padding: 14px 18px;
-                    flex-wrap: nowrap;
-                }
+                @keyframes spin    { to { transform: rotate(360deg); } }
+                @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+                .tm-member-row { display: flex; align-items: center; gap: 14px; padding: 14px 18px; flex-wrap: nowrap; }
                 .tm-member-name-col  { flex: 0 0 200px; min-width: 0; }
                 .tm-member-role-col  { flex: 0 0 100px; }
-                .tm-member-task-stats {
-                    flex: 1;
-                    display: flex;
-                    gap: 16px;
-                    align-items: center;
-                }
+                .tm-member-task-stats { flex: 1; display: flex; gap: 16px; align-items: center; }
                 .tm-progress-bar-wrap { flex: 1; max-width: 100px; }
                 .tm-member-joined-col { flex: 0 0 80px; text-align: right; }
-
-                /* ── Stats row: 4 cols ── */
-                .tm-stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 12px;
-                    margin-bottom: 22px;
-                }
-
-                /* ── Member detail stats ── */
-                .tm-member-stats {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 10px;
-                }
-
-                /* ── Tablet ≤ 768px ── */
-                @media (max-width: 768px) {
-                    .tm-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-                    .tm-member-joined-col { display: none; }
-                    .tm-progress-bar-wrap { display: none; }
-                    .tm-member-task-stats { gap: 12px; }
-                }
-
-                /* ── Mobile ≤ 600px ── */
-                @media (max-width: 600px) {
-                    .tm-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-                    .tm-member-row { min-width: 0; overflow: hidden;}
-                    .tm-member-row { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
-                    .tm-member-name-col  { flex: 1; min-width: 120px; }
-                    .tm-member-role-col  { flex: 0 0 auto; }
-                    .tm-member-task-stats { display: none; }
-                    .tm-member-joined-col { display: none; }
-                    .tm-member-stats { grid-template-columns: repeat(2, 1fr); }
-                }
-                    @media (max-width: 400px) {
-    .tm-member-stats { grid-template-columns: repeat(2, 1fr); }
-    .tm-stats-grid   { grid-template-columns: 1fr 1fr; }
-}
-
-                /* ── Very small ≤ 420px ── */
-                @media (max-width: 420px) {
-                    .tm-stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
-                }
+                .tm-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+                .tm-member-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+                @media (max-width: 768px) { .tm-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } .tm-member-joined-col { display: none; } .tm-progress-bar-wrap { display: none; } .tm-member-task-stats { gap: 12px; } }
+                @media (max-width: 600px) { .tm-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; } .tm-member-row { flex-wrap: wrap; gap: 10px; padding: 12px 14px; } .tm-member-name-col { flex: 1; min-width: 120px; } .tm-member-role-col { flex: 0 0 auto; } .tm-member-task-stats { display: none; } .tm-member-joined-col { display: none; } .tm-member-stats { grid-template-columns: repeat(2, 1fr); } }
+                @media (max-width: 420px) { .tm-stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; } }
             `}</style>
 
-            {/* Toast */}
             {toast && (
                 <div style={{ position: 'fixed', top: '20px', right: '24px', zIndex: 3000, animation: 'slideIn 0.25s ease', background: toast.type === 'error' ? t.dangerBg : t.successBg, border: `1px solid ${toast.type === 'error' ? t.dangerBorder : t.successBorder}`, color: toast.type === 'error' ? t.dangerText : t.successText, padding: '12px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', maxWidth: '320px' }}>
-                    {toast.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
-                    {toast.msg}
+                    {toast.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}{toast.msg}
                 </div>
             )}
 
-            {/* Page Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
                     <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: t.textPrimary, display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Users size={22} color="#6366f1" /> Team Management
                     </h1>
-                    <p style={{ margin: '5px 0 0', fontSize: '13px', color: t.textMuted }}>
-                        Manage members, roles, and permissions for your organisation
-                    </p>
+                    <p style={{ margin: '5px 0 0', fontSize: '13px', color: t.textMuted }}>Manage members, roles, and permissions for your organisation</p>
                 </div>
                 {canManage && (
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button onClick={exportCSV}
-                            style={{ padding: '9px 16px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button onClick={exportCSV} style={{ padding: '9px 16px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textSecondary, fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Download size={14} /> Export
                         </button>
-                        <button onClick={() => setShowInvite(true)}
-                            style={{ padding: '9px 18px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', boxShadow: '0 3px 12px rgba(99,102,241,0.35)' }}>
+                        <button onClick={() => setShowInvite(true)} style={{ padding: '9px 18px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', boxShadow: '0 3px 12px rgba(99,102,241,0.35)' }}>
                             <UserPlus size={15} /> Invite Member
                         </button>
                     </div>
                 )}
             </div>
 
-            {/* Stats Row */}
             <div className="tm-stats-grid">
                 {[
                     { icon: <Users size={19} />,    value: stats.total,   label: 'Total Members',   color: '#6366f1' },
@@ -804,7 +682,6 @@ const TeamManagement = ({ dark = true }) => {
                 ))}
             </div>
 
-            {/* Error Banner */}
             {error && (
                 <div style={{ marginBottom: '16px' }}>
                     <StatusAlert t={t} type="error">
@@ -814,45 +691,34 @@ const TeamManagement = ({ dark = true }) => {
                 </div>
             )}
 
-            {/* Main Panel */}
             <div style={{ background: t.surfacePrimary, border: `1px solid ${t.border}`, borderRadius: '15px', overflow: 'hidden' }}>
-
-                {/* Toolbar */}
                 <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', gap: '2px', background: t.inputBg, borderRadius: '9px', padding: '3px' }}>
                         {[
                             { id: 'members',     label: `Members (${members.length})` },
                             { id: 'invitations', label: `Pending (${invitations.length})` },
                         ].map(tb => (
-                            <button key={tb.id} onClick={() => setTab(tb.id)}
-                                style={{ padding: '6px 12px', background: tab === tb.id ? t.surfacePrimary : 'none', border: tab === tb.id ? `1px solid ${t.border}` : '1px solid transparent', borderRadius: '7px', color: tab === tb.id ? t.textPrimary : t.textMuted, fontSize: '12px', fontWeight: tab === tb.id ? '600' : '400', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
+                            <button key={tb.id} onClick={() => setTab(tb.id)} style={{ padding: '6px 12px', background: tab === tb.id ? t.surfacePrimary : 'none', border: tab === tb.id ? `1px solid ${t.border}` : '1px solid transparent', borderRadius: '7px', color: tab === tb.id ? t.textPrimary : t.textMuted, fontSize: '12px', fontWeight: tab === tb.id ? '600' : '400', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
                                 {tb.label}
                             </button>
                         ))}
                     </div>
-
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', flex: 1, minWidth: '140px', maxWidth: '320px' }}>
                         <Search size={14} color={t.textMuted} />
-                        <input type="text" placeholder="Search members…" value={search} onChange={e => setSearch(e.target.value)}
-                            style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
+                        <input type="text" placeholder="Search members…" value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, background: 'none', border: 'none', color: t.textPrimary, fontSize: '13px', outline: 'none' }} />
                         {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', display: 'flex', padding: 0 }}><X size={13} /></button>}
                     </div>
-
                     {tab === 'members' && (
-                        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-                            style={{ padding: '7px 10px', background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.selectText, fontSize: '12px', cursor: 'pointer', outline: 'none' }}>
+                        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} style={{ padding: '7px 10px', background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.selectText, fontSize: '12px', cursor: 'pointer', outline: 'none' }}>
                             <option value="all">All Roles</option>
                             {Object.keys(roleConfig).map(r => <option key={r} value={r}>{roleConfig[r].label}</option>)}
                         </select>
                     )}
-
-                    <button onClick={() => { fetchMembers(); fetchInvitations(); fetchTasks(); }}
-                        style={{ padding: '7px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', display: 'flex', marginLeft: 'auto' }}>
+                    <button onClick={() => { fetchMembers(); fetchInvitations(); fetchTasks(); }} style={{ padding: '7px', background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: '9px', color: t.textMuted, cursor: 'pointer', display: 'flex', marginLeft: 'auto' }}>
                         <RefreshCw size={14} />
                     </button>
                 </div>
 
-                {/* Content */}
                 <div style={{ padding: '14px 16px' }}>
                     {tab === 'members' ? (
                         filtered.length === 0 ? (
@@ -862,8 +728,7 @@ const TeamManagement = ({ dark = true }) => {
                                     {search || roleFilter !== 'all' ? 'No members match your filters' : 'No team members yet'}
                                 </p>
                                 {canManage && !search && roleFilter === 'all' && (
-                                    <button onClick={() => setShowInvite(true)}
-                                        style={{ marginTop: '14px', padding: '9px 18px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '9px', color: t.accentText, fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                    <button onClick={() => setShowInvite(true)} style={{ marginTop: '14px', padding: '9px 18px', background: t.accentBg, border: `1px solid ${t.accentBorder}`, borderRadius: '9px', color: t.accentText, fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                         <UserPlus size={14} /> Invite your first member
                                     </button>
                                 )}
@@ -872,22 +737,18 @@ const TeamManagement = ({ dark = true }) => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {filtered.map(member => (
                                     <MemberRow key={member.id} t={t} member={member} currentUser={user} tasks={tasks}
-                                        onInspect={setInspectMember}
-                                        onChangeRole={setChangeRoleMember}
-                                        onRemove={setRemoveMember}
-                                        onDeactivate={handleDeactivate} />
+                                        onInspect={setInspectMember} onChangeRole={setChangeRoleMember}
+                                        onRemove={setRemoveMember} onDeactivate={handleDeactivate} />
                                 ))}
                             </div>
                         )
                     ) : (
-                        <InvitationsPanel t={t} invitations={invitations} loading={actionLoading}
-                            onResend={handleResendInvite} onRevoke={handleRevokeInvite} />
+                        <InvitationsPanel t={t} invitations={invitations} loading={actionLoading} onResend={handleResendInvite} onRevoke={handleRevokeInvite} />
                     )}
                 </div>
             </div>
 
-            {/* Modals */}
-            {showInvite && <InviteModal t={t} currentUserRole={user?.role} onClose={() => setShowInvite(false)} onInvite={handleInvite} />}
+            {showInvite       && <InviteModal t={t} currentUserRole={user?.role} onClose={() => setShowInvite(false)} onInvite={handleInvite} />}
             {changeRoleMember && <ChangeRoleModal t={t} member={changeRoleMember} currentUserRole={user?.role} onClose={() => setChangeRoleMember(null)} onSave={handleChangeRole} />}
             {removeMember     && <RemoveModal t={t} member={removeMember} loading={actionLoading} onClose={() => setRemoveMember(null)} onConfirm={handleRemove} />}
             {inspectMember    && <MemberDetailPanel t={t} member={inspectMember} tasks={tasks} onClose={() => setInspectMember(null)} />}
