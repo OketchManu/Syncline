@@ -1,18 +1,26 @@
 // web/src/components/auth/Register.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Eye, EyeOff, Mail, Lock, User, Zap, CheckCircle2,
     Building2, UserCircle, ArrowLeft, Globe, FileText,
 } from 'lucide-react';
 
 const Register = () => {
-    const [step,          setStep]          = useState(1); // 1: account type, 2: details
+    const navigate  = useNavigate();
+    const location  = useLocation();
+
+    // ── If arriving from Login's "not registered" Google redirect,
+    //    pull the pre-filled Google profile from router state.
+    const incomingGoogleProfile = location.state?.googleProfile || null;
+    const fromGoogleLogin       = location.state?.fromGoogleLogin || false;
+
+    const [step,          setStep]          = useState(fromGoogleLogin ? 1 : 1);
     const [accountType,   setAccountType]   = useState('');
-    const [email,         setEmail]         = useState('');
+    const [email,         setEmail]         = useState(incomingGoogleProfile?.email    || '');
     const [password,      setPassword]      = useState('');
-    const [fullName,      setFullName]      = useState('');
+    const [fullName,      setFullName]      = useState(incomingGoogleProfile?.fullName || '');
     const [companyName,   setCompanyName]   = useState('');
     const [industry,      setIndustry]      = useState('');
     const [description,   setDescription]   = useState('');
@@ -22,8 +30,14 @@ const Register = () => {
     const [loading,       setLoading]       = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
-    const { register, loginWithGoogle } = useAuth();
-    const navigate = useNavigate();
+    // Show a helpful banner when redirected from login
+    const [googleBanner, setGoogleBanner] = useState(
+        fromGoogleLogin
+            ? `No Syncline account found for ${incomingGoogleProfile?.email || 'your Google account'}. Please register below.`
+            : ''
+    );
+
+    const { register, registerWithGoogle } = useAuth();
 
     // ── Theme detection ──────────────────────────────────────────────────────
     const [dark, setDark] = useState(() => {
@@ -110,13 +124,15 @@ const Register = () => {
     };
 
     // ── Google register ───────────────────────────────────────────────────────
+    // Uses registerWithGoogle (not loginWithGoogle) so it always creates the account.
     const handleGoogleSignup = async () => {
         setError('');
         setGoogleLoading(true);
 
-        const result = await loginWithGoogle(
+        const result = await registerWithGoogle(
             accountType || 'personal',
             accountType === 'company' ? companyName || null : null,
+            accountType === 'company' ? { industry, description, website } : null,
         );
 
         if (result.success) {
@@ -152,6 +168,29 @@ const Register = () => {
                 {/* Main card */}
                 <div style={{ ...styles.card, background: t.cardBg, border: `1px solid ${t.border}`, boxShadow: t.cardShadow }}>
 
+                    {/* ── Banner when redirected from a failed Google login ── */}
+                    {googleBanner && (
+                        <div style={{
+                            background: 'rgba(99,102,241,0.1)',
+                            border: '1px solid rgba(99,102,241,0.3)',
+                            color: '#a5b4fc',
+                            padding: '12px 16px',
+                            borderRadius: '12px',
+                            fontSize: '14px',
+                            marginBottom: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                        }}>
+                            <span>ℹ️ {googleBanner}</span>
+                            <button
+                                onClick={() => setGoogleBanner('')}
+                                style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}
+                            >×</button>
+                        </div>
+                    )}
+
                     {/* ── STEP 1: Account type ── */}
                     {step === 1 ? (
                         <>
@@ -167,14 +206,14 @@ const Register = () => {
                                     style={{ ...styles.accountTypeCard, background: t.accountCardBg, border: `2px solid ${t.accountCardBorder}` }}
                                     onClick={() => handleAccountTypeSelect('personal')}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor  = '#6366f1';
-                                        e.currentTarget.style.transform    = 'translateY(-4px)';
-                                        e.currentTarget.style.boxShadow    = '0 10px 30px rgba(99,102,241,0.2)';
+                                        e.currentTarget.style.borderColor = '#6366f1';
+                                        e.currentTarget.style.transform   = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow   = '0 10px 30px rgba(99,102,241,0.2)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor  = t.accountCardBorder;
-                                        e.currentTarget.style.transform    = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow    = 'none';
+                                        e.currentTarget.style.borderColor = t.accountCardBorder;
+                                        e.currentTarget.style.transform   = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow   = 'none';
                                     }}
                                 >
                                     <div style={styles.accountTypeIcon}>
@@ -203,14 +242,14 @@ const Register = () => {
                                     style={{ ...styles.accountTypeCard, ...styles.accountTypeCardFeatured }}
                                     onClick={() => handleAccountTypeSelect('company')}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor  = '#8b5cf6';
-                                        e.currentTarget.style.transform    = 'translateY(-4px)';
-                                        e.currentTarget.style.boxShadow    = '0 10px 30px rgba(139,92,246,0.2)';
+                                        e.currentTarget.style.borderColor = '#8b5cf6';
+                                        e.currentTarget.style.transform   = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow   = '0 10px 30px rgba(139,92,246,0.2)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor  = 'rgba(139,92,246,0.3)';
-                                        e.currentTarget.style.transform    = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow    = 'none';
+                                        e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)';
+                                        e.currentTarget.style.transform   = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow   = 'none';
                                     }}
                                 >
                                     <div style={styles.featuredBadge}>RECOMMENDED</div>
@@ -262,7 +301,7 @@ const Register = () => {
                                 </p>
                             </div>
 
-                            {/* Google signup */}
+                            {/* Google signup — uses registerWithGoogle so it always creates */}
                             <div style={styles.socialButtons}>
                                 <button
                                     type="button"
@@ -407,42 +446,45 @@ const Register = () => {
                                     </div>
                                 </div>
 
-                                {/* Password */}
-                                <div style={styles.inputGroup}>
-                                    <label style={{ ...styles.label, color: t.label }}>Password *</label>
-                                    <div style={styles.inputWrapper}>
-                                        <Lock size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
-                                        <input
-                                            type={showPassword ? 'text' : 'password'}
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Create a strong password"
-                                            style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
-                                            required
-                                            disabled={isDisabled}
-                                            minLength={6}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            style={{ ...styles.eyeBtn, color: t.iconColor }}
-                                            disabled={isDisabled}
-                                        >
-                                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                        </button>
-                                    </div>
-
-                                    {password && (
-                                        <div style={styles.strengthContainer}>
-                                            <div style={styles.strengthBar}>
-                                                <div style={{ ...styles.strengthFill, width: `${passwordStrength.strength}%`, background: passwordStrength.color }} />
-                                            </div>
-                                            <span style={{ ...styles.strengthLabel, color: passwordStrength.color }}>
-                                                {passwordStrength.label}
-                                            </span>
+                                {/* Password — hidden when arriving from Google login redirect
+                                    since they'll complete registration via the Google button */}
+                                {!fromGoogleLogin && (
+                                    <div style={styles.inputGroup}>
+                                        <label style={{ ...styles.label, color: t.label }}>Password *</label>
+                                        <div style={styles.inputWrapper}>
+                                            <Lock size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
+                                            <input
+                                                type={showPassword ? 'text' : 'password'}
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                placeholder="Create a strong password"
+                                                style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
+                                                required
+                                                disabled={isDisabled}
+                                                minLength={6}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                style={{ ...styles.eyeBtn, color: t.iconColor }}
+                                                disabled={isDisabled}
+                                            >
+                                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                            </button>
                                         </div>
-                                    )}
-                                </div>
+
+                                        {password && (
+                                            <div style={styles.strengthContainer}>
+                                                <div style={styles.strengthBar}>
+                                                    <div style={{ ...styles.strengthFill, width: `${passwordStrength.strength}%`, background: passwordStrength.color }} />
+                                                </div>
+                                                <span style={{ ...styles.strengthLabel, color: passwordStrength.color }}>
+                                                    {passwordStrength.label}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {error && (
                                     <div style={styles.error}>
@@ -451,23 +493,27 @@ const Register = () => {
                                     </div>
                                 )}
 
-                                <button
-                                    type="submit"
-                                    style={{ ...styles.submitBtn, ...(isDisabled ? styles.submitBtnDisabled : {}) }}
-                                    disabled={isDisabled}
-                                >
-                                    {loading ? (
-                                        <>
-                                            <div style={styles.spinner}></div>
-                                            <span>Creating account…</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Zap size={20} />
-                                            <span>Create {accountType === 'company' ? 'Company' : 'Personal'} Account</span>
-                                        </>
-                                    )}
-                                </button>
+                                {/* Only show the email submit button when NOT coming from a Google login redirect
+                                    (in that case the user should click "Continue with Google" above) */}
+                                {!fromGoogleLogin && (
+                                    <button
+                                        type="submit"
+                                        style={{ ...styles.submitBtn, ...(isDisabled ? styles.submitBtnDisabled : {}) }}
+                                        disabled={isDisabled}
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <div style={styles.spinner}></div>
+                                                <span>Creating account…</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Zap size={20} />
+                                                <span>Create {accountType === 'company' ? 'Company' : 'Personal'} Account</span>
+                                            </>
+                                        )}
+                                    </button>
+                                )}
 
                                 <p style={{ ...styles.terms, color: t.iconColor }}>
                                     By signing up you agree to our{' '}
@@ -551,15 +597,7 @@ const tokens = {
 };
 
 const styles = {
-    container: {
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '20px',
-    },
+    container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', padding: '20px' },
     bgAnimation: { position: 'absolute', width: '100%', height: '100%', overflow: 'hidden' },
     circle1: { position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', top: '-250px', right: '-250px', animation: 'float 20s infinite ease-in-out' },
     circle2: { position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', bottom: '-200px', left: '-200px', animation: 'float 15s infinite ease-in-out reverse' },

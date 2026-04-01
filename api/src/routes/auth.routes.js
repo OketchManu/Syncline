@@ -59,6 +59,27 @@ async function createCompany(userId, { companyName, industry, size, description,
     return companyId;
 }
 
+// ─── Helper: verify bearer token ─────────────────────────────────────────────
+async function verifyBearerToken(req, res) {
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Missing Authorization header' });
+        return null;
+    }
+    const idToken = authHeader.split('Bearer ')[1]?.trim();
+    if (!idToken) {
+        res.status(401).json({ error: 'Empty token' });
+        return null;
+    }
+    try {
+        return await admin.auth().verifyIdToken(idToken);
+    } catch (err) {
+        console.error('❌ Token verification failed:', err.message);
+        res.status(401).json({ error: 'Invalid or expired token' });
+        return null;
+    }
+}
+
 // ─── POST /api/auth/register ──────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
     try {
@@ -152,33 +173,87 @@ router.post('/register', async (req, res) => {
     }
 });
 
+// ─── POST /api/auth/google-login ──────────────────────────────────────────────
+// LOGIN ONLY — looks up existing users, NEVER creates one.
+// Returns 404 { registered: false, googleProfile: {...} } when no account exists,
+// so the frontend can redirect to /register with pre-filled Google data.
+router.post('/google-login', async (req, res) => {
+    try {
+        const decoded = await verifyBearerToken(req, res);
+        if (!decoded) return; // response already sent by helper
+
+        const firebaseUid = decoded.uid;
+        const email       = decoded.email || req.body?.email || null;
+
+        console.log('🔍 google-login lookup for UID:', firebaseUid, '| email:', email);
+
+        // Look up by firebase_uid first, then email
+        let existing = await getOne(
+            'SELECT * FROM users WHERE firebase_uid = ?',
+            [firebaseUid]
+        );
+
+        if (!existing && email) {
+            existing = await getOne(
+                'SELECT * FROM users WHERE email = ?',
+                [email]
+            );
+        }
+
+        // ── Not registered — tell frontend to redirect to /register ───────────
+        if (!existing) {
+            console.log('ℹ️  google-login: no account found for', email || firebaseUid);
+            return res.status(404).json({
+                registered: false,
+                error:      'No account found. Please register first.',
+                googleProfile: {
+                    email:      decoded.email   || null,
+                    fullName:   decoded.name    || null,
+                    avatar:     decoded.picture || null,
+                    firebaseUid,
+                },
+            });
+        }
+
+        // ── Existing user — link UID if missing, return full profile ──────────
+        if (!existing.firebase_uid) {
+            await runQuery(
+                'UPDATE users SET firebase_uid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [firebaseUid, existing.id]
+            );
+            existing.firebase_uid = firebaseUid;
+        }
+
+        let company = null;
+        if (existing.company_id) {
+            company = await getOne(
+                'SELECT id, name, invite_code, industry, size, description, website FROM companies WHERE id = ?',
+                [existing.company_id]
+            );
+        }
+
+        console.log('✅ google-login: existing user found:', email);
+        return res.json({
+            registered: true,
+            user: { ...sanitizeUser(existing), company: company || undefined },
+        });
+
+    } catch (error) {
+        console.error('❌ google-login error:', error.message);
+        res.status(500).json({ error: 'Google login failed', details: error.message });
+    }
+});
+
 // ─── POST /api/auth/firebase-sync ─────────────────────────────────────────────
+// REGISTER path only — called during sign-up to create a new user row.
+// Never call this from the login flow.
 router.post('/firebase-sync', async (req, res) => {
     try {
-        // ── 1. Verify the Firebase ID token ──────────────────────────────────
-        const authHeader = req.headers.authorization || '';
-        if (!authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Missing Authorization header' });
-        }
-
-        const idToken = authHeader.split('Bearer ')[1]?.trim();
-        if (!idToken) {
-            return res.status(401).json({ error: 'Empty token' });
-        }
-
-        let decoded;
-        try {
-            decoded = await admin.auth().verifyIdToken(idToken);
-        } catch (tokenErr) {
-            console.error('❌ firebase-sync: token verification failed:', tokenErr.message);
-            return res.status(401).json({ error: 'Invalid or expired token' });
-        }
+        const decoded = await verifyBearerToken(req, res);
+        if (!decoded) return;
 
         const firebaseUid = decoded.uid;
 
-        // ── 2. Always guarantee a non-null email ──────────────────────────────
-        // SQLite users.email is NOT NULL — fall back to a derived address so the
-        // INSERT never fails, even if Google withholds the real email.
         const email = decoded.email
             || req.body?.email
             || `${firebaseUid}@firebase.local`;
@@ -192,7 +267,7 @@ router.post('/firebase-sync', async (req, res) => {
 
         console.log('🔄 firebase-sync for UID:', firebaseUid, '| email:', email);
 
-        // ── 3. Check if user already exists (by UID first, then email) ────────
+        // Check if user already exists (by UID first, then email)
         let existing = await getOne(
             'SELECT * FROM users WHERE firebase_uid = ?',
             [firebaseUid]
@@ -206,7 +281,6 @@ router.post('/firebase-sync', async (req, res) => {
         }
 
         if (existing) {
-            // Link firebase_uid if it was missing
             if (!existing.firebase_uid) {
                 await runQuery(
                     'UPDATE users SET firebase_uid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
@@ -230,7 +304,7 @@ router.post('/firebase-sync', async (req, res) => {
             });
         }
 
-        // ── 4. Create new user row ────────────────────────────────────────────
+        // Create new user row
         let userResult;
         try {
             userResult = await runQuery(
@@ -241,7 +315,6 @@ router.post('/firebase-sync', async (req, res) => {
                 [email, displayName, firebaseUid, avatarUrl]
             );
         } catch (insertErr) {
-            // Race condition — another request already created this user
             if (insertErr.message.includes('UNIQUE constraint')) {
                 const raceUser = await getOne(
                     'SELECT * FROM users WHERE firebase_uid = ? OR email = ?',

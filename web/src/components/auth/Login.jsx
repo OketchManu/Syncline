@@ -5,11 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Zap } from 'lucide-react';
 
 const Login = () => {
-    const [email,        setEmail]        = useState('');
-    const [password,     setPassword]     = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error,        setError]        = useState('');
-    const [loading,      setLoading]      = useState(false);
+    const [email,         setEmail]         = useState('');
+    const [password,      setPassword]      = useState('');
+    const [showPassword,  setShowPassword]  = useState(false);
+    const [error,         setError]         = useState('');
+    const [loading,       setLoading]       = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
     const { login, loginWithGoogle } = useAuth();
@@ -58,8 +58,17 @@ const Login = () => {
 
         if (result.success) {
             navigate('/dashboard');
+        } else if (result.notRegistered) {
+            // Google account exists in Firebase but has no Syncline account —
+            // redirect to /register and pre-fill the form with their Google profile.
+            navigate('/register', {
+                state: {
+                    fromGoogleLogin: true,
+                    googleProfile:   result.googleProfile,
+                },
+            });
         } else if (result.error) {
-            // result.error is null when user simply closed the popup — don't show anything
+            // null error = popup closed, don't show anything
             setError(result.error);
         }
 
@@ -106,7 +115,7 @@ const Login = () => {
                                 border: `1px solid ${t.border}`,
                                 color: t.text,
                                 opacity: isDisabled ? 0.6 : 1,
-                                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                cursor:  isDisabled ? 'not-allowed' : 'pointer',
                             }}
                             onClick={handleGoogleLogin}
                             disabled={isDisabled}
