@@ -98,17 +98,23 @@ export const AuthProvider = ({ children }) => {
                 message: err.message 
             });
 
-            if (err.response?.status === 404) {
-                console.log('📝 User not found, creating via firebase-sync...');
-                const res = await axios.post(`${API_URL}/auth/firebase-sync`, {
-                    email:       fbUser.email,
-                    fullName:    fbUser.displayName || fbUser.email.split('@')[0],
-                    firebaseUid: fbUser.uid,
-                    avatar:      fbUser.photoURL || null,
-                });
-                console.log('✅ firebase-sync response:', { userId: res.data.user?.id });
-                return normaliseUser(res.data.user);
-            }
+           if (err.response?.status === 404) {
+    console.log('📝 User not found, creating via firebase-sync...');
+    const res = await axios.post(`${API_URL}/auth/firebase-sync`, {
+        email:       fbUser.email,
+        fullName:    fbUser.displayName || fbUser.email.split('@')[0],
+        firebaseUid: fbUser.uid,
+        avatar:      fbUser.photoURL || null,
+    });
+    console.log('✅ firebase-sync response:', { userId: res.data.user?.id });
+    // Fetch full profile from /me so we get name, avatar_url etc.
+    try {
+        const meRes = await axios.get(`${API_URL}/auth/me`);
+        return normaliseUser(meRes.data.user);
+    } catch (_) {
+        return normaliseUser(res.data.user);
+    }
+}
             throw err;
         }
     }, []);
