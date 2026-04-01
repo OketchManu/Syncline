@@ -86,6 +86,7 @@ export const AuthProvider = ({ children }) => {
             return normaliseUser(res.data.user);
         }
 
+        // ── Always try /me first to get the full profile ──────────────────────
         try {
             console.log('🔍 Fetching user from /api/auth/me...');
             const res = await axios.get(`${API_URL}/auth/me`);
@@ -98,23 +99,22 @@ export const AuthProvider = ({ children }) => {
                 message: err.message 
             });
 
-           if (err.response?.status === 404) {
-    console.log('📝 User not found, creating via firebase-sync...');
-    const res = await axios.post(`${API_URL}/auth/firebase-sync`, {
-        email:       fbUser.email,
-        fullName:    fbUser.displayName || fbUser.email.split('@')[0],
-        firebaseUid: fbUser.uid,
-        avatar:      fbUser.photoURL || null,
-    });
-    console.log('✅ firebase-sync response:', { userId: res.data.user?.id });
-    // Fetch full profile from /me so we get name, avatar_url etc.
-    try {
-        const meRes = await axios.get(`${API_URL}/auth/me`);
-        return normaliseUser(meRes.data.user);
-    } catch (_) {
-        return normaliseUser(res.data.user);
-    }
-}
+            if (err.response?.status === 404) {
+                // User row doesn't exist yet — create it via firebase-sync
+                console.log('📝 User not found in DB, creating via firebase-sync...');
+                await axios.post(`${API_URL}/auth/firebase-sync`, {
+                    email:       fbUser.email,
+                    fullName:    fbUser.displayName || fbUser.email.split('@')[0],
+                    firebaseUid: fbUser.uid,
+                    avatar:      fbUser.photoURL || null,
+                });
+                console.log('✅ firebase-sync complete, fetching full profile from /me...');
+
+                // ── Always follow up with /me to get full profile (name, avatar, company, etc.)
+                const meRes = await axios.get(`${API_URL}/auth/me`);
+                return normaliseUser(meRes.data.user);
+            }
+
             throw err;
         }
     }, []);
@@ -125,24 +125,27 @@ export const AuthProvider = ({ children }) => {
             console.log('🔄 Auth state changed:', { uid: fbUser?.uid, email: fbUser?.email });
             
             setFirebaseUser(fbUser);
+
             if (fbUser) {
-                if (!user) {
-                    try {
-                        console.log('👤 No user in state, syncing with backend...');
-                        const backendUser = await syncBackendUser(fbUser);
-                        console.log('✅ Backend sync successful:', { userId: backendUser?.id });
-                        setUser(backendUser);
-                    } catch (err) {
-                        console.error('❌ AuthContext: failed to sync user with backend:', err);
-                        console.error('   Stack:', err.stack);
-                        setUser(null);
-                    }
+                // ✅ FIX: Always sync on every auth state change (page refresh, tab refocus, etc.)
+                // Removed the `if (!user)` guard — that was causing stale name/avatar after refresh
+                // because the old cached `user` state prevented re-fetching the full profile from /me.
+                try {
+                    console.log('👤 Firebase user present, syncing full profile from backend...');
+                    const backendUser = await syncBackendUser(fbUser);
+                    console.log('✅ Backend sync successful:', { userId: backendUser?.id });
+                    setUser(backendUser);
+                } catch (err) {
+                    console.error('❌ AuthContext: failed to sync user with backend:', err);
+                    console.error('   Stack:', err.stack);
+                    setUser(null);
                 }
             } else {
                 console.log('🚪 User logged out');
                 delete axios.defaults.headers.common['Authorization'];
                 setUser(null);
             }
+
             setLoading(false);
         });
 
