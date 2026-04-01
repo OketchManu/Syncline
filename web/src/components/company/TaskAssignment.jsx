@@ -1,6 +1,5 @@
 // web/src/components/company/TaskAssignment.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { auth } from '../../firebase.js';
 import { UserPlus, X, Search, Check, AlertCircle, Users, Shield, Briefcase, User, Crown } from 'lucide-react';
 
 const API_BASE   = 'https://syncline-1.onrender.com/api';
