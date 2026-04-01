@@ -50,7 +50,7 @@ const setAxiosToken = async (firebaseUser) => {
         return null;
     }
     try {
-        const token = await firebaseUser.getIdToken(true); // Force refresh
+        const token = await firebaseUser.getIdToken(true);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         console.log('🔐 Set Authorization header with Firebase ID token (length:', token.length, ')');
         return token;
@@ -66,13 +66,13 @@ export const AuthProvider = ({ children }) => {
     const [loading,      setLoading]      = useState(true);
     const [authError,    setAuthError]    = useState(null);
 
+    // ── syncBackendUser: used on page load / refresh and during email register ─
     const syncBackendUser = useCallback(async (fbUser, registrationPayload = null) => {
-        console.log('📡 syncBackendUser called with:', { 
-            fbUid: fbUser?.uid, 
-            hasRegistrationPayload: !!registrationPayload 
+        console.log('📡 syncBackendUser called with:', {
+            fbUid: fbUser?.uid,
+            hasRegistrationPayload: !!registrationPayload
         });
 
-        // ✅ CRITICAL: Set token BEFORE making any API requests
         await setAxiosToken(fbUser);
 
         if (registrationPayload) {
@@ -86,50 +86,50 @@ export const AuthProvider = ({ children }) => {
             return normaliseUser(res.data.user);
         }
 
-        // ── Always try /me first to get the full profile ──────────────────────
+        // Always try /me first to get the full profile
         try {
             console.log('🔍 Fetching user from /api/auth/me...');
             const res = await axios.get(`${API_URL}/auth/me`);
-            console.log('✅ /api/auth/me success:', { userId: res.data.user?.id, email: res.data.user?.email });
+            console.log('✅ /api/auth/me success:', { userId: res.data.user?.id });
             return normaliseUser(res.data.user);
         } catch (err) {
-            console.error('❌ /api/auth/me failed:', { 
-                status: err.response?.status, 
-                error: err.response?.data?.error,
-                message: err.message 
+            console.error('❌ /api/auth/me failed:', {
+                status: err.response?.status,
+                error:  err.response?.data?.error,
             });
 
             if (err.response?.status === 404) {
-                // User row doesn't exist yet — create it via firebase-sync
-                console.log('📝 User not found in DB, creating via firebase-sync...');
-                await axios.post(`${API_URL}/auth/firebase-sync`, {
-                    email:       fbUser.email,
-                    fullName:    fbUser.displayName || fbUser.email.split('@')[0],
-                    firebaseUid: fbUser.uid,
-                    avatar:      fbUser.photoURL || null,
-                });
-                console.log('✅ firebase-sync complete, fetching full profile from /me...');
-
-                // ── Always follow up with /me to get full profile (name, avatar, company, etc.)
-                const meRes = await axios.get(`${API_URL}/auth/me`);
-                return normaliseUser(meRes.data.user);
-            }
+    console.log('📝 User not found, creating via firebase-sync...');
+    const res = await axios.post(`${API_URL}/auth/firebase-sync`, {
+        email:       fbUser.email,
+        fullName:    fbUser.displayName || fbUser.email.split('@')[0],
+        firebaseUid: fbUser.uid,
+        avatar:      fbUser.photoURL || null,
+    });
+    console.log('✅ firebase-sync response:', { userId: res.data.user?.id });
+    // Fetch full profile so name, avatar_url and id are all correct
+    try {
+        const meRes = await axios.get(`${API_URL}/auth/me`);
+        return normaliseUser(meRes.data.user);
+    } catch (_) {
+        return normaliseUser(res.data.user);
+    }
+}
 
             throw err;
         }
     }, []);
 
+    // ── Auth state listener ───────────────────────────────────────────────────
     useEffect(() => {
         console.log('🔌 Setting up Firebase auth listener...');
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             console.log('🔄 Auth state changed:', { uid: fbUser?.uid, email: fbUser?.email });
-            
+
             setFirebaseUser(fbUser);
 
             if (fbUser) {
-                // ✅ FIX: Always sync on every auth state change (page refresh, tab refocus, etc.)
-                // Removed the `if (!user)` guard — that was causing stale name/avatar after refresh
-                // because the old cached `user` state prevented re-fetching the full profile from /me.
+                // Always sync on every auth state change so refresh never shows stale profile
                 try {
                     console.log('👤 Firebase user present, syncing full profile from backend...');
                     const backendUser = await syncBackendUser(fbUser);
@@ -137,7 +137,6 @@ export const AuthProvider = ({ children }) => {
                     setUser(backendUser);
                 } catch (err) {
                     console.error('❌ AuthContext: failed to sync user with backend:', err);
-                    console.error('   Stack:', err.stack);
                     setUser(null);
                 }
             } else {
@@ -154,15 +153,16 @@ export const AuthProvider = ({ children }) => {
                 console.log('🔄 Refreshing Firebase ID token...');
                 await setAxiosToken(auth.currentUser);
             }
-        }, 55 * 60 * 1000); // Every 55 minutes
+        }, 55 * 60 * 1000);
 
-        return () => { 
+        return () => {
             console.log('🧹 Cleaning up auth listener');
-            unsubscribe(); 
-            clearInterval(tokenInterval); 
+            unsubscribe();
+            clearInterval(tokenInterval);
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── Email / password login ────────────────────────────────────────────────
     const login = async (email, password) => {
         setAuthError(null);
         try {
@@ -180,6 +180,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // ── Email / password register ─────────────────────────────────────────────
     const register = async (email, password, fullName, accountType = 'personal', companyName = null, extraCompanyFields = null) => {
         setAuthError(null);
         try {
@@ -204,30 +205,46 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const loginWithGoogle = async (accountType = 'personal', companyName = null) => {
+    // ── Google LOGIN — only lets existing users in ────────────────────────────
+    // If the Google account has no backend row, returns { notRegistered: true, googleProfile }
+    // so the Login page can redirect to /register with pre-filled data.
+    const loginWithGoogle = async () => {
         setAuthError(null);
         try {
-            console.log('🔐 Logging in with Google:', { accountType });
-            const result    = await signInWithPopup(auth, googleProvider);
-            const fbUser    = result.user;
-            const isNewUser = result._tokenResponse?.isNewUser ?? false;
-            let backendUser;
-            if (isNewUser) {
-                console.log('📝 New Google user, creating account...');
-                backendUser = await syncBackendUser(fbUser, {
-                    fullName:    fbUser.displayName || fbUser.email.split('@')[0],
-                    avatar:      fbUser.photoURL    || null,
-                    accountType: accountType === 'company' ? 'company' : 'personal',
-                    companyName,
-                    googleLogin: true,
+            console.log('🔐 Google login attempt...');
+            const result  = await signInWithPopup(auth, googleProvider);
+            const fbUser  = result.user;
+
+            // Set the axios token so the lookup call is authenticated
+            await setAxiosToken(fbUser);
+
+            let backendResponse;
+            try {
+                backendResponse = await axios.post(`${API_URL}/auth/google-login`, {
+                    email: fbUser.email,
                 });
-            } else {
-                console.log('👤 Existing Google user, syncing...');
-                backendUser = await syncBackendUser(fbUser);
+            } catch (err) {
+                if (err.response?.status === 404 && err.response?.data?.registered === false) {
+                    // ── Unregistered Google user — sign them out of Firebase so
+                    //    they're not left in a half-authenticated state, then tell
+                    //    the Login page to redirect to /register.
+                    console.log('ℹ️  Google login: user not registered, redirecting to register');
+                    await signOut(auth);
+                    delete axios.defaults.headers.common['Authorization'];
+                    return {
+                        success:       false,
+                        notRegistered: true,
+                        googleProfile: err.response.data.googleProfile,
+                    };
+                }
+                throw err;
             }
+
+            const backendUser = normaliseUser(backendResponse.data.user);
             console.log('✅ Google login successful:', { userId: backendUser?.id });
             setUser(backendUser);
             return { success: true };
+
         } catch (err) {
             if (err.code === 'auth/popup-closed-by-user') return { success: false, error: null };
             const message = firebaseErrorMessage(err.code) || err.message;
@@ -237,6 +254,42 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // ── Google REGISTER — creates a new account via Google ───────────────────
+    // Called only from the Register page after the user has chosen an account type.
+    const registerWithGoogle = async (accountType = 'personal', companyName = null, extraCompanyFields = null) => {
+        setAuthError(null);
+        try {
+            console.log('📝 Google register attempt:', { accountType });
+            const result = await signInWithPopup(auth, googleProvider);
+            const fbUser = result.user;
+
+            await setAxiosToken(fbUser);
+
+            // Use firebase-sync which creates the row if it doesn't exist,
+            // then follow up with /register to set the correct accountType / company.
+            const backendUser = await syncBackendUser(fbUser, {
+                fullName:    fbUser.displayName || fbUser.email.split('@')[0],
+                avatar:      fbUser.photoURL    || null,
+                accountType: accountType === 'company' ? 'company' : 'personal',
+                companyName,
+                googleLogin: true,
+                ...(extraCompanyFields || {}),
+            });
+
+            console.log('✅ Google register successful:', { userId: backendUser?.id });
+            setUser(backendUser);
+            return { success: true };
+
+        } catch (err) {
+            if (err.code === 'auth/popup-closed-by-user') return { success: false, error: null };
+            const message = firebaseErrorMessage(err.code) || err.message;
+            console.error('❌ Google register failed:', message);
+            setAuthError(message);
+            return { success: false, error: message };
+        }
+    };
+
+    // ── Logout ────────────────────────────────────────────────────────────────
     const logout = async () => {
         try {
             console.log('🚪 Logging out...');
@@ -302,7 +355,7 @@ export const AuthProvider = ({ children }) => {
         <AuthContext.Provider value={{
             user, firebaseUser, loading, authError,
             isAuthenticated: !!user,
-            login, register, loginWithGoogle, logout,
+            login, register, loginWithGoogle, registerWithGoogle, logout,
             resetPassword, changePassword, resendVerificationEmail,
             updateUser, hasCompanyFeatures, isCompanyOwner, isEmailVerified,
         }}>
