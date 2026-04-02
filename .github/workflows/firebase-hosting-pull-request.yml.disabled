@@ -9,17 +9,16 @@ permissions:
   pull-requests: write
 jobs:
   build_and_preview:
-    if: github.repository == github.event.pull_request.head.repo.full_name
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install and Build
         run: |
-          cd web
-          npm ci
-          npm run build
-          mkdir -p ../dist
-          mv build ../dist
+              cd web
+              npm ci
+              npm run build
+              mkdir -p ../dist
+              mv build ../dist
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
