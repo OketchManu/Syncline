@@ -262,6 +262,10 @@ const MIGRATIONS = [
         name: 'tasks — nullify created_by on delete instead of FK constraint',
         sql: `UPDATE tasks SET created_by = NULL WHERE created_by NOT IN (SELECT id FROM users)`,
     },
+    {
+    name: 'cleanup — drop users_old if still exists',
+    sql: `DROP TABLE IF EXISTS users_old`,
+},
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
