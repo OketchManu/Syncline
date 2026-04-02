@@ -15,6 +15,7 @@ const repoSchema = path.join(__dirname, '../../../database/schema.sql');
 const localDB    = path.join(__dirname, '../../data/syncline.db');
 const localSchema= path.join(__dirname, '../../data/schema.sql');
 
+
 // Use repo path if the directory is writable, otherwise use local data/
 const repoDir = path.dirname(repoDB);
 try {
