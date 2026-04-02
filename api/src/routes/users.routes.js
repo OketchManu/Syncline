@@ -86,7 +86,7 @@ router.put('/me', upload.single('avatar'), async (req, res) => {
 
         if (req.file) {
             // File uploaded via multer
-           const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
+            const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
             avatarUrl = `${BASE_URL}/uploads/avatars/${req.file.filename}`;
         } else if (req.body.removeAvatar === true || req.body.removeAvatar === 'true') {
             removeAvatar = true;
@@ -163,30 +163,127 @@ router.put('/me/password', async (req, res) => {
 });
 
 // ── DELETE /api/users/me ──────────────────────────────────────────────────────
+//
+// BEHAVIOUR:
+//   - Full name and avatar are PRESERVED on tasks/records (they belong to work
+//     history, not the account). The user row is anonymized, not hard-deleted,
+//     so foreign keys on tasks, reports, etc. remain valid.
+//   - firebase_uid and email are cleared so the account can never be re-linked.
+//   - Company ownership is transferred or the company is dissolved if no other
+//     members exist.
+//   - The caller is responsible for deleting the Firebase Auth account on the
+//     client side (fbUser.delete()) after this call succeeds.
+//
 router.delete('/me', async (req, res) => {
     try {
         const userId = req.user.id;
         const device = req.body?.device || 'Unknown device';
 
+        const { runQuery, getOne } = require('../config/database');
+
         const user = await findById(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        // Delete user's tasks first (foreign-key safety)
-        const { runQuery } = require('../config/database');
+        console.log(`🗑️  Deleting account for user ${userId} (${user.email})`);
+
+        // ── 1. Nullify created_by / assignee_id on tasks so tasks survive ────
+        // We do NOT delete tasks — they are work history.
+        // Tasks keep their content; they just lose the user link.
         await runQuery(
-            'DELETE FROM tasks WHERE created_by = ? OR assignee_id = ?',
-            [userId, userId]
+            'UPDATE tasks SET created_by = NULL WHERE created_by = ?',
+            [userId]
+        );
+        await runQuery(
+            'UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?',
+            [userId]
         );
 
-        // Notify other sessions before deletion
+        // ── 2. Handle company membership ──────────────────────────────────────
+        if (user.company_id) {
+            const company = await getOne(
+                'SELECT * FROM companies WHERE id = ?',
+                [user.company_id]
+            );
+
+            if (company && company.owner_id === userId) {
+                // User is the company owner — try to transfer ownership to another active member
+                const nextOwner = await getOne(
+                    `SELECT user_id FROM company_members
+                     WHERE company_id = ? AND user_id != ? AND status = 'active'
+                     ORDER BY joined_at ASC LIMIT 1`,
+                    [user.company_id, userId]
+                );
+
+                if (nextOwner) {
+                    // Transfer ownership
+                    await runQuery(
+                        'UPDATE companies SET owner_id = ? WHERE id = ?',
+                        [nextOwner.user_id, user.company_id]
+                    );
+                    await runQuery(
+                        `UPDATE company_members SET role = 'owner'
+                         WHERE company_id = ? AND user_id = ?`,
+                        [user.company_id, nextOwner.user_id]
+                    );
+                    console.log(`  ↳ Company ownership transferred to user ${nextOwner.user_id}`);
+                } else {
+                    // No other members — dissolve the company
+                    await runQuery(
+                        'UPDATE tasks SET company_id = NULL, org_id = NULL WHERE company_id = ?',
+                        [user.company_id]
+                    );
+                    await runQuery('DELETE FROM company_members WHERE company_id = ?', [user.company_id]);
+                    await runQuery('DELETE FROM invitations WHERE company_id = ?', [user.company_id]);
+                    await runQuery('DELETE FROM join_requests WHERE company_id = ?', [user.company_id]);
+                    await runQuery('DELETE FROM companies WHERE id = ?', [user.company_id]);
+                    console.log(`  ↳ Company ${user.company_id} dissolved (no remaining members)`);
+                }
+            }
+
+            // Remove from company_members regardless
+            await runQuery(
+                'DELETE FROM company_members WHERE user_id = ?',
+                [userId]
+            );
+        }
+
+        // ── 3. Remove outstanding invitations / join requests ─────────────────
+        await runQuery('DELETE FROM invitations WHERE invited_by = ?',  [userId]);
+        await runQuery('DELETE FROM join_requests WHERE user_id = ?',   [userId]);
+
+        // ── 4. Remove task_reports authored by this user ──────────────────────
+        // (these are personal submissions, not shared work history)
+        try {
+            await runQuery('DELETE FROM task_reports WHERE user_id = ?', [userId]);
+        } catch (_) {
+            // task_reports table may not exist on all installs
+        }
+
+        // ── 5. Anonymize the user row — do NOT hard-delete ───────────────────
+        // Keeping the row means all FK references on tasks/reports stay valid.
+        // firebase_uid + email are cleared so the account is permanently unlinked.
+        await runQuery(
+            `UPDATE users SET
+                firebase_uid = NULL,
+                email        = ?,
+                password_hash = NULL,
+                is_active    = 0,
+                company_id   = NULL,
+                org_id       = NULL,
+                last_seen    = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [`deleted_user_${userId}@syncline.local`, userId]
+        );
+
+        console.log(`  ✅ User ${userId} anonymized successfully`);
+
+        // ── 6. Broadcast before we finish (best-effort) ───────────────────────
         try {
             const { broadcastToUser } = require('../config/websocket');
             if (typeof broadcastToUser === 'function') {
                 broadcastToUser(userId, 'user:account_deleted', { userId, device });
             }
         } catch (_) {}
-
-        await deleteUser(userId);
 
         res.json({ message: 'Account permanently deleted' });
     } catch (err) {
