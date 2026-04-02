@@ -64,6 +64,13 @@ async function updateUser(userId, updates) {
     await runQuery(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
 }
 
+// ── updateProfile ─────────────────────────────────────────────────────────────
+// Updates name and/or avatar on the users row AND mirrors the change into
+// the profile_data table (keyed by firebase_uid).
+//
+// profile_data survives database wipes on Render because firebase-sync reads
+// from it when recreating a user row — so the user's custom name and avatar
+// are automatically restored after every redeploy without any extra action.
 async function updateProfile(userId, { fullName, avatarUrl, removeAvatar } = {}) {
     const fields = [];
     const values = [];
@@ -85,7 +92,37 @@ async function updateProfile(userId, { fullName, avatarUrl, removeAvatar } = {})
 
     if (fields.length === 0) throw new Error('Nothing to update');
     values.push(userId);
+
+    // 1. Update the main users row
     await runQuery(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+
+    // 2. Mirror into profile_data so it survives a DB wipe on Render
+    //    Fetch firebase_uid for this user then upsert profile_data
+    try {
+        const user = await getOne('SELECT firebase_uid, full_name, avatar_url FROM users WHERE id = ?', [userId]);
+        if (user && user.firebase_uid) {
+            // Build what we want to store — merge with current values
+            const storedName   = (fullName !== undefined && fullName !== null)
+                ? String(fullName).trim()
+                : user.full_name;
+            const storedAvatar = removeAvatar === true
+                ? null
+                : (avatarUrl !== undefined && avatarUrl !== null ? avatarUrl : user.avatar_url);
+
+            await runQuery(
+                `INSERT INTO profile_data (firebase_uid, full_name, avatar_url, updated_at)
+                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                 ON CONFLICT(firebase_uid) DO UPDATE SET
+                     full_name  = excluded.full_name,
+                     avatar_url = excluded.avatar_url,
+                     updated_at = CURRENT_TIMESTAMP`,
+                [user.firebase_uid, storedName, storedAvatar]
+            );
+        }
+    } catch (profileErr) {
+        // Non-fatal — profile_data is a best-effort persistence layer
+        console.warn('⚠️  Could not update profile_data:', profileErr.message);
+    }
 }
 
 async function changePassword(userId, newPassword) {
@@ -93,44 +130,27 @@ async function changePassword(userId, newPassword) {
     await runQuery('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId]);
 }
 
+// ── deleteUser ────────────────────────────────────────────────────────────────
+// NOTE: users.routes.js DELETE /me no longer calls this function.
+// The route handles its own anonymization inline so it never touches tasks
+// with a DELETE (which would trigger the ghost FK trigger on tasks_old).
+// This function is kept for any admin tooling that may call it, but it now
+// uses safe UPDATE-based nullification that doesn't trigger FK ghosts.
 async function deleteUser(userId) {
-    // Delete in correct order to avoid FK issues
     // 1. Remove from company_members
-    await runQuery(
-        'DELETE FROM company_members WHERE user_id = ?',
-        [userId]
-    ).catch(() => {}); // non-fatal if table doesn't exist
-
+    await runQuery('DELETE FROM company_members WHERE user_id = ?', [userId]).catch(() => {});
     // 2. Remove join requests
-    await runQuery(
-        'DELETE FROM join_requests WHERE user_id = ?',
-        [userId]
-    ).catch(() => {});
-
-    // 3. Nullify tasks created by or assigned to this user
-    await runQuery(
-        'UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?',
-        [userId]
-    ).catch(() => {});
-
-    await runQuery(
-        'UPDATE tasks SET created_by = NULL WHERE created_by = ?',
-        [userId]
-    ).catch(() => {});
-
-    // 4. Delete task reports submitted by this user
-    await runQuery(
-        'DELETE FROM task_reports WHERE submitted_by = ?',
-        [userId]
-    ).catch(() => {});
-
-    // 5. If this user owns a company, clear the owner_id
-    await runQuery(
-        'UPDATE companies SET owner_id = NULL WHERE owner_id = ?',
-        [userId]
-    ).catch(() => {});
-
-    // 6. Finally delete the user
+    await runQuery('DELETE FROM join_requests WHERE user_id = ?', [userId]).catch(() => {});
+    // 3. Nullify task references (UPDATE, not DELETE — avoids FK ghost triggers)
+    await runQuery('UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?', [userId]).catch(() => {});
+    await runQuery('UPDATE tasks SET created_by  = NULL WHERE created_by  = ?', [userId]).catch(() => {});
+    // 4. Delete task reports
+    await runQuery('DELETE FROM task_reports WHERE submitted_by = ?', [userId]).catch(() => {});
+    // 5. Clear company ownership
+    await runQuery('UPDATE companies SET owner_id = NULL WHERE owner_id = ?', [userId]).catch(() => {});
+    // 6. Remove from profile_data
+    await runQuery('DELETE FROM profile_data WHERE firebase_uid = (SELECT firebase_uid FROM users WHERE id = ?)', [userId]).catch(() => {});
+    // 7. Delete the user row
     await runQuery('DELETE FROM users WHERE id = ?', [userId]);
 }
 
