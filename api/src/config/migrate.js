@@ -79,108 +79,38 @@ const MIGRATIONS = [
             )
         `,
     },
+
     // ── users column additions ─────────────────────────────────────────────────
-    {
-        name: 'users — add account_type',
-        sql: `ALTER TABLE users ADD COLUMN account_type TEXT DEFAULT 'personal'`,
-    },
-    {
-        name: 'users — add role',
-        sql: `ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'`,
-    },
-    {
-        name: 'users — add firebase_uid',
-        sql: `ALTER TABLE users ADD COLUMN firebase_uid TEXT`,
-    },
-    {
-        name: 'users — add avatar_url',
-        sql: `ALTER TABLE users ADD COLUMN avatar_url TEXT`,
-    },
-    {
-        name: 'users — add company_id',
-        sql: `ALTER TABLE users ADD COLUMN company_id INTEGER`,
-    },
-    {
-        name: 'users — add org_id',
-        sql: `ALTER TABLE users ADD COLUMN org_id INTEGER`,
-    },
-    {
-        name: 'users — add is_active',
-        sql: `ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1`,
-    },
-    {
-        name: 'users — add join_status',
-        sql: `ALTER TABLE users ADD COLUMN join_status TEXT DEFAULT 'active'`,
-    },
-    {
-        name: 'users — add last_seen',
-        sql: `ALTER TABLE users ADD COLUMN last_seen DATETIME`,
-    },
-    {
-        name: 'users — add updated_at',
-        sql: `ALTER TABLE users ADD COLUMN updated_at DATETIME`,
-    },
-    {
-        name: 'users — add full_name',
-        sql: `ALTER TABLE users ADD COLUMN full_name TEXT`,
-    },
+    { name: 'users — add account_type', sql: `ALTER TABLE users ADD COLUMN account_type TEXT DEFAULT 'personal'` },
+    { name: 'users — add role',         sql: `ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'` },
+    { name: 'users — add firebase_uid', sql: `ALTER TABLE users ADD COLUMN firebase_uid TEXT` },
+    { name: 'users — add avatar_url',   sql: `ALTER TABLE users ADD COLUMN avatar_url TEXT` },
+    { name: 'users — add company_id',   sql: `ALTER TABLE users ADD COLUMN company_id INTEGER` },
+    { name: 'users — add org_id',       sql: `ALTER TABLE users ADD COLUMN org_id INTEGER` },
+    { name: 'users — add is_active',    sql: `ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1` },
+    { name: 'users — add join_status',  sql: `ALTER TABLE users ADD COLUMN join_status TEXT DEFAULT 'active'` },
+    { name: 'users — add last_seen',    sql: `ALTER TABLE users ADD COLUMN last_seen DATETIME` },
+    { name: 'users — add updated_at',   sql: `ALTER TABLE users ADD COLUMN updated_at DATETIME` },
+    { name: 'users — add full_name',    sql: `ALTER TABLE users ADD COLUMN full_name TEXT` },
+
     // ── tasks column additions ─────────────────────────────────────────────────
-    {
-        name: 'tasks — add company_id',
-        sql: `ALTER TABLE tasks ADD COLUMN company_id INTEGER`,
-    },
-    {
-        name: 'tasks — add org_id',
-        sql: `ALTER TABLE tasks ADD COLUMN org_id INTEGER`,
-    },
-    {
-        name: 'tasks — add assignee_id',
-        sql: `ALTER TABLE tasks ADD COLUMN assignee_id INTEGER`,
-    },
-    {
-        name: 'tasks — add flagged',
-        sql: `ALTER TABLE tasks ADD COLUMN flagged INTEGER DEFAULT 0`,
-    },
-    {
-        name: 'tasks — add flag_reason',
-        sql: `ALTER TABLE tasks ADD COLUMN flag_reason TEXT`,
-    },
-    {
-        name: 'tasks — add deadline',
-        sql: `ALTER TABLE tasks ADD COLUMN deadline DATETIME`,
-    },
-    {
-        name: 'tasks — add updated_at',
-        sql: `ALTER TABLE tasks ADD COLUMN updated_at DATETIME`,
-    },
+    { name: 'tasks — add company_id',  sql: `ALTER TABLE tasks ADD COLUMN company_id INTEGER` },
+    { name: 'tasks — add org_id',      sql: `ALTER TABLE tasks ADD COLUMN org_id INTEGER` },
+    { name: 'tasks — add assignee_id', sql: `ALTER TABLE tasks ADD COLUMN assignee_id INTEGER` },
+    { name: 'tasks — add flagged',     sql: `ALTER TABLE tasks ADD COLUMN flagged INTEGER DEFAULT 0` },
+    { name: 'tasks — add flag_reason', sql: `ALTER TABLE tasks ADD COLUMN flag_reason TEXT` },
+    { name: 'tasks — add deadline',    sql: `ALTER TABLE tasks ADD COLUMN deadline DATETIME` },
+    { name: 'tasks — add updated_at',  sql: `ALTER TABLE tasks ADD COLUMN updated_at DATETIME` },
+
     // ── indexes ────────────────────────────────────────────────────────────────
-    {
-        name: 'companies — add invite_code index',
-        sql: `CREATE INDEX IF NOT EXISTS idx_companies_invite_code ON companies(invite_code)`,
-    },
-    {
-        name: 'users — add firebase_uid index',
-        sql: `CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid) WHERE firebase_uid IS NOT NULL`,
-    },
-    {
-        name: 'users — add email index',
-        sql: `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
-    },
-    {
-        name: 'tasks — add created_by index',
-        sql: `CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by)`,
-    },
-    {
-        name: 'tasks — add company_id index',
-        sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id)`,
-    },
-    {
-        name: 'users — drop users_new if exists from failed migration',
-        sql: `DROP TABLE IF EXISTS users_new`,
-    },
-    // ── fix NOT NULL on password_hash ──────────────────────────────────────────
-    // SQLite cannot ALTER COLUMN, so we rename the old table, recreate it
-    // correctly, copy all data across, then drop the old table.
+    { name: 'companies — add invite_code index',     sql: `CREATE INDEX IF NOT EXISTS idx_companies_invite_code ON companies(invite_code)` },
+    { name: 'users — add firebase_uid index',        sql: `CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid) WHERE firebase_uid IS NOT NULL` },
+    { name: 'users — add email index',               sql: `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)` },
+    { name: 'tasks — add created_by index',          sql: `CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by)` },
+    { name: 'tasks — add company_id index',          sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id)` },
+
+    // ── fix NOT NULL on password_hash (users table rebuild) ───────────────────
+    { name: 'users — drop users_new if exists from failed migration', sql: `DROP TABLE IF EXISTS users_new` },
     {
         name: 'users — fix password_hash NOT NULL constraint',
         sql: `
@@ -217,55 +147,81 @@ const MIGRATIONS = [
             FROM users
         `,
     },
-    {
-        name: 'users — drop old users table',
-        sql: `DROP TABLE IF EXISTS users_old`,
-    },
-    {
-        name: 'users — rename users to users_old',
-        sql: `ALTER TABLE users RENAME TO users_old`,
-    },
-    {
-        name: 'users — rename users_new to users',
-        sql: `ALTER TABLE users_new RENAME TO users`,
-    },
-    {
-        name: 'users — drop users_old',
-        sql: `DROP TABLE IF EXISTS users_old`,
-    },
-    {
-        name: 'users — restore firebase_uid index after rebuild',
-        sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid_unique ON users(firebase_uid) WHERE firebase_uid IS NOT NULL`,
-    },
-    {
-        name: 'users — restore email index after rebuild',
-        sql: `CREATE INDEX IF NOT EXISTS idx_users_email_after_rebuild ON users(email)`,
-    },
+    { name: 'users — drop old users table',          sql: `DROP TABLE IF EXISTS users_old` },
+    { name: 'users — rename users to users_old',     sql: `ALTER TABLE users RENAME TO users_old` },
+    { name: 'users — rename users_new to users',     sql: `ALTER TABLE users_new RENAME TO users` },
+    { name: 'users — drop users_old',                sql: `DROP TABLE IF EXISTS users_old` },
+    { name: 'users — restore firebase_uid index after rebuild', sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid_unique ON users(firebase_uid) WHERE firebase_uid IS NOT NULL` },
+    { name: 'users — restore email index after rebuild',        sql: `CREATE INDEX IF NOT EXISTS idx_users_email_after_rebuild ON users(email)` },
+    { name: 'users — fix localhost avatar_url to use Render URL', sql: `UPDATE users SET avatar_url = REPLACE(avatar_url, 'http://localhost:3001', 'https://syncline-1.onrender.com') WHERE avatar_url LIKE 'http://localhost:3001%'` },
+    { name: 'users — fix localhost logo_url in companies to use Render URL', sql: `UPDATE companies SET logo_url = REPLACE(logo_url, 'http://localhost:3001', 'https://syncline-1.onrender.com') WHERE logo_url LIKE 'http://localhost:3001%'` },
+    { name: 'cleanup — drop users_old if still exists', sql: `DROP TABLE IF EXISTS users_old` },
+    { name: 'tasks — nullify created_by on delete instead of FK constraint', sql: `UPDATE tasks SET created_by = NULL WHERE created_by NOT IN (SELECT id FROM users)` },
 
+    // ── FIX: rebuild tasks table to kill ghost FK trigger from users_old ───────
+    // The users table rebuild left SQLite internal triggers referencing users_old.
+    // Any UPDATE/DELETE on tasks that touches created_by or assignee_id fires
+    // those triggers and crashes with "no such table: main.users_old".
+    // We rebuild tasks the same way we rebuilt users — rename, recreate, copy.
     {
-        name: 'users — fix localhost avatar_url to use Render URL',
-        sql: `UPDATE users 
-              SET avatar_url = REPLACE(avatar_url, 'http://localhost:3001', 'https://syncline-1.onrender.com')
-              WHERE avatar_url LIKE 'http://localhost:3001%'`,
+        name: 'tasks — drop tasks_new if exists from failed migration',
+        sql: `DROP TABLE IF EXISTS tasks_new`,
     },
     {
-        name: 'users — fix localhost logo_url in companies to use Render URL',
-        sql: `UPDATE companies 
-              SET logo_url = REPLACE(logo_url, 'http://localhost:3001', 'https://syncline-1.onrender.com')
-              WHERE logo_url LIKE 'http://localhost:3001%'`,
+        name: 'tasks — create tasks_new without FK triggers',
+        sql: `
+            CREATE TABLE IF NOT EXISTS tasks_new (
+                id          INTEGER  PRIMARY KEY AUTOINCREMENT,
+                title       TEXT     NOT NULL,
+                description TEXT,
+                status      TEXT     DEFAULT 'pending',
+                priority    TEXT     DEFAULT 'medium',
+                created_by  INTEGER,
+                assignee_id INTEGER,
+                company_id  INTEGER,
+                org_id      INTEGER,
+                deadline    DATETIME,
+                flagged     INTEGER  DEFAULT 0,
+                flag_reason TEXT,
+                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at  DATETIME
+            )
+        `,
     },
     {
-        name: 'cleanup — drop users_old if still exists',
-        sql: `DROP TABLE IF EXISTS users_old`,
+        name: 'tasks — copy data into tasks_new',
+        sql: `
+            INSERT OR IGNORE INTO tasks_new
+                (id, title, description, status, priority, created_by, assignee_id,
+                 company_id, org_id, deadline, flagged, flag_reason, created_at, updated_at)
+            SELECT
+                id, title, description, status, priority, created_by, assignee_id,
+                company_id, org_id, deadline, flagged, flag_reason, created_at, updated_at
+            FROM tasks
+        `,
     },
+    { name: 'tasks — drop tasks_old if exists',   sql: `DROP TABLE IF EXISTS tasks_old` },
+    { name: 'tasks — rename tasks to tasks_old',  sql: `ALTER TABLE tasks RENAME TO tasks_old` },
+    { name: 'tasks — rename tasks_new to tasks',  sql: `ALTER TABLE tasks_new RENAME TO tasks` },
+    { name: 'tasks — drop tasks_old',             sql: `DROP TABLE IF EXISTS tasks_old` },
+    { name: 'tasks — restore created_by index after rebuild',   sql: `CREATE INDEX IF NOT EXISTS idx_tasks_created_by_v2 ON tasks(created_by)` },
+    { name: 'tasks — restore company_id index after rebuild',   sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id_v2 ON tasks(company_id)` },
+
+    // ── profile_data table — survives DB wipes because firebase-sync restores it ─
+    // Stores custom full_name and avatar_url keyed by firebase_uid.
+    // Written whenever a user updates their profile; read by firebase-sync
+    // to restore the profile into the fresh users row after a redeploy.
     {
-        name: 'tasks — nullify created_by on delete instead of FK constraint',
-        sql: `UPDATE tasks SET created_by = NULL WHERE created_by NOT IN (SELECT id FROM users)`,
+        name: 'create profile_data table',
+        sql: `
+            CREATE TABLE IF NOT EXISTS profile_data (
+                firebase_uid TEXT PRIMARY KEY,
+                full_name    TEXT,
+                avatar_url   TEXT,
+                updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `,
     },
-    {
-    name: 'cleanup — drop users_old if still exists',
-    sql: `DROP TABLE IF EXISTS users_old`,
-},
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

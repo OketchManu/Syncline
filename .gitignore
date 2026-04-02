@@ -23,5 +23,3 @@ Thumbs.db
 # IDE
 .vscode/settings.json
 .idea/
-
-database/syncline.db
