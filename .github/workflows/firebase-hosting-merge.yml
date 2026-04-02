@@ -16,8 +16,6 @@ jobs:
           cd web
           npm ci
           npm run build
-          mkdir -p ../dist
-          mv build ../dist
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
