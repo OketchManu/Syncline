@@ -156,17 +156,9 @@ const MIGRATIONS = [
     { name: 'users — fix localhost avatar_url to use Render URL', sql: `UPDATE users SET avatar_url = REPLACE(avatar_url, 'http://localhost:3001', 'https://syncline-1.onrender.com') WHERE avatar_url LIKE 'http://localhost:3001%'` },
     { name: 'users — fix localhost logo_url in companies to use Render URL', sql: `UPDATE companies SET logo_url = REPLACE(logo_url, 'http://localhost:3001', 'https://syncline-1.onrender.com') WHERE logo_url LIKE 'http://localhost:3001%'` },
     { name: 'cleanup — drop users_old if still exists', sql: `DROP TABLE IF EXISTS users_old` },
-    { name: 'tasks — nullify created_by on delete instead of FK constraint', sql: `UPDATE tasks SET created_by = NULL WHERE created_by NOT IN (SELECT id FROM users)` },
 
-    // ── FIX: rebuild tasks table to kill ghost FK trigger from users_old ───────
-    // The users table rebuild left SQLite internal triggers referencing users_old.
-    // Any UPDATE/DELETE on tasks that touches created_by or assignee_id fires
-    // those triggers and crashes with "no such table: main.users_old".
-    // We rebuild tasks the same way we rebuilt users — rename, recreate, copy.
-    {
-        name: 'tasks — drop tasks_new if exists from failed migration',
-        sql: `DROP TABLE IF EXISTS tasks_new`,
-    },
+    // ── FIX: rebuild tasks table to kill ghost FK triggers from users_old ──────
+    { name: 'tasks — drop tasks_new if exists from failed migration', sql: `DROP TABLE IF EXISTS tasks_new` },
     {
         name: 'tasks — create tasks_new without FK triggers',
         sql: `
@@ -200,17 +192,14 @@ const MIGRATIONS = [
             FROM tasks
         `,
     },
-    { name: 'tasks — drop tasks_old if exists',   sql: `DROP TABLE IF EXISTS tasks_old` },
-    { name: 'tasks — rename tasks to tasks_old',  sql: `ALTER TABLE tasks RENAME TO tasks_old` },
-    { name: 'tasks — rename tasks_new to tasks',  sql: `ALTER TABLE tasks_new RENAME TO tasks` },
-    { name: 'tasks — drop tasks_old',             sql: `DROP TABLE IF EXISTS tasks_old` },
-    { name: 'tasks — restore created_by index after rebuild',   sql: `CREATE INDEX IF NOT EXISTS idx_tasks_created_by_v2 ON tasks(created_by)` },
-    { name: 'tasks — restore company_id index after rebuild',   sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id_v2 ON tasks(company_id)` },
+    { name: 'tasks — drop tasks_old if exists',  sql: `DROP TABLE IF EXISTS tasks_old` },
+    { name: 'tasks — rename tasks to tasks_old', sql: `ALTER TABLE tasks RENAME TO tasks_old` },
+    { name: 'tasks — rename tasks_new to tasks', sql: `ALTER TABLE tasks_new RENAME TO tasks` },
+    { name: 'tasks — drop tasks_old',            sql: `DROP TABLE IF EXISTS tasks_old` },
+    { name: 'tasks — restore created_by index after rebuild',  sql: `CREATE INDEX IF NOT EXISTS idx_tasks_created_by_v2 ON tasks(created_by)` },
+    { name: 'tasks — restore company_id index after rebuild',  sql: `CREATE INDEX IF NOT EXISTS idx_tasks_company_id_v2 ON tasks(company_id)` },
 
-    // ── profile_data table — survives DB wipes because firebase-sync restores it ─
-    // Stores custom full_name and avatar_url keyed by firebase_uid.
-    // Written whenever a user updates their profile; read by firebase-sync
-    // to restore the profile into the fresh users row after a redeploy.
+    // ── profile_data — persists custom name/avatar across DB wipes ────────────
     {
         name: 'create profile_data table',
         sql: `
