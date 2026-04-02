@@ -11,11 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-            cd web
-            npm ci
-            npm run build
-            mv build ../dist
+      - name: Install and Build
+        run: |
+          cd web
+          npm ci
+          npm run build
+          mv build ../dist
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
