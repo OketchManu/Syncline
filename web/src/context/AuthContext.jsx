@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }) => {
     const [loading,      setLoading]      = useState(true);
     const [authError,    setAuthError]    = useState(null);
 
-    // ── syncBackendUser: used on page load / refresh and during email register ─
+    // ── syncBackendUser ───────────────────────────────────────────────────────
     const syncBackendUser = useCallback(async (fbUser, registrationPayload = null) => {
         console.log('📡 syncBackendUser called with:', {
             fbUid: fbUser?.uid,
@@ -90,31 +90,32 @@ export const AuthProvider = ({ children }) => {
         try {
             console.log('🔍 Fetching user from /api/auth/me...');
             const res = await axios.get(`${API_URL}/auth/me`);
-            console.log('✅ /api/auth/me success:', { userId: res.data.user?.id });
+            console.log('✅ /api/auth/me success:', { userId: res.data.user?.id, email: res.data.user?.email });
             return normaliseUser(res.data.user);
         } catch (err) {
             console.error('❌ /api/auth/me failed:', {
                 status: err.response?.status,
                 error:  err.response?.data?.error,
+                message: err.message,
             });
 
             if (err.response?.status === 404) {
-    console.log('📝 User not found, creating via firebase-sync...');
-    const res = await axios.post(`${API_URL}/auth/firebase-sync`, {
-        email:       fbUser.email,
-        fullName:    fbUser.displayName || fbUser.email.split('@')[0],
-        firebaseUid: fbUser.uid,
-        avatar:      fbUser.photoURL || null,
-    });
-    console.log('✅ firebase-sync response:', { userId: res.data.user?.id });
-    // Fetch full profile so name, avatar_url and id are all correct
-    try {
-        const meRes = await axios.get(`${API_URL}/auth/me`);
-        return normaliseUser(meRes.data.user);
-    } catch (_) {
-        return normaliseUser(res.data.user);
-    }
-}
+                console.log('📝 User not found, creating via firebase-sync...');
+                const res = await axios.post(`${API_URL}/auth/firebase-sync`, {
+                    email:       fbUser.email,
+                    fullName:    fbUser.displayName || fbUser.email.split('@')[0],
+                    firebaseUid: fbUser.uid,
+                    avatar:      fbUser.photoURL || null,
+                });
+                console.log('✅ firebase-sync response:', { userId: res.data.user?.id });
+                // Fetch full profile so name, avatar_url and all fields are correct
+                try {
+                    const meRes = await axios.get(`${API_URL}/auth/me`);
+                    return normaliseUser(meRes.data.user);
+                } catch (_) {
+                    return normaliseUser(res.data.user);
+                }
+            }
 
             throw err;
         }
@@ -129,7 +130,6 @@ export const AuthProvider = ({ children }) => {
             setFirebaseUser(fbUser);
 
             if (fbUser) {
-                // Always sync on every auth state change so refresh never shows stale profile
                 try {
                     console.log('👤 Firebase user present, syncing full profile from backend...');
                     const backendUser = await syncBackendUser(fbUser);
@@ -205,9 +205,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // ── Google LOGIN — only lets existing users in ────────────────────────────
-    // If the Google account has no backend row, returns { notRegistered: true, googleProfile }
-    // so the Login page can redirect to /register with pre-filled data.
+    // ── Google LOGIN ──────────────────────────────────────────────────────────
     const loginWithGoogle = async () => {
         setAuthError(null);
         try {
@@ -215,7 +213,6 @@ export const AuthProvider = ({ children }) => {
             const result  = await signInWithPopup(auth, googleProvider);
             const fbUser  = result.user;
 
-            // Set the axios token so the lookup call is authenticated
             await setAxiosToken(fbUser);
 
             let backendResponse;
@@ -225,9 +222,6 @@ export const AuthProvider = ({ children }) => {
                 });
             } catch (err) {
                 if (err.response?.status === 404 && err.response?.data?.registered === false) {
-                    // ── Unregistered Google user — sign them out of Firebase so
-                    //    they're not left in a half-authenticated state, then tell
-                    //    the Login page to redirect to /register.
                     console.log('ℹ️  Google login: user not registered, redirecting to register');
                     await signOut(auth);
                     delete axios.defaults.headers.common['Authorization'];
@@ -254,8 +248,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // ── Google REGISTER — creates a new account via Google ───────────────────
-    // Called only from the Register page after the user has chosen an account type.
+    // ── Google REGISTER ───────────────────────────────────────────────────────
     const registerWithGoogle = async (accountType = 'personal', companyName = null, extraCompanyFields = null) => {
         setAuthError(null);
         try {
@@ -265,8 +258,6 @@ export const AuthProvider = ({ children }) => {
 
             await setAxiosToken(fbUser);
 
-            // Use firebase-sync which creates the row if it doesn't exist,
-            // then follow up with /register to set the correct accountType / company.
             const backendUser = await syncBackendUser(fbUser, {
                 fullName:    fbUser.displayName || fbUser.email.split('@')[0],
                 avatar:      fbUser.photoURL    || null,
@@ -302,6 +293,91 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // ── Delete Account ────────────────────────────────────────────────────────
+    // Order matters:
+    //   1. Delete from backend DB first (while we still have a valid token)
+    //   2. Delete the Firebase Auth account
+    //   3. Sign out (clears local state via onAuthStateChanged)
+    const deleteAccount = async ({ device = 'Unknown device', currentPassword = null } = {}) => {
+        const fbUser = auth.currentUser;
+        if (!fbUser) return { success: false, error: 'Not authenticated.' };
+
+        try {
+            console.log('🗑️  Deleting account...');
+
+            // ── Step 1: Re-authenticate if password provided ──────────────────
+            // Required by Firebase before sensitive operations like account deletion.
+            // Google users don't need this — their token is always fresh from the popup.
+            if (currentPassword && fbUser.email) {
+                try {
+                    console.log('🔐 Re-authenticating before delete...');
+                    const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
+                    await reauthenticateWithCredential(fbUser, credential);
+                    console.log('✅ Re-authentication successful');
+                } catch (reAuthErr) {
+                    const message = firebaseErrorMessage(reAuthErr.code) || reAuthErr.message;
+                    console.error('❌ Re-authentication failed:', message);
+                    return { success: false, error: `Re-authentication failed: ${message}` };
+                }
+            }
+
+            // ── Step 2: Delete from backend DB ────────────────────────────────
+            // This anonymizes the row (clears firebase_uid + email) so the
+            // account can never be recovered or logged into again.
+            try {
+                console.log('🗑️  Deleting backend account...');
+                await axios.delete(`${API_URL}/users/me`, { data: { device } });
+                console.log('✅ Backend account deleted');
+            } catch (backendErr) {
+                // If the backend row is already gone (404), still proceed
+                // to delete the Firebase account — don't leave a zombie auth account.
+                if (backendErr.response?.status !== 404) {
+                    console.error('❌ Backend delete failed:', backendErr.message);
+                    return {
+                        success: false,
+                        error:   backendErr.response?.data?.error || 'Failed to delete account data. Please try again.',
+                    };
+                }
+                console.warn('⚠️  Backend returned 404 on delete — proceeding with Firebase delete');
+            }
+
+            // ── Step 3: Delete the Firebase Auth account ──────────────────────
+            // This permanently removes the ability to log in with this email/Google account.
+            try {
+                console.log('🗑️  Deleting Firebase Auth account...');
+                await fbUser.delete();
+                console.log('✅ Firebase Auth account deleted');
+            } catch (firebaseErr) {
+                // auth/requires-recent-login means we need re-auth
+                // This shouldn't happen since we re-auth above, but handle it gracefully
+                if (firebaseErr.code === 'auth/requires-recent-login') {
+                    return {
+                        success: false,
+                        error:   'Please sign out and sign back in, then try deleting your account again.',
+                        requiresReauth: true,
+                    };
+                }
+                console.error('❌ Firebase delete failed:', firebaseErr.message);
+                // Backend is already deleted — warn but don't block the user
+                console.warn('⚠️  Firebase account deletion failed but backend was deleted.');
+            }
+
+            // ── Step 4: Sign out — clears state via onAuthStateChanged ────────
+            console.log('🚪 Signing out after account deletion...');
+            await signOut(auth).catch(() => {}); // best-effort
+            delete axios.defaults.headers.common['Authorization'];
+            setUser(null);
+
+            console.log('✅ Account fully deleted');
+            return { success: true };
+
+        } catch (err) {
+            console.error('❌ Delete account failed:', err);
+            return { success: false, error: err.message || 'Failed to delete account.' };
+        }
+    };
+
+    // ── Other helpers ─────────────────────────────────────────────────────────
     const resetPassword = async (email) => {
         try {
             console.log('📧 Sending password reset email to:', email);
@@ -355,7 +431,8 @@ export const AuthProvider = ({ children }) => {
         <AuthContext.Provider value={{
             user, firebaseUser, loading, authError,
             isAuthenticated: !!user,
-            login, register, loginWithGoogle, registerWithGoogle, logout,
+            login, register, loginWithGoogle, registerWithGoogle,
+            logout, deleteAccount,
             resetPassword, changePassword, resendVerificationEmail,
             updateUser, hasCompanyFeatures, isCompanyOwner, isEmailVerified,
         }}>
@@ -372,6 +449,7 @@ const firebaseErrorMessage = (code) => {
         'auth/email-already-in-use':   'Email is already registered.',
         'auth/invalid-email':          'Invalid email address.',
         'auth/popup-closed-by-user':   'Sign-in popup was closed.',
+        'auth/requires-recent-login':  'Please sign out and sign back in, then try again.',
         'auth/account-exists-with-different-credential': 'An account already exists with this email.',
     };
     return map[code] || null;
