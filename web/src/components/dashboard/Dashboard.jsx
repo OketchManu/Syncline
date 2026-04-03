@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 
 const API_ORIGIN = 'https://syncline-1.onrender.com';
-const API_BASE   = 'https://syncline-1.onrender.com/api';
 
 const resolveAvatar = (avatar) => {
     if (!avatar) return null;
@@ -236,6 +235,7 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     const [status,setStatus]=useState(null);
     const [deleteConfirm,setDeleteConfirm]=useState('');
     const [deleteStep,setDeleteStep]=useState(1);
+    const [deleteError,setDeleteError]=useState('');
     const fileRef=useRef();
     const device=getDeviceInfo();
     const pwStrength=newPw.length===0?0:newPw.length<6?1:newPw.length<8?2:newPw.length<12?3:4;
@@ -243,7 +243,24 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     const handleAvatarChange=(e)=>{ const file=e.target.files[0]; if(!file) return; if(file.size>3*1024*1024){setStatus({type:'error',msg:'Image must be under 3 MB'});return;} setAvatarFile(file); const reader=new FileReader(); reader.onload=ev=>setAvatarPreview(ev.target.result); reader.readAsDataURL(file); };
     const saveProfile=async()=>{ if(!isOnline){setStatus({type:'error',msg:'You are offline.'});return;} setLoading(true);setStatus(null); const avatarPayload=avatarFile?avatarFile:avatarPreview===null?null:undefined; const err=await onSave({fullName,avatar:avatarPayload},'profile',device); setLoading(false); setStatus(err?{type:'error',msg:err}:{type:'success',msg:'Profile updated!'}); };
     const savePassword=async()=>{ if(!isOnline){setStatus({type:'error',msg:'You are offline.'});return;} if(newPw!==confirmPw){setStatus({type:'error',msg:'Passwords do not match.'});return;} if(newPw.length<8){setStatus({type:'error',msg:'Password must be at least 8 characters.'});return;} setLoading(true);setStatus(null); const err=await onSave({currentPassword:currentPw,newPassword:newPw},'password',device); setLoading(false); if(err)setStatus({type:'error',msg:err}); else{setStatus({type:'success',msg:'Password updated!'});setCurrentPw('');setNewPw('');setConfirmPw('');} };
-    const doDelete=async()=>{ if(deleteConfirm!=='DELETE'){setStatus({type:'error',msg:'Type DELETE to confirm.'});return;} setLoading(true); await onDeleteAccount(device); };
+
+    const doDelete = async () => {
+        if (deleteConfirm !== 'DELETE') { setDeleteError('Type DELETE to confirm.'); return; }
+        setLoading(true);
+        setDeleteError('');
+        // ── FIX: call onDeleteAccount and handle errors properly ──────────────
+        // onDeleteAccount now calls AuthContext.deleteAccount() which handles
+        // fbUser.delete() + signOut() — no need for separate cleanup here.
+        const result = await onDeleteAccount(device);
+        // If deleteAccount returns a failure, show the error
+        if (result && !result.success) {
+            setDeleteError(result.error || 'Failed to delete account. Please try again.');
+            setLoading(false);
+        }
+        // On success, AuthContext.deleteAccount() signs out and clears state,
+        // which will unmount this modal automatically via route protection.
+    };
+
     const TABS=[{id:'profile',icon:<User size={13}/>,label:'Profile'},{id:'security',icon:<Shield size={13}/>,label:'Security'},{id:'danger',icon:<AlertTriangle size={13}/>,label:'Danger Zone'}];
     return (
         <div style={{ position:'fixed',inset:0,background:t.overlay,backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1500,padding:'16px' }} onClick={onClose}>
@@ -253,7 +270,7 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
                         <div><h2 style={{ margin:0,fontSize:'17px',fontWeight:'700',color:t.textPrimary }}>Account Settings</h2><p style={{ margin:'3px 0 0',fontSize:'11px',color:t.textMuted,display:'flex',alignItems:'center',gap:'4px' }}><Smartphone size={10}/>{device}</p></div>
                         <button onClick={onClose} style={{ background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.textMuted,cursor:'pointer',padding:'7px',display:'flex' }}><X size={15}/></button>
                     </div>
-                    <div style={{ display:'flex' }}>{TABS.map(tb=>(<button key={tb.id} onClick={()=>{setTab(tb.id);setStatus(null);}} style={{ padding:'9px 16px',background:'none',border:'none',borderBottom:`2px solid ${tab===tb.id?t.accent:'transparent'}`,color:tab===tb.id?t.accent:t.textMuted,fontSize:'12px',fontWeight:tab===tb.id?'700':'400',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontFamily:'inherit',transition:'all 0.15s' }}>{tb.icon}{tb.label}</button>))}</div>
+                    <div style={{ display:'flex' }}>{TABS.map(tb=>(<button key={tb.id} onClick={()=>{setTab(tb.id);setStatus(null);setDeleteError('');}} style={{ padding:'9px 16px',background:'none',border:'none',borderBottom:`2px solid ${tab===tb.id?t.accent:'transparent'}`,color:tab===tb.id?t.accent:t.textMuted,fontSize:'12px',fontWeight:tab===tb.id?'700':'400',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontFamily:'inherit',transition:'all 0.15s' }}>{tb.icon}{tb.label}</button>))}</div>
                 </div>
                 <div style={{ padding:'22px 24px',overflowY:'auto',flex:1 }}>
                     {status&&<div style={{marginBottom:'16px'}}><Alert t={t} type={status.type}>{status.type==='success'?<CheckCircle2 size={13}/>:<AlertCircle size={13}/>} {status.msg}</Alert></div>}
@@ -286,9 +303,17 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
                         <div style={{ display:'flex',flexDirection:'column',gap:'16px' }}>
                             <Alert t={t} type="error"><AlertTriangle size={13}/> Account deletion is permanent and cannot be reversed.</Alert>
                             {deleteStep===1?(
-                                <div style={{padding:'20px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,borderRadius:'14px'}}><h4 style={{margin:'0 0 8px',fontSize:'14px',fontWeight:'700',color:t.danger}}>Delete My Account</h4><p style={{margin:'0 0 16px',fontSize:'13px',color:t.text,lineHeight:1.6}}>All your tasks, profile, and account data will be permanently erased.</p><Btn t={t} variant="danger" onClick={()=>setDeleteStep(2)} style={{background:t.danger,color:'#fff',border:'none',boxShadow:`0 4px 12px ${t.danger}40`}}><Trash2 size={13}/> I understand, proceed</Btn></div>
+                                <div style={{padding:'20px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,borderRadius:'14px'}}><h4 style={{margin:'0 0 8px',fontSize:'14px',fontWeight:'700',color:t.danger}}>Delete My Account</h4><p style={{margin:'0 0 16px',fontSize:'13px',color:t.text,lineHeight:1.6}}>Your profile name and avatar will remain on historical tasks. Your login credentials will be permanently removed.</p><Btn t={t} variant="danger" onClick={()=>setDeleteStep(2)} style={{background:t.danger,color:'#fff',border:'none',boxShadow:`0 4px 12px ${t.danger}40`}}><Trash2 size={13}/> I understand, proceed</Btn></div>
                             ):(
-                                <div style={{padding:'20px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,borderRadius:'14px',display:'flex',flexDirection:'column',gap:'14px'}}><p style={{margin:0,fontSize:'13px',color:t.text}}>Type <strong style={{color:t.danger,fontFamily:'monospace'}}>DELETE</strong> to confirm:</p><input type="text" value={deleteConfirm} onChange={e=>setDeleteConfirm(e.target.value)} placeholder="Type DELETE here" style={{width:'100%',padding:'10px 12px',background:t.inputBg,border:`2px solid ${deleteConfirm==='DELETE'?t.danger:t.dangerBorder}`,borderRadius:'8px',fontSize:'14px',color:t.textPrimary,boxSizing:'border-box',fontFamily:'monospace',outline:'none'}}/><div style={{display:'flex',gap:'10px'}}><Btn t={t} variant="ghost" onClick={()=>{setDeleteStep(1);setDeleteConfirm('');}} style={{flex:1,justifyContent:'center'}}>Cancel</Btn><Btn t={t} disabled={deleteConfirm!=='DELETE'||loading} onClick={doDelete} style={{flex:1,justifyContent:'center',background:deleteConfirm==='DELETE'?t.danger:t.inputBg,color:deleteConfirm==='DELETE'?'#fff':t.textMuted,border:'none',boxShadow:deleteConfirm==='DELETE'?`0 4px 12px ${t.danger}40`:'none'}}>{loading?'Deleting…':'Delete Forever'}</Btn></div></div>
+                                <div style={{padding:'20px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,borderRadius:'14px',display:'flex',flexDirection:'column',gap:'14px'}}>
+                                    <p style={{margin:0,fontSize:'13px',color:t.text}}>Type <strong style={{color:t.danger,fontFamily:'monospace'}}>DELETE</strong> to confirm:</p>
+                                    <input type="text" value={deleteConfirm} onChange={e=>{setDeleteConfirm(e.target.value);setDeleteError('');}} placeholder="Type DELETE here" style={{width:'100%',padding:'10px 12px',background:t.inputBg,border:`2px solid ${deleteConfirm==='DELETE'?t.danger:t.dangerBorder}`,borderRadius:'8px',fontSize:'14px',color:t.textPrimary,boxSizing:'border-box',fontFamily:'monospace',outline:'none'}}/>
+                                    {deleteError && <Alert t={t} type="error"><AlertCircle size={13}/> {deleteError}</Alert>}
+                                    <div style={{display:'flex',gap:'10px'}}>
+                                        <Btn t={t} variant="ghost" onClick={()=>{setDeleteStep(1);setDeleteConfirm('');setDeleteError('');}} style={{flex:1,justifyContent:'center'}} disabled={loading}>Cancel</Btn>
+                                        <Btn t={t} disabled={deleteConfirm!=='DELETE'||loading} onClick={doDelete} style={{flex:1,justifyContent:'center',background:deleteConfirm==='DELETE'?t.danger:t.inputBg,color:deleteConfirm==='DELETE'?'#fff':t.textMuted,border:'none',boxShadow:deleteConfirm==='DELETE'?`0 4px 12px ${t.danger}40`:'none'}}>{loading?'Deleting…':'Delete Forever'}</Btn>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     )}
@@ -494,7 +519,9 @@ const LockedView = ({ t, label, onSetup }) => (
 );
 
 const Dashboard = () => {
-    const { user, logout, updateUser } = useAuth();
+    // ── FIX: added deleteAccount to the destructure ───────────────────────────
+    const { user, logout, updateUser, deleteAccount } = useAuth();
+
     const [dark, setDark] = useState(() => {
         const saved = localStorage.getItem('syncline_theme');
         if (saved !== null) return saved === 'dark';
@@ -629,10 +656,20 @@ const Dashboard = () => {
         }catch(err){return err.response?.data?.message||err.message||`Failed to update ${type}`;}
     };
 
-    const handleDeleteAccount=async(device)=>{
-        try{await userAPI.deleteAccount({device});}catch(err){const s=err.response?.status;if(s&&s!==404&&s!==410){addNotification('Error','Could not delete account','error');return;}}
-        try{localStorage.clear();}catch(_){}
-        logout();
+    // ── FIX: handleDeleteAccount now uses AuthContext.deleteAccount() ──────────
+    // AuthContext.deleteAccount() handles the full sequence:
+    //   1. Delete backend DB row (anonymizes the user, clears firebase_uid)
+    //   2. Delete the Firebase Auth account (fbUser.delete())
+    //   3. Sign out (clears local state via onAuthStateChanged)
+    // Previously this only called userAPI.deleteAccount() then logout(),
+    // which left the Firebase Auth account alive — allowing the user to
+    // log back in and get re-created as a "ghost" user via firebase-sync.
+    const handleDeleteAccount = async (device) => {
+        try { localStorage.clear(); } catch (_) {}
+        try { sessionStorage.clear(); } catch (_) {}
+        // deleteAccount() returns { success, error } — pass result back to
+        // ProfileModal so it can display any error message.
+        return await deleteAccount({ device });
     };
 
     const unreadCount=notifications.filter(n=>!n.read).length;
@@ -642,9 +679,7 @@ const Dashboard = () => {
     if(loading) return (
         <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif",display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px' }}>
             <div style={{ width:'42px',height:'42px',border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:'50%',animation:'spin 0.75s linear infinite' }}/>
-            <style>
-                
-                {`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
+            <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
             <p style={{ color:t.textMuted,fontSize:'13px',margin:0 }}>Loading Syncline…</p>
         </div>
     );
@@ -737,11 +772,6 @@ const Dashboard = () => {
                         transition: transform 0.25s ease !important;
                         box-shadow: 4px 0 32px rgba(0,0,0,0.45);
                     }
-                    @media (max-width: 360px) {
-                    .dash-status-text { display: none; }
-                    .dash-stats-grid { grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px 8px 0; }
-                    .dash-team-stats { grid-template-columns: 1fr 1fr; }
-}
                     .dash-sidebar--open    { transform: translateX(0) !important; }
                     .dash-sidebar--collapsed { width: 220px !important; }
                     .dash-overlay { display: block; }
@@ -768,6 +798,12 @@ const Dashboard = () => {
                     .dash-stats-grid { gap: 6px; }
                     .dash-team-stats { gap: 6px; }
                 }
+
+                @media (max-width: 360px) {
+                    .dash-status-text { display: none; }
+                    .dash-stats-grid { grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px 8px 0; }
+                    .dash-team-stats { grid-template-columns: 1fr 1fr; }
+                }
             `}</style>
 
             {/* Header */}
@@ -781,7 +817,7 @@ const Dashboard = () => {
 
                     <div style={{ display:'flex',alignItems:'center',gap:'8px',flexShrink:0 }}>
                         {companyLogo
-                            ? <img src={companyLogo.startsWith('http')?companyLogo:`http://localhost:3001${companyLogo}`} alt="logo" style={{ width:'32px',height:'32px',borderRadius:'7px',objectFit:'cover',border:`1px solid ${t.border}`,flexShrink:0 }}/>
+                            ? <img src={companyLogo.startsWith('http')?companyLogo:`${API_ORIGIN}${companyLogo}`} alt="logo" style={{ width:'32px',height:'32px',borderRadius:'7px',objectFit:'cover',border:`1px solid ${t.border}`,flexShrink:0 }}/>
                             : <div style={{ width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Zap size={14} color="#fff"/></div>
                         }
                         <span className="dash-header-name" style={{ fontSize:'16px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px',whiteSpace:'nowrap' }}>{headerLabel}</span>
