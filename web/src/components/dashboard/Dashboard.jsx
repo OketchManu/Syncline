@@ -79,13 +79,13 @@ const PRIORITY_COLOR= { low:'#64748b',medium:'#f59e0b',high:'#ef4444',urgent:'#d
 const STATUS_LABEL  = { pending:'Pending',in_progress:'In Progress',completed:'Completed',blocked:'Blocked' };
 
 const Pill = ({ color, children }) => (
-    <span style={{ padding:'2px 8px',borderRadius:'20px',fontSize:'10px',fontWeight:'700',letterSpacing:'0.03em',background:`${color}20`,color,display:'inline-block' }}>{children}</span>
+    <span style={{ padding:'2px 8px',borderRadius:'20px',fontSize:'10px',fontWeight:'700',letterSpacing:'0.03em',background:`${color}20`,color,display:'inline-block',whiteSpace:'nowrap' }}>{children}</span>
 );
 const Btn = ({ t, children, variant='primary', size='md', disabled, onClick, style:sx={}, ...rest }) => {
     const sizes = { sm:'6px 12px', md:'9px 18px', lg:'12px 24px' };
     const isPrimary=variant==='primary', isDanger=variant==='danger', isGhost=variant==='ghost';
     return (
-        <button onClick={onClick} disabled={disabled} {...rest} style={{ padding:sizes[size], background:isPrimary?t.accentGrad:isDanger?t.dangerBg:isGhost?'transparent':t.inputBg, border:`1px solid ${isPrimary?'transparent':isDanger?t.dangerBorder:t.border}`, borderRadius:'8px', color:isPrimary?'#fff':isDanger?t.danger:t.text, fontSize:size==='sm'?'11px':'13px', fontWeight:'600', cursor:disabled?'not-allowed':'pointer', opacity:disabled?0.5:1, display:'inline-flex', alignItems:'center', gap:'6px', transition:'all 0.15s', boxShadow:isPrimary&&!disabled?`0 4px 14px ${t.accent}40`:'none', fontFamily:'inherit', ...sx }}>{children}</button>
+        <button onClick={onClick} disabled={disabled} {...rest} style={{ padding:sizes[size], background:isPrimary?t.accentGrad:isDanger?t.dangerBg:isGhost?'transparent':t.inputBg, border:`1px solid ${isPrimary?'transparent':isDanger?t.dangerBorder:t.border}`, borderRadius:'8px', color:isPrimary?'#fff':isDanger?t.danger:t.text, fontSize:size==='sm'?'11px':'13px', fontWeight:'600', cursor:disabled?'not-allowed':'pointer', opacity:disabled?0.5:1, display:'inline-flex', alignItems:'center', gap:'6px', transition:'all 0.15s', boxShadow:isPrimary&&!disabled?`0 4px 14px ${t.accent}40`:'none', fontFamily:'inherit', whiteSpace:'nowrap', ...sx }}>{children}</button>
     );
 };
 const Input = ({ t, label, ...props }) => (
@@ -100,12 +100,12 @@ const Alert = ({ t, type, children }) => {
     return <div style={{ display:'flex',alignItems:'flex-start',gap:'8px',padding:'10px 13px',background:bg,border:`1px solid ${border}`,borderRadius:'8px',fontSize:'12px',color,lineHeight:1.5 }}>{children}</div>;
 };
 const StatCard = ({ t, icon, value, label, color }) => (
-    <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'14px',padding:'18px 20px',display:'flex',alignItems:'center',gap:'14px',position:'relative',overflow:'hidden' }}>
-        <div style={{ position:'absolute',top:0,right:0,width:'80px',height:'80px',borderRadius:'50%',background:`radial-gradient(circle at 70% 30%,${color}18,transparent 70%)`,pointerEvents:'none' }} />
-        <div style={{ width:'42px',height:'42px',borderRadius:'11px',background:`${color}15`,color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>{icon}</div>
-        <div>
-            <div style={{ fontSize:'clamp(18px, 4vw, 26px)',fontWeight:'800',color:t.textPrimary,lineHeight:1,fontVariantNumeric:'tabular-nums' }}>{value}</div>
-            <div style={{ fontSize:'11px',color:t.textMuted,marginTop:'3px',fontWeight:'500' }}>{label}</div>
+    <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'14px',padding:'14px 16px',display:'flex',alignItems:'center',gap:'12px',position:'relative',overflow:'hidden',minWidth:0 }}>
+        <div style={{ position:'absolute',top:0,right:0,width:'70px',height:'70px',borderRadius:'50%',background:`radial-gradient(circle at 70% 30%,${color}18,transparent 70%)`,pointerEvents:'none' }} />
+        <div style={{ width:'38px',height:'38px',borderRadius:'10px',background:`${color}15`,color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>{icon}</div>
+        <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:'clamp(16px,3.5vw,24px)',fontWeight:'800',color:t.textPrimary,lineHeight:1,fontVariantNumeric:'tabular-nums' }}>{value}</div>
+            <div style={{ fontSize:'10px',color:t.textMuted,marginTop:'3px',fontWeight:'500',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{label}</div>
         </div>
     </div>
 );
@@ -126,45 +126,64 @@ const LogoutModal = ({ t, onConfirm, onCancel }) => (
     </div>
 );
 
+// ── TaskCard: fixed action buttons so they never squish or overlap ────────────
 const TaskCard = ({ t, task, onStatusChange, onDelete, onEdit, onAssign, updatingStatus, isOnline, canAssign }) => {
     const isOverdue = task.deadline && task.status !== 'completed' && new Date(task.deadline) < new Date();
     const isUpdating = updatingStatus === task.id;
     return (
-        <div style={{ background:isOverdue?t.dangerBg:t.card,border:`1px solid ${isOverdue?t.dangerBorder:t.border}`,borderRadius:'12px',padding:'14px 16px',transition:'all 0.15s' }}
+        <div style={{ background:isOverdue?t.dangerBg:t.card,border:`1px solid ${isOverdue?t.dangerBorder:t.border}`,borderRadius:'12px',padding:'12px 14px',transition:'all 0.15s' }}
             onMouseEnter={e => { if(!isOverdue) e.currentTarget.style.background=t.cardHover; e.currentTarget.style.borderColor=t.borderMid; }}
             onMouseLeave={e => { if(!isOverdue) e.currentTarget.style.background=t.card; e.currentTarget.style.borderColor=isOverdue?t.dangerBorder:t.border; }}>
-            <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'10px' }}>
-                <div style={{ flex:1,minWidth:0 }}>
-                    <div style={{ display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px' }}>
-                        {!!task.flagged && <Flag size={11} color={t.danger} fill={t.danger} />}
-                        <h3 style={{ fontSize:'13px',fontWeight:'600',color:t.textPrimary,margin:0,lineHeight:1.4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{task.title}</h3>
-                    </div>
-                    {task.description && <p style={{ fontSize:'11px',color:t.textMuted,margin:'0 0 8px',lineHeight:1.5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{task.description}</p>}
-                    <div style={{ display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center' }}>
-                        <Pill color={STATUS_COLOR[task.status]}>{STATUS_LABEL[task.status]}</Pill>
-                        <Pill color={PRIORITY_COLOR[task.priority]}>{task.priority}</Pill>
-                        {task.assignee_name && <span style={{ fontSize:'10px',color:t.textMuted }}>· {task.assignee_name}</span>}
-                        {task.deadline && <span style={{ fontSize:'10px',color:isOverdue?t.danger:t.textMuted,fontWeight:isOverdue?'700':'400' }}>{isOverdue?'⚠ Overdue · ':' · '}{new Date(task.deadline).toLocaleDateString()}</span>}
-                    </div>
+
+            {/* Top row: title + action buttons */}
+            <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px',marginBottom:'8px' }}>
+                <div style={{ display:'flex',alignItems:'center',gap:'5px',minWidth:0,flex:1 }}>
+                    {!!task.flagged && <Flag size={11} color={t.danger} fill={t.danger} style={{flexShrink:0}}/>}
+                    <h3 style={{ fontSize:'13px',fontWeight:'600',color:t.textPrimary,margin:0,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{task.title}</h3>
                 </div>
+                {/* Action buttons — always in a fixed-width row, never wrap */}
                 <div style={{ display:'flex',alignItems:'center',gap:'2px',flexShrink:0 }}>
-                    <select value={task.status} onChange={e => onStatusChange(task.id, e.target.value)} disabled={isUpdating||!isOnline}
-                        style={{ padding:'4px 6px',background:t.selectBg,border:`1px solid ${t.border}`,borderRadius:'6px',color:t.text,fontSize:'10px',cursor:'pointer',fontFamily:'inherit',outline:'none',marginRight:'4px' }}>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="blocked">Blocked</option>
-                    </select>
                     {canAssign && (
-                        <button onClick={onAssign} disabled={!isOnline} title="Assign task"
-                            style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',borderRadius:'6px',transition:'all 0.1s' }}
+                        <button onClick={onAssign} disabled={!isOnline} title="Assign"
+                            style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',alignItems:'center',borderRadius:'6px',transition:'all 0.1s',flexShrink:0 }}
                             onMouseEnter={e=>{e.currentTarget.style.background=t.accentBg;e.currentTarget.style.color=t.accentLight;}}
                             onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}>
                             <UserPlus size={13}/>
                         </button>
                     )}
-                    <button onClick={onEdit} disabled={!isOnline} title="Edit" style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',borderRadius:'6px',transition:'all 0.1s' }} onMouseEnter={e=>{e.currentTarget.style.background=t.accentBg;e.currentTarget.style.color=t.accentLight;}} onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}><Edit2 size={13}/></button>
-                    <button onClick={onDelete} disabled={!isOnline} title="Delete" style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',borderRadius:'6px',transition:'all 0.1s' }} onMouseEnter={e=>{e.currentTarget.style.background=t.dangerBg;e.currentTarget.style.color=t.danger;}} onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}><Trash2 size={13}/></button>
+                    <button onClick={onEdit} disabled={!isOnline} title="Edit"
+                        style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',alignItems:'center',borderRadius:'6px',transition:'all 0.1s',flexShrink:0 }}
+                        onMouseEnter={e=>{e.currentTarget.style.background=t.accentBg;e.currentTarget.style.color=t.accentLight;}}
+                        onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}>
+                        <Edit2 size={13}/>
+                    </button>
+                    <button onClick={onDelete} disabled={!isOnline} title="Delete"
+                        style={{ background:'none',border:'none',color:t.textMuted,cursor:isOnline?'pointer':'not-allowed',padding:'5px',display:'flex',alignItems:'center',borderRadius:'6px',transition:'all 0.1s',flexShrink:0 }}
+                        onMouseEnter={e=>{e.currentTarget.style.background=t.dangerBg;e.currentTarget.style.color=t.danger;}}
+                        onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color=t.textMuted;}}>
+                        <Trash2 size={13}/>
+                    </button>
+                </div>
+            </div>
+
+            {/* Description */}
+            {task.description && <p style={{ fontSize:'11px',color:t.textMuted,margin:'0 0 8px',lineHeight:1.5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{task.description}</p>}
+
+            {/* Bottom row: pills + status select */}
+            <div style={{ display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap' }}>
+                <Pill color={STATUS_COLOR[task.status]}>{STATUS_LABEL[task.status]}</Pill>
+                <Pill color={PRIORITY_COLOR[task.priority]}>{task.priority}</Pill>
+                {task.assignee_name && <span style={{ fontSize:'10px',color:t.textMuted,whiteSpace:'nowrap' }}>· {task.assignee_name}</span>}
+                {task.deadline && <span style={{ fontSize:'10px',color:isOverdue?t.danger:t.textMuted,fontWeight:isOverdue?'700':'400',whiteSpace:'nowrap' }}>{isOverdue?'⚠ Overdue':new Date(task.deadline).toLocaleDateString()}</span>}
+                {/* Status select pushed to right */}
+                <div style={{ marginLeft:'auto',flexShrink:0 }}>
+                    <select value={task.status} onChange={e => onStatusChange(task.id, e.target.value)} disabled={isUpdating||!isOnline}
+                        style={{ padding:'3px 6px',background:t.selectBg,border:`1px solid ${t.border}`,borderRadius:'6px',color:t.text,fontSize:'10px',cursor:'pointer',fontFamily:'inherit',outline:'none' }}>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -243,24 +262,12 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     const handleAvatarChange=(e)=>{ const file=e.target.files[0]; if(!file) return; if(file.size>3*1024*1024){setStatus({type:'error',msg:'Image must be under 3 MB'});return;} setAvatarFile(file); const reader=new FileReader(); reader.onload=ev=>setAvatarPreview(ev.target.result); reader.readAsDataURL(file); };
     const saveProfile=async()=>{ if(!isOnline){setStatus({type:'error',msg:'You are offline.'});return;} setLoading(true);setStatus(null); const avatarPayload=avatarFile?avatarFile:avatarPreview===null?null:undefined; const err=await onSave({fullName,avatar:avatarPayload},'profile',device); setLoading(false); setStatus(err?{type:'error',msg:err}:{type:'success',msg:'Profile updated!'}); };
     const savePassword=async()=>{ if(!isOnline){setStatus({type:'error',msg:'You are offline.'});return;} if(newPw!==confirmPw){setStatus({type:'error',msg:'Passwords do not match.'});return;} if(newPw.length<8){setStatus({type:'error',msg:'Password must be at least 8 characters.'});return;} setLoading(true);setStatus(null); const err=await onSave({currentPassword:currentPw,newPassword:newPw},'password',device); setLoading(false); if(err)setStatus({type:'error',msg:err}); else{setStatus({type:'success',msg:'Password updated!'});setCurrentPw('');setNewPw('');setConfirmPw('');} };
-
     const doDelete = async () => {
         if (deleteConfirm !== 'DELETE') { setDeleteError('Type DELETE to confirm.'); return; }
-        setLoading(true);
-        setDeleteError('');
-        // ── FIX: call onDeleteAccount and handle errors properly ──────────────
-        // onDeleteAccount now calls AuthContext.deleteAccount() which handles
-        // fbUser.delete() + signOut() — no need for separate cleanup here.
+        setLoading(true); setDeleteError('');
         const result = await onDeleteAccount(device);
-        // If deleteAccount returns a failure, show the error
-        if (result && !result.success) {
-            setDeleteError(result.error || 'Failed to delete account. Please try again.');
-            setLoading(false);
-        }
-        // On success, AuthContext.deleteAccount() signs out and clears state,
-        // which will unmount this modal automatically via route protection.
+        if (result && !result.success) { setDeleteError(result.error || 'Failed to delete account. Please try again.'); setLoading(false); }
     };
-
     const TABS=[{id:'profile',icon:<User size={13}/>,label:'Profile'},{id:'security',icon:<Shield size={13}/>,label:'Security'},{id:'danger',icon:<AlertTriangle size={13}/>,label:'Danger Zone'}];
     return (
         <div style={{ position:'fixed',inset:0,background:t.overlay,backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1500,padding:'16px' }} onClick={onClose}>
@@ -338,9 +345,7 @@ const Sidebar = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany, m
     ];
     const nav = isCompany ? companyNav : personalNav;
     const lockedForPersonal = ['team','progress'];
-
     const handleNav = (id) => { onNavigate(id); if (onMobileClose) onMobileClose(); };
-
     return (
         <>
             {mobileOpen && <div className="dash-overlay" onClick={onMobileClose} />}
@@ -396,50 +401,50 @@ const PersonalDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivi
     const completed=tasks.filter(tk=>tk.status==='completed').length;
     const rate=tasks.length>0?Math.round((completed/tasks.length)*100):0;
     return (
-        <div style={{ padding:'20px 16px 40px',display:'flex',flexDirection:'column',gap:'18px' }}>
-            <div style={{ padding:'24px 20px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'18px',position:'relative',overflow:'hidden' }}>
-                <div style={{ position:'absolute',top:'-50px',right:'-30px',width:'180px',height:'180px',borderRadius:'50%',background:`radial-gradient(circle,${t.accent}20,transparent 70%)`,pointerEvents:'none' }}/>
+        <div style={{ padding:'clamp(12px,3vw,20px) clamp(10px,3vw,16px) 40px',display:'flex',flexDirection:'column',gap:'16px' }}>
+            <div style={{ padding:'20px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'16px',position:'relative',overflow:'hidden' }}>
+                <div style={{ position:'absolute',top:'-50px',right:'-30px',width:'160px',height:'160px',borderRadius:'50%',background:`radial-gradient(circle,${t.accent}20,transparent 70%)`,pointerEvents:'none' }}/>
                 <p style={{ margin:'0 0 2px',fontSize:'12px',color:t.accentLight,fontWeight:'600' }}>{greeting},</p>
-                <h2 style={{ margin:'0 0 16px',fontSize:'22px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.4px' }}>{user?.fullName||user?.email?.split('@')[0]} 👋</h2>
-                <div style={{ display:'flex',alignItems:'center',gap:'20px',flexWrap:'wrap' }}>
-                    <div style={{ flex:1,minWidth:'160px' }}>
-                        <div style={{ display:'flex',justifyContent:'space-between',marginBottom:'6px' }}><span style={{fontSize:'11px',color:t.textMuted,fontWeight:'500'}}>Today's completion</span><span style={{fontSize:'11px',fontWeight:'800',color:rate>=70?t.success:rate>=40?t.warning:t.accentLight}}>{rate}%</span></div>
+                <h2 style={{ margin:'0 0 14px',fontSize:'clamp(17px,4vw,22px)',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.4px' }}>{user?.fullName||user?.email?.split('@')[0]} 👋</h2>
+                <div style={{ display:'flex',alignItems:'center',gap:'16px',flexWrap:'wrap' }}>
+                    <div style={{ flex:1,minWidth:'140px' }}>
+                        <div style={{ display:'flex',justifyContent:'space-between',marginBottom:'6px' }}><span style={{fontSize:'11px',color:t.textMuted,fontWeight:'500'}}>Completion</span><span style={{fontSize:'11px',fontWeight:'800',color:rate>=70?t.success:rate>=40?t.warning:t.accentLight}}>{rate}%</span></div>
                         <div style={{ height:'5px',background:t.border,borderRadius:'3px',overflow:'hidden' }}><div style={{ height:'100%',width:`${rate}%`,background:rate>=70?`linear-gradient(90deg,${t.success},#34d399)`:t.accentGrad,borderRadius:'3px',transition:'width 0.6s ease' }}/></div>
                     </div>
-                    <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', justifyContent:'flex-end' }}>
+                    <div style={{ display:'flex',gap:'6px',flexWrap:'wrap' }}>
                         {[{v:tasks.length,label:'Total',color:t.accent},{v:completed,label:'Done',color:t.success},{v:tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length,label:'Overdue',color:t.danger}].map((s,i)=>(
-                            <div key={i} style={{ textAlign:'center',padding:'8px 12px',background:'rgba(255,255,255,0.03)',borderRadius:'10px',border:`1px solid ${t.border}` }}><div style={{fontSize:'20px',fontWeight:'800',color:s.color,lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{s.v}</div><div style={{fontSize:'9px',color:t.textMuted,marginTop:'2px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em'}}>{s.label}</div></div>
+                            <div key={i} style={{ textAlign:'center',padding:'7px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'10px',border:`1px solid ${t.border}`,minWidth:'48px' }}><div style={{fontSize:'18px',fontWeight:'800',color:s.color,lineHeight:1}}>{s.v}</div><div style={{fontSize:'9px',color:t.textMuted,marginTop:'2px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em'}}>{s.label}</div></div>
                         ))}
                     </div>
                 </div>
             </div>
-            <div style={{ padding:'14px 16px',background:`linear-gradient(135deg,rgba(124,58,237,0.08),rgba(16,185,129,0.04))`,border:`1px solid ${t.accentBorder}`,borderRadius:'13px',display:'flex',alignItems:'center',gap:'14px',flexWrap:'wrap' }}>
-                <div style={{ width:'36px',height:'36px',borderRadius:'10px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Sparkles size={17} color="#fff"/></div>
-                <div style={{flex:1,minWidth:'160px'}}><p style={{margin:'0 0 1px',fontSize:'13px',fontWeight:'700',color:t.textPrimary}}>Unlock Team Collaboration</p><p style={{margin:0,fontSize:'11px',color:t.textMuted}}>Set up a company workspace to access team management, progress tracking and reports.</p></div>
-                <button onClick={() => onNavigate('company-setup')} style={{ padding:'8px 14px',background:t.accentGrad,border:'none',borderRadius:'8px',color:'#fff',fontSize:'11px',fontWeight:'700',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',flexShrink:0,boxShadow:`0 4px 12px ${t.accent}40`,fontFamily:'inherit' }}>Set up <ArrowRight size={12}/></button>
+            <div style={{ padding:'12px 14px',background:`linear-gradient(135deg,rgba(124,58,237,0.08),rgba(16,185,129,0.04))`,border:`1px solid ${t.accentBorder}`,borderRadius:'12px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap' }}>
+                <div style={{ width:'32px',height:'32px',borderRadius:'9px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Sparkles size={15} color="#fff"/></div>
+                <div style={{flex:1,minWidth:'140px'}}><p style={{margin:'0 0 1px',fontSize:'12px',fontWeight:'700',color:t.textPrimary}}>Unlock Team Collaboration</p><p style={{margin:0,fontSize:'11px',color:t.textMuted}}>Set up a company workspace for team management.</p></div>
+                <button onClick={() => onNavigate('company-setup')} style={{ padding:'7px 12px',background:t.accentGrad,border:'none',borderRadius:'7px',color:'#fff',fontSize:'11px',fontWeight:'700',cursor:'pointer',display:'flex',alignItems:'center',gap:'4px',flexShrink:0,boxShadow:`0 4px 12px ${t.accent}40`,fontFamily:'inherit',whiteSpace:'nowrap' }}>Set up <ArrowRight size={11}/></button>
             </div>
             <div className="dash-content-grid">
                 <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',overflow:'hidden' }}>
-                    <div style={{ padding:'16px 18px',borderBottom:`1px solid ${t.border}`,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
-                        <h2 style={{ fontSize:'14px',fontWeight:'700',color:t.textPrimary,margin:0,display:'flex',alignItems:'center',gap:'7px' }}><ListTodo size={15} color={t.accentLight}/> My Tasks <span style={{fontSize:'11px',fontWeight:'600',color:t.textMuted,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'20px',padding:'1px 7px'}}>{filteredTasks.length}</span></h2>
-                        <Btn t={t} variant="primary" size="sm" onClick={()=>isOnline&&setShowCreateModal(true)} disabled={!isOnline}><Plus size={13}/> New Task</Btn>
+                    <div style={{ padding:'14px 16px',borderBottom:`1px solid ${t.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px' }}>
+                        <h2 style={{ fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0,display:'flex',alignItems:'center',gap:'6px',minWidth:0 }}><ListTodo size={14} color={t.accentLight}/> <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>My Tasks</span> <span style={{fontSize:'11px',fontWeight:'600',color:t.textMuted,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'20px',padding:'1px 7px',flexShrink:0}}>{filteredTasks.length}</span></h2>
+                        <Btn t={t} variant="primary" size="sm" onClick={()=>isOnline&&setShowCreateModal(true)} disabled={!isOnline}><Plus size={13}/> New</Btn>
                     </div>
-                    <div style={{padding:'14px 18px'}}>
-                        <div style={{ display:'flex',alignItems:'center',gap:'8px',padding:'8px 12px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'9px',marginBottom:'12px' }}><Search size={13} color={t.textMuted}/><input type="text" placeholder="Search tasks…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} style={{flex:1,background:'none',border:'none',color:t.textPrimary,fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>{searchQuery&&<button onClick={()=>setSearchQuery('')} style={{background:'none',border:'none',color:t.textMuted,cursor:'pointer',display:'flex',padding:'2px'}}><X size={11}/></button>}</div>
-                        <div style={{ display:'flex',gap:'4px',marginBottom:'14px',flexWrap:'wrap' }}>
-                            {['all','pending','in_progress','completed','blocked'].map(s=>(<button key={s} onClick={()=>setFilter(s)} style={{ padding:'4px 10px',background:filter===s?t.accentBg:'transparent',border:`1px solid ${filter===s?t.accentBorder:t.border}`,borderRadius:'20px',color:filter===s?t.accentLight:t.textMuted,fontSize:'10px',fontWeight:filter===s?'700':'400',cursor:'pointer',fontFamily:'inherit',transition:'all 0.13s',textTransform:'capitalize' }}>{s.replace('_',' ')}</button>))}
+                    <div style={{padding:'12px 14px'}}>
+                        <div style={{ display:'flex',alignItems:'center',gap:'7px',padding:'7px 10px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',marginBottom:'10px' }}><Search size={12} color={t.textMuted}/><input type="text" placeholder="Search tasks…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} style={{flex:1,background:'none',border:'none',color:t.textPrimary,fontSize:'12px',outline:'none',fontFamily:'inherit',minWidth:0}}/>{searchQuery&&<button onClick={()=>setSearchQuery('')} style={{background:'none',border:'none',color:t.textMuted,cursor:'pointer',display:'flex',padding:'2px',flexShrink:0}}><X size={11}/></button>}</div>
+                        <div style={{ display:'flex',gap:'4px',marginBottom:'12px',flexWrap:'wrap' }}>
+                            {['all','pending','in_progress','completed','blocked'].map(s=>(<button key={s} onClick={()=>setFilter(s)} style={{ padding:'3px 8px',background:filter===s?t.accentBg:'transparent',border:`1px solid ${filter===s?t.accentBorder:t.border}`,borderRadius:'20px',color:filter===s?t.accentLight:t.textMuted,fontSize:'10px',fontWeight:filter===s?'700':'400',cursor:'pointer',fontFamily:'inherit',transition:'all 0.13s',textTransform:'capitalize',whiteSpace:'nowrap' }}>{s.replace('_',' ')}</button>))}
                         </div>
-                        <div style={{ display:'flex',flexDirection:'column',gap:'7px',maxHeight:'460px',overflowY:'auto' }}>
+                        <div style={{ display:'flex',flexDirection:'column',gap:'6px',maxHeight:'460px',overflowY:'auto' }}>
                             {filteredTasks.length===0?(
-                                <div style={{textAlign:'center',padding:'48px 20px'}}><ListTodo size={32} color={t.textMuted}/><p style={{color:t.textMuted,margin:'10px 0 0',fontSize:'13px'}}>{searchQuery||filter!=='all'?'No matching tasks':'No tasks yet'}</p>{!searchQuery&&filter==='all'&&isOnline&&<Btn t={t} variant="ghost" size="sm" onClick={()=>setShowCreateModal(true)} style={{marginTop:'12px',border:`1px solid ${t.accentBorder}`,color:t.accentLight}}>Create your first task</Btn>}</div>
+                                <div style={{textAlign:'center',padding:'40px 20px'}}><ListTodo size={28} color={t.textMuted}/><p style={{color:t.textMuted,margin:'8px 0 0',fontSize:'13px'}}>{searchQuery||filter!=='all'?'No matching tasks':'No tasks yet'}</p>{!searchQuery&&filter==='all'&&isOnline&&<Btn t={t} variant="ghost" size="sm" onClick={()=>setShowCreateModal(true)} style={{marginTop:'10px',border:`1px solid ${t.accentBorder}`,color:t.accentLight}}>Create first task</Btn>}</div>
                             ):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} updatingStatus={updatingStatus} isOnline={isOnline} canAssign={false}/>))}
                         </div>
                     </div>
                 </div>
-                <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px' }}>
-                    <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'14px' }}><Activity size={14} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Live Activity</h3><div style={{width:'6px',height:'6px',borderRadius:'50%',background:wsConnected&&isOnline?t.success:t.danger,marginLeft:'auto',flexShrink:0}}/></div>
-                    <div style={{ display:'flex',flexDirection:'column',gap:'10px',maxHeight:'400px',overflowY:'auto' }}>
-                        {recentActivity.length===0?<p style={{fontSize:'12px',color:t.textMuted,textAlign:'center',padding:'24px 0',margin:0,lineHeight:1.5}}>Activity will appear here as you work.</p>:recentActivity.map(a=>(<div key={a.id} style={{display:'flex',gap:'9px'}}><div style={{width:'5px',height:'5px',borderRadius:'50%',background:t.accent,marginTop:'6px',flexShrink:0}}/><div><p style={{fontSize:'12px',color:t.text,margin:'0 0 1px',lineHeight:1.4}}>{a.message}</p><p style={{fontSize:'10px',color:t.textMuted,margin:0}}>{new Date(a.timestamp).toLocaleTimeString()}</p></div></div>))}
+                <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'16px' }}>
+                    <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'12px' }}><Activity size={13} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Live Activity</h3><div style={{width:'6px',height:'6px',borderRadius:'50%',background:wsConnected&&isOnline?t.success:t.danger,marginLeft:'auto',flexShrink:0}}/></div>
+                    <div style={{ display:'flex',flexDirection:'column',gap:'9px',maxHeight:'380px',overflowY:'auto' }}>
+                        {recentActivity.length===0?<p style={{fontSize:'12px',color:t.textMuted,textAlign:'center',padding:'20px 0',margin:0,lineHeight:1.5}}>Activity will appear here.</p>:recentActivity.map(a=>(<div key={a.id} style={{display:'flex',gap:'8px'}}><div style={{width:'5px',height:'5px',borderRadius:'50%',background:t.accent,marginTop:'6px',flexShrink:0}}/><div><p style={{fontSize:'11px',color:t.text,margin:'0 0 1px',lineHeight:1.4}}>{a.message}</p><p style={{fontSize:'10px',color:t.textMuted,margin:0}}>{new Date(a.timestamp).toLocaleTimeString()}</p></div></div>))}
                     </div>
                 </div>
             </div>
@@ -453,57 +458,57 @@ const CompanyDashboard = ({ t, user, tasks, isOnline, wsConnected, recentActivit
     const completionRate=tasks.length>0?Math.round((teamStats.completed/tasks.length)*100):0;
     const byAssignee=tasks.reduce((acc,tk)=>{ const name=tk.assignee_name||'Unassigned'; if(!acc[name])acc[name]={total:0,completed:0}; acc[name].total++; if(tk.status==='completed')acc[name].completed++; return acc; },{});
     return (
-        <div style={{ padding:'20px 16px 40px',display:'flex',flexDirection:'column',gap:'18px' }}>
-            <div style={{ padding:'22px 20px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'18px',position:'relative',overflow:'hidden' }}>
-                <div style={{ position:'absolute',top:'-40px',right:'-40px',width:'160px',height:'160px',borderRadius:'50%',background:`radial-gradient(circle,${t.accent}18,transparent 70%)`,pointerEvents:'none' }}/>
-                <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'16px',flexWrap:'wrap' }}>
+        <div style={{ padding:'clamp(12px,3vw,20px) clamp(10px,3vw,16px) 40px',display:'flex',flexDirection:'column',gap:'16px' }}>
+            <div style={{ padding:'20px',background:`linear-gradient(135deg,${t.accentBg},transparent)`,border:`1px solid ${t.accentBorder}`,borderRadius:'16px',position:'relative',overflow:'hidden' }}>
+                <div style={{ position:'absolute',top:'-40px',right:'-40px',width:'140px',height:'140px',borderRadius:'50%',background:`radial-gradient(circle,${t.accent}18,transparent 70%)`,pointerEvents:'none' }}/>
+                <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'12px',flexWrap:'wrap' }}>
                     <div>
-                        <div style={{ display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px' }}>
-                            <div style={{ width:'36px',height:'36px',borderRadius:'10px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Building2 size={18} color="#fff"/></div>
-                            <div><p style={{margin:0,fontSize:'11px',color:t.accentLight,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em'}}>Company Workspace</p><h2 style={{margin:0,fontSize:'20px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px'}}>Team Overview</h2></div>
+                        <div style={{ display:'flex',alignItems:'center',gap:'9px',marginBottom:'5px' }}>
+                            <div style={{ width:'32px',height:'32px',borderRadius:'9px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Building2 size={16} color="#fff"/></div>
+                            <div><p style={{margin:0,fontSize:'10px',color:t.accentLight,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em'}}>Company Workspace</p><h2 style={{margin:0,fontSize:'clamp(15px,3.5vw,20px)',fontWeight:'800',color:t.textPrimary}}>Team Overview</h2></div>
                         </div>
                         <p style={{margin:0,fontSize:'12px',color:t.textMuted}}>Welcome back, <strong style={{color:t.text}}>{user?.fullName}</strong> · {user?.role}</p>
                     </div>
                     <div style={{textAlign:'right',flexShrink:0}}>
-                        <div style={{ fontSize:'clamp(24px, 5vw, 36px)', fontWeight:'900',color:t.textPrimary,lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{completionRate}%</div>
+                        <div style={{ fontSize:'clamp(22px,5vw,34px)',fontWeight:'900',color:t.textPrimary,lineHeight:1}}>{completionRate}%</div>
                         <div style={{fontSize:'10px',color:t.textMuted,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:'2px'}}>Team Completion</div>
-                        <div style={{marginTop:'8px',height:'4px',background:t.border,borderRadius:'2px',width:'100px',overflow:'hidden'}}><div style={{height:'100%',width:`${completionRate}%`,background:t.accentGrad,borderRadius:'2px',transition:'width 0.6s ease'}}/></div>
+                        <div style={{marginTop:'6px',height:'4px',background:t.border,borderRadius:'2px',width:'90px',overflow:'hidden'}}><div style={{height:'100%',width:`${completionRate}%`,background:t.accentGrad,borderRadius:'2px',transition:'width 0.6s ease'}}/></div>
                     </div>
                 </div>
             </div>
             <div className="dash-team-stats">
-                {[{icon:<Clock size={17}/>,v:teamStats.inProgress,label:'In Progress',color:t.info},{icon:<CheckCircle2 size={17}/>,v:teamStats.completed,label:'Completed',color:t.success},{icon:<AlertCircle size={17}/>,v:teamStats.overdue,label:'Overdue',color:t.danger}].map((s,i)=>(
-                    <div key={i} style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'13px',padding:'14px 16px',display:'flex',alignItems:'center',gap:'12px' }}><div style={{width:'38px',height:'38px',borderRadius:'10px',background:`${s.color}15`,color:s.color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{s.icon}</div><div><div style={{fontSize:'24px',fontWeight:'800',color:t.textPrimary,lineHeight:1}}>{s.v}</div><div style={{fontSize:'10px',color:t.textMuted,marginTop:'2px',fontWeight:'500'}}>{s.label}</div></div></div>
+                {[{icon:<Clock size={16}/>,v:teamStats.inProgress,label:'In Progress',color:t.info},{icon:<CheckCircle2 size={16}/>,v:teamStats.completed,label:'Completed',color:t.success},{icon:<AlertCircle size={16}/>,v:teamStats.overdue,label:'Overdue',color:t.danger}].map((s,i)=>(
+                    <div key={i} style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'center',gap:'10px',minWidth:0 }}><div style={{width:'34px',height:'34px',borderRadius:'9px',background:`${s.color}15`,color:s.color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{s.icon}</div><div style={{minWidth:0}}><div style={{fontSize:'clamp(18px,4vw,24px)',fontWeight:'800',color:t.textPrimary,lineHeight:1}}>{s.v}</div><div style={{fontSize:'10px',color:t.textMuted,marginTop:'2px',fontWeight:'500',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.label}</div></div></div>
                 ))}
             </div>
             <div className="dash-content-grid">
                 <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',overflow:'hidden' }}>
-                    <div style={{ padding:'16px 18px',borderBottom:`1px solid ${t.border}`,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
-                        <h2 style={{ fontSize:'14px',fontWeight:'700',color:t.textPrimary,margin:0,display:'flex',alignItems:'center',gap:'7px' }}><ListTodo size={15} color={t.accentLight}/> All Team Tasks <span style={{fontSize:'11px',fontWeight:'600',color:t.textMuted,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'20px',padding:'1px 7px'}}>{filteredTasks.length}</span></h2>
-                        <Btn t={t} variant="primary" size="sm" onClick={()=>isOnline&&setShowCreateModal(true)} disabled={!isOnline}><Plus size={13}/> New Task</Btn>
+                    <div style={{ padding:'14px 16px',borderBottom:`1px solid ${t.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px' }}>
+                        <h2 style={{ fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0,display:'flex',alignItems:'center',gap:'6px',minWidth:0 }}><ListTodo size={14} color={t.accentLight}/> <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>Team Tasks</span> <span style={{fontSize:'11px',fontWeight:'600',color:t.textMuted,background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'20px',padding:'1px 7px',flexShrink:0}}>{filteredTasks.length}</span></h2>
+                        <Btn t={t} variant="primary" size="sm" onClick={()=>isOnline&&setShowCreateModal(true)} disabled={!isOnline}><Plus size={13}/> New</Btn>
                     </div>
-                    <div style={{padding:'14px 18px'}}>
-                        <div style={{ display:'flex',alignItems:'center',gap:'8px',padding:'8px 12px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'9px',marginBottom:'12px' }}><Search size={13} color={t.textMuted}/><input type="text" placeholder="Search all team tasks…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} style={{flex:1,background:'none',border:'none',color:t.textPrimary,fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>{searchQuery&&<button onClick={()=>setSearchQuery('')} style={{background:'none',border:'none',color:t.textMuted,cursor:'pointer',display:'flex',padding:'2px'}}><X size={11}/></button>}</div>
-                        <div style={{ display:'flex',gap:'4px',marginBottom:'14px',flexWrap:'wrap' }}>
-                            {['all','pending','in_progress','completed','blocked'].map(s=>(<button key={s} onClick={()=>setFilter(s)} style={{ padding:'4px 10px',background:filter===s?t.accentBg:'transparent',border:`1px solid ${filter===s?t.accentBorder:t.border}`,borderRadius:'20px',color:filter===s?t.accentLight:t.textMuted,fontSize:'10px',fontWeight:filter===s?'700':'400',cursor:'pointer',fontFamily:'inherit',transition:'all 0.13s',textTransform:'capitalize' }}>{s.replace('_',' ')}</button>))}
+                    <div style={{padding:'12px 14px'}}>
+                        <div style={{ display:'flex',alignItems:'center',gap:'7px',padding:'7px 10px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',marginBottom:'10px' }}><Search size={12} color={t.textMuted}/><input type="text" placeholder="Search tasks…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} style={{flex:1,background:'none',border:'none',color:t.textPrimary,fontSize:'12px',outline:'none',fontFamily:'inherit',minWidth:0}}/>{searchQuery&&<button onClick={()=>setSearchQuery('')} style={{background:'none',border:'none',color:t.textMuted,cursor:'pointer',display:'flex',padding:'2px',flexShrink:0}}><X size={11}/></button>}</div>
+                        <div style={{ display:'flex',gap:'4px',marginBottom:'12px',flexWrap:'wrap' }}>
+                            {['all','pending','in_progress','completed','blocked'].map(s=>(<button key={s} onClick={()=>setFilter(s)} style={{ padding:'3px 8px',background:filter===s?t.accentBg:'transparent',border:`1px solid ${filter===s?t.accentBorder:t.border}`,borderRadius:'20px',color:filter===s?t.accentLight:t.textMuted,fontSize:'10px',fontWeight:filter===s?'700':'400',cursor:'pointer',fontFamily:'inherit',transition:'all 0.13s',textTransform:'capitalize',whiteSpace:'nowrap' }}>{s.replace('_',' ')}</button>))}
                         </div>
-                        <div style={{ display:'flex',flexDirection:'column',gap:'7px',maxHeight:'460px',overflowY:'auto' }}>
-                            {filteredTasks.length===0?(<div style={{textAlign:'center',padding:'48px 20px'}}><ListTodo size={32} color={t.textMuted}/><p style={{color:t.textMuted,margin:'10px 0 0',fontSize:'13px'}}>No tasks found</p></div>):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} onAssign={()=>onAssign(task)} canAssign={canAssign} updatingStatus={updatingStatus} isOnline={isOnline}/>))}
+                        <div style={{ display:'flex',flexDirection:'column',gap:'6px',maxHeight:'460px',overflowY:'auto' }}>
+                            {filteredTasks.length===0?(<div style={{textAlign:'center',padding:'40px 20px'}}><ListTodo size={28} color={t.textMuted}/><p style={{color:t.textMuted,margin:'8px 0 0',fontSize:'13px'}}>No tasks found</p></div>):filteredTasks.map(task=>(<TaskCard key={task.id} t={t} task={task} onStatusChange={updateTaskStatus} onDelete={()=>setDeleteTarget(task)} onEdit={()=>setEditTask(task)} onAssign={()=>onAssign(task)} canAssign={canAssign} updatingStatus={updatingStatus} isOnline={isOnline}/>))}
                         </div>
                     </div>
                 </div>
                 <div style={{ display:'flex',flexDirection:'column',gap:'12px' }}>
-                    <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px' }}>
-                        <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'14px' }}><Users size={14} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Team Workload</h3></div>
-                        {Object.entries(byAssignee).length===0?<p style={{fontSize:'12px',color:t.textMuted,margin:0}}>No assignments yet</p>:Object.entries(byAssignee).map(([name,data])=>{ const pct=data.total>0?Math.round((data.completed/data.total)*100):0; return (<div key={name} style={{marginBottom:'12px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}><span style={{fontSize:'12px',color:t.text,fontWeight:'500'}}>{name}</span><span style={{fontSize:'10px',color:t.textMuted}}>{data.completed}/{data.total}</span></div><div style={{height:'4px',background:t.border,borderRadius:'2px',overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:pct===100?t.success:t.accentGrad,borderRadius:'2px'}}/></div></div>); })}
+                    <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'16px' }}>
+                        <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'12px' }}><Users size={13} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Team Workload</h3></div>
+                        {Object.entries(byAssignee).length===0?<p style={{fontSize:'12px',color:t.textMuted,margin:0}}>No assignments yet</p>:Object.entries(byAssignee).map(([name,data])=>{ const pct=data.total>0?Math.round((data.completed/data.total)*100):0; return (<div key={name} style={{marginBottom:'10px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'3px'}}><span style={{fontSize:'11px',color:t.text,fontWeight:'500',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{name}</span><span style={{fontSize:'10px',color:t.textMuted,flexShrink:0,marginLeft:'6px'}}>{data.completed}/{data.total}</span></div><div style={{height:'4px',background:t.border,borderRadius:'2px',overflow:'hidden'}}><div style={{height:'100%',width:`${pct}%`,background:pct===100?t.success:t.accentGrad,borderRadius:'2px'}}/></div></div>); })}
                     </div>
-                    <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px' }}>
-                        <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'14px' }}><Activity size={14} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Team Activity</h3><div style={{width:'6px',height:'6px',borderRadius:'50%',background:wsConnected&&isOnline?t.success:t.danger,marginLeft:'auto',flexShrink:0}}/></div>
-                        <div style={{ display:'flex',flexDirection:'column',gap:'10px',maxHeight:'240px',overflowY:'auto' }}>
-                            {recentActivity.length===0?<p style={{fontSize:'12px',color:t.textMuted,margin:0}}>No recent activity</p>:recentActivity.map(a=>(<div key={a.id} style={{display:'flex',gap:'9px'}}><div style={{width:'5px',height:'5px',borderRadius:'50%',background:t.accent,marginTop:'6px',flexShrink:0}}/><div><p style={{fontSize:'11px',color:t.text,margin:'0 0 1px',lineHeight:1.4}}>{a.message}</p><p style={{fontSize:'10px',color:t.textMuted,margin:0}}>{new Date(a.timestamp).toLocaleTimeString()}</p></div></div>))}
+                    <div style={{ background:t.surface,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'16px' }}>
+                        <div style={{ display:'flex',alignItems:'center',gap:'7px',marginBottom:'12px' }}><Activity size={13} color={t.accentLight}/><h3 style={{fontSize:'13px',fontWeight:'700',color:t.textPrimary,margin:0}}>Team Activity</h3><div style={{width:'6px',height:'6px',borderRadius:'50%',background:wsConnected&&isOnline?t.success:t.danger,marginLeft:'auto',flexShrink:0}}/></div>
+                        <div style={{ display:'flex',flexDirection:'column',gap:'9px',maxHeight:'220px',overflowY:'auto' }}>
+                            {recentActivity.length===0?<p style={{fontSize:'11px',color:t.textMuted,margin:0}}>No recent activity</p>:recentActivity.map(a=>(<div key={a.id} style={{display:'flex',gap:'8px'}}><div style={{width:'5px',height:'5px',borderRadius:'50%',background:t.accent,marginTop:'6px',flexShrink:0}}/><div><p style={{fontSize:'11px',color:t.text,margin:'0 0 1px',lineHeight:1.4}}>{a.message}</p><p style={{fontSize:'10px',color:t.textMuted,margin:0}}>{new Date(a.timestamp).toLocaleTimeString()}</p></div></div>))}
                         </div>
                     </div>
-                    {teamStats.flagged>0&&(<div style={{padding:'14px',background:t.warningBg,border:`1px solid ${t.warningBorder}`,borderRadius:'13px',display:'flex',alignItems:'center',gap:'10px'}}><Flag size={16} color={t.warning}/><div><p style={{margin:0,fontSize:'12px',fontWeight:'700',color:t.textPrimary}}>{teamStats.flagged} Flagged {teamStats.flagged===1?'Task':'Tasks'}</p><p style={{margin:'1px 0 0',fontSize:'11px',color:t.textMuted}}>Requires attention</p></div></div>)}
+                    {teamStats.flagged>0&&(<div style={{padding:'12px 14px',background:t.warningBg,border:`1px solid ${t.warningBorder}`,borderRadius:'12px',display:'flex',alignItems:'center',gap:'10px'}}><Flag size={15} color={t.warning} style={{flexShrink:0}}/><div><p style={{margin:0,fontSize:'12px',fontWeight:'700',color:t.textPrimary}}>{teamStats.flagged} Flagged {teamStats.flagged===1?'Task':'Tasks'}</p><p style={{margin:'1px 0 0',fontSize:'11px',color:t.textMuted}}>Requires attention</p></div></div>)}
                 </div>
             </div>
         </div>
@@ -519,9 +524,7 @@ const LockedView = ({ t, label, onSetup }) => (
 );
 
 const Dashboard = () => {
-    // ── FIX: added deleteAccount to the destructure ───────────────────────────
     const { user, logout, updateUser, deleteAccount } = useAuth();
-
     const [dark, setDark] = useState(() => {
         const saved = localStorage.getItem('syncline_theme');
         if (saved !== null) return saved === 'dark';
@@ -582,9 +585,7 @@ const Dashboard = () => {
             try {
                 const token = await auth.currentUser?.getIdToken();
                 if (!token) return;
-                const res = await fetch(`https://syncline-1.onrender.com/api/company/team`, {
-                    headers:{ Authorization:`Bearer ${token}` }
-                });
+                const res = await fetch(`${API_ORIGIN}/api/company/team`, { headers:{ Authorization:`Bearer ${token}` } });
                 const data = await res.json();
                 if(data.company?.name) setCompanyName(data.company.name);
                 if(data.company?.logo_url) setCompanyLogo(data.company.logo_url);
@@ -656,19 +657,9 @@ const Dashboard = () => {
         }catch(err){return err.response?.data?.message||err.message||`Failed to update ${type}`;}
     };
 
-    // ── FIX: handleDeleteAccount now uses AuthContext.deleteAccount() ──────────
-    // AuthContext.deleteAccount() handles the full sequence:
-    //   1. Delete backend DB row (anonymizes the user, clears firebase_uid)
-    //   2. Delete the Firebase Auth account (fbUser.delete())
-    //   3. Sign out (clears local state via onAuthStateChanged)
-    // Previously this only called userAPI.deleteAccount() then logout(),
-    // which left the Firebase Auth account alive — allowing the user to
-    // log back in and get re-created as a "ghost" user via firebase-sync.
     const handleDeleteAccount = async (device) => {
         try { localStorage.clear(); } catch (_) {}
         try { sessionStorage.clear(); } catch (_) {}
-        // deleteAccount() returns { success, error } — pass result back to
-        // ProfileModal so it can display any error message.
         return await deleteAccount({ device });
     };
 
@@ -678,7 +669,7 @@ const Dashboard = () => {
 
     if(loading) return (
         <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif",display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px' }}>
-            <div style={{ width:'42px',height:'42px',border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:'50%',animation:'spin 0.75s linear infinite' }}/>
+            <div style={{ width:'40px',height:'40px',border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:'50%',animation:'spin 0.75s linear infinite' }}/>
             <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
             <p style={{ color:t.textMuted,fontSize:'13px',margin:0 }}>Loading Syncline…</p>
         </div>
@@ -686,11 +677,9 @@ const Dashboard = () => {
 
     return (
         <div style={{ minHeight:'100vh',background:t.bg,color:t.text,fontFamily:"'DM Sans','Sora',system-ui,sans-serif",display:'flex',flexDirection:'column' }}>
-
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
                 @keyframes spin      { to { transform:rotate(360deg); } }
-                @keyframes fadeUp    { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
                 @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
                 *,*::before,*::after { box-sizing:border-box; }
                 html,body,#root      { overflow-x:hidden; max-width:100vw; }
@@ -700,149 +689,118 @@ const Dashboard = () => {
                 ::-webkit-scrollbar-thumb { background:${t.border}; border-radius:2px; }
                 ::-webkit-scrollbar-thumb:hover { background:${t.borderMid}; }
                 select option { background:${t.surfaceRaised}; color:${t.textPrimary}; }
+                @media (max-width:768px) { input,select,textarea { font-size:16px !important; } }
 
-                @media (max-width:768px) {
-                    input,select,textarea { font-size:16px !important; }
-                }
-
+                /* ── Sidebar ── */
                 .dash-sidebar {
-                    width: 210px;
-                    height: calc(100vh - 58px);
-                    position: sticky;
-                    top: 58px;
-                    transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                    flex-shrink: 0;
+                    width:210px; height:calc(100vh - 58px); position:sticky; top:58px;
+                    transition:width 0.22s cubic-bezier(0.4,0,0.2,1);
+                    display:flex; flex-direction:column; overflow:hidden; flex-shrink:0;
                 }
-                .dash-sidebar--collapsed { width: 60px; }
+                .dash-sidebar--collapsed { width:60px; }
 
+                /* ── Grids ── */
                 .dash-stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 10px;
-                    padding: 16px 20px 0;
-                    flex-shrink: 0;
+                    display:grid; grid-template-columns:repeat(4,1fr);
+                    gap:10px; padding:14px 16px 0; flex-shrink:0;
                 }
+                .dash-content-grid  { display:grid; grid-template-columns:1fr 260px; gap:14px; }
+                .dash-team-stats    { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
 
-                .dash-content-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 280px;
-                    gap: 16px;
-                }
+                /* Hamburger — hidden on desktop via CSS only, no inline style */
+                .dash-hamburger { display:none; }
 
-                .dash-team-stats {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 10px;
-                }
+                /* status pill text */
+                .dash-status-text { display:inline; }
 
-                .dash-hamburger { display: none; }
-
+                /* Mobile overlay */
                 .dash-overlay {
-                    display: none;
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(0,0,0,0.55);
-                    z-index: 140;
-                    backdrop-filter: blur(2px);
-                    -webkit-backdrop-filter: blur(2px);
+                    display:none; position:fixed; inset:0;
+                    background:rgba(0,0,0,0.55); z-index:140;
+                    backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
                 }
 
-                @media (max-width: 900px) {
-                    .dash-stats-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                        padding: 12px 14px 0;
-                        gap: 8px;
-                    }
-                    .dash-content-grid { grid-template-columns: 1fr; }
-                    .dash-team-stats   { grid-template-columns: repeat(3, 1fr); }
+                /* ── Tablet ≤ 900px ── */
+                @media (max-width:900px) {
+                    .dash-stats-grid  { grid-template-columns:repeat(2,1fr); padding:10px 12px 0; gap:8px; }
+                    .dash-content-grid{ grid-template-columns:1fr; }
+                    .dash-team-stats  { grid-template-columns:repeat(3,1fr); }
                 }
 
-                @media (max-width: 640px) {
+                /* ── Mobile ≤ 640px ── */
+                @media (max-width:640px) {
                     .dash-sidebar {
-                        position: fixed !important;
-                        top: 58px !important;
-                        left: 0 !important;
-                        height: calc(100vh - 58px) !important;
-                        width: 220px !important;
-                        z-index: 150 !important;
-                        transform: translateX(-110%);
-                        transition: transform 0.25s ease !important;
-                        box-shadow: 4px 0 32px rgba(0,0,0,0.45);
+                        position:fixed !important; top:58px !important; left:0 !important;
+                        height:calc(100vh - 58px) !important; width:220px !important;
+                        z-index:150 !important; transform:translateX(-110%);
+                        transition:transform 0.25s ease !important;
+                        box-shadow:4px 0 32px rgba(0,0,0,0.45);
                     }
-                    .dash-sidebar--open    { transform: translateX(0) !important; }
-                    .dash-sidebar--collapsed { width: 220px !important; }
-                    .dash-overlay { display: block; }
-                    .dash-hamburger {
-                        display: flex !important;
-                        align-items: center;
-                        justify-content: center;
-                    }
-                    .dash-header-name { display: none !important; }
-                    .dash-stats-grid {
-                        grid-template-columns: repeat(2, 1fr);
-                        padding: 10px 10px 0;
-                        gap: 8px;
-                    }
-                    .dash-notif-panel {
-                        width: calc(100vw - 24px) !important;
-                        right: -48px !important;
-                    }
-                    .dash-content-grid { gap: 10px; }
-                    .dash-team-stats   { gap: 8px; }
+                    .dash-sidebar--open      { transform:translateX(0) !important; }
+                    .dash-sidebar--collapsed { width:220px !important; }
+                    .dash-overlay            { display:block; }
+                    .dash-hamburger          { display:flex !important; align-items:center; justify-content:center; }
+                    .dash-header-name        { display:none !important; }
+                    .dash-stats-grid         { grid-template-columns:repeat(2,1fr); padding:8px 10px 0; gap:7px; }
+                    .dash-team-stats         { gap:7px; }
+                    .dash-content-grid       { gap:10px; }
+                    .dash-notif-panel        { width:calc(100vw - 24px) !important; right:-48px !important; }
                 }
 
-                @media (max-width: 400px) {
-                    .dash-stats-grid { gap: 6px; }
-                    .dash-team-stats { gap: 6px; }
+                /* ── Very small ≤ 400px ── */
+                @media (max-width:400px) {
+                    .dash-stats-grid { gap:6px; }
+                    .dash-status-text { display:none; }
                 }
 
-                @media (max-width: 360px) {
-                    .dash-status-text { display: none; }
-                    .dash-stats-grid { grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px 8px 0; }
-                    .dash-team-stats { grid-template-columns: 1fr 1fr; }
+                /* ── Tiny ≤ 360px ── */
+                @media (max-width:360px) {
+                    .dash-stats-grid  { grid-template-columns:1fr 1fr; gap:5px; padding:7px 8px 0; }
+                    .dash-team-stats  { grid-template-columns:1fr 1fr; }
+                    .dash-status-text { display:none; }
                 }
             `}</style>
 
-            {/* Header */}
-            <header style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 14px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'58px',flexShrink:0,gap:'8px' }}>
-                <div style={{ display:'flex',alignItems:'center',gap:'8px',minWidth:0 }}>
+            {/* ── Header ── */}
+            <header style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 12px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'58px',flexShrink:0,gap:'6px' }}>
+                <div style={{ display:'flex',alignItems:'center',gap:'6px',minWidth:0,flex:1 }}>
+                    {/* Hamburger — NO inline display:none, CSS class controls visibility */}
                     <button className="dash-hamburger"
                         onClick={() => setMobileSidebarOpen(o => !o)}
-                        style={{ padding:'7px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.text,cursor:'pointer',flexShrink:0,display:'none',alignItems:'center',justifyContent:'center' }}>
+                        style={{ padding:'7px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',color:t.text,cursor:'pointer',flexShrink:0,alignItems:'center',justifyContent:'center' }}>
                         <Menu size={16}/>
                     </button>
 
-                    <div style={{ display:'flex',alignItems:'center',gap:'8px',flexShrink:0 }}>
+                    <div style={{ display:'flex',alignItems:'center',gap:'7px',flexShrink:0 }}>
                         {companyLogo
-                            ? <img src={companyLogo.startsWith('http')?companyLogo:`${API_ORIGIN}${companyLogo}`} alt="logo" style={{ width:'32px',height:'32px',borderRadius:'7px',objectFit:'cover',border:`1px solid ${t.border}`,flexShrink:0 }}/>
-                            : <div style={{ width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Zap size={14} color="#fff"/></div>
+                            ? <img src={companyLogo.startsWith('http')?companyLogo:`${API_ORIGIN}${companyLogo}`} alt="logo" style={{ width:'28px',height:'28px',borderRadius:'7px',objectFit:'cover',border:`1px solid ${t.border}`,flexShrink:0 }}/>
+                            : <div style={{ width:'26px',height:'26px',borderRadius:'6px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}><Zap size={13} color="#fff"/></div>
                         }
-                        <span className="dash-header-name" style={{ fontSize:'16px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px',whiteSpace:'nowrap' }}>{headerLabel}</span>
+                        <span className="dash-header-name" style={{ fontSize:'15px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.3px',whiteSpace:'nowrap' }}>{headerLabel}</span>
                     </div>
 
-                    <div style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:isOnline?t.onlineBg:t.offlineBg,borderRadius:'20px',border:`1px solid ${isOnline?t.successBorder:t.dangerBorder}`,flexShrink:0 }}>
+                    {/* Online/offline pill */}
+                    <div style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 7px',background:isOnline?t.onlineBg:t.offlineBg,borderRadius:'20px',border:`1px solid ${isOnline?t.successBorder:t.dangerBorder}`,flexShrink:0 }}>
                         {isOnline?<Wifi size={9} color={t.online}/>:<WifiOff size={9} color={t.offline}/>}
                         <span className="dash-status-text" style={{ fontSize:'9px',color:isOnline?t.online:t.offline,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>{!isOnline?'Offline':wsConnected?'Live':'Connecting'}</span>
                     </div>
 
                     {isCompany && (
-                        <div className="dash-header-name" style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:t.accentBg,borderRadius:'20px',border:`1px solid ${t.accentBorder}`,flexShrink:0 }}>
+                        <div className="dash-header-name" style={{ display:'flex',alignItems:'center',gap:'4px',padding:'3px 7px',background:t.accentBg,borderRadius:'20px',border:`1px solid ${t.accentBorder}`,flexShrink:0 }}>
                             <Building2 size={9} color={t.accentLight}/>
                             <span style={{ fontSize:'9px',color:t.accentLight,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.06em' }}>Team</span>
                         </div>
                     )}
                 </div>
 
-                <div style={{ display:'flex',alignItems:'center',gap:'6px',flexShrink:0 }}>
+                {/* Right side actions — fixed width, never squeeze */}
+                <div style={{ display:'flex',alignItems:'center',gap:'4px',flexShrink:0 }}>
                     <button onClick={() => { const next=!dark; setDark(next); localStorage.setItem('syncline_theme',next?'dark':'light'); }} title="Toggle theme"
-                        style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+                        style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
                         {dark?<Sun size={14}/>:<Moon size={14}/>}
                     </button>
 
-                    <div style={{position:'relative'}}>
+                    <div style={{position:'relative',flexShrink:0}}>
                         <button onClick={()=>setShowNotifications(!showNotifications)}
                             style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',display:'flex',position:'relative' }}>
                             <Bell size={14}/>
@@ -857,31 +815,31 @@ const Dashboard = () => {
                     </div>
 
                     <button onClick={()=>setShowProfile(true)}
-                        style={{ display:'flex',alignItems:'center',gap:'7px',padding:'4px 10px 4px 4px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'9px',cursor:'pointer',transition:'all 0.13s' }}>
+                        style={{ display:'flex',alignItems:'center',gap:'6px',padding:'4px 8px 4px 4px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'9px',cursor:'pointer',transition:'all 0.13s',flexShrink:0 }}>
                         <div style={{ width:'26px',height:'26px',borderRadius:'6px',overflow:'hidden',flexShrink:0 }}>
                             {(user?.avatar||user?.avatar_url)?<img src={resolveAvatar(user.avatar||user.avatar_url)} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:'800',color:'#fff'}}>{(user?.fullName||user?.email||'?').charAt(0).toUpperCase()}</div>}
                         </div>
-                        <div className="dash-header-name" style={{textAlign:'left'}}>
-                            <div style={{fontSize:'11px',fontWeight:'700',color:t.textPrimary,maxWidth:'90px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.fullName||user?.email}</div>
+                        <div className="dash-header-name" style={{textAlign:'left',minWidth:0}}>
+                            <div style={{fontSize:'11px',fontWeight:'700',color:t.textPrimary,maxWidth:'80px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.fullName||user?.email}</div>
                             <div style={{fontSize:'9px',color:t.textMuted,textTransform:'capitalize'}}>{user?.role}</div>
                         </div>
-                        <ChevronDown size={10} color={t.textMuted}/>
+                        <ChevronDown size={10} color={t.textMuted} style={{flexShrink:0}}/>
                     </button>
 
                     <button onClick={()=>setShowLogoutConfirm(true)} title="Sign out"
-                        style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.textMuted,cursor:'pointer',display:'flex' }}>
+                        style={{ padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.textMuted,cursor:'pointer',display:'flex',flexShrink:0 }}>
                         <LogOut size={14}/>
                     </button>
                 </div>
             </header>
 
             {!isOnline && (
-                <div style={{ padding:'7px 20px',background:t.offlineBg,borderBottom:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',gap:'8px',justifyContent:'center' }}>
-                    <WifiOff size={12} color={t.offline}/><span style={{fontSize:'12px',color:t.offline,fontWeight:'600'}}>You're offline — some features are limited.</span>
+                <div style={{ padding:'6px 16px',background:t.offlineBg,borderBottom:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',gap:'7px',justifyContent:'center' }}>
+                    <WifiOff size={11} color={t.offline}/><span style={{fontSize:'12px',color:t.offline,fontWeight:'600'}}>You're offline — some features are limited.</span>
                 </div>
             )}
 
-            <div style={{display:'flex',width:'100%'}}>
+            <div style={{display:'flex',width:'100%',overflow:'hidden'}}>
                 <Sidebar
                     t={t}
                     currentView={currentView}
@@ -892,12 +850,12 @@ const Dashboard = () => {
                     mobileOpen={mobileSidebarOpen}
                     onMobileClose={() => setMobileSidebarOpen(false)}
                 />
-                <main style={{flex:1,width:'100%',overflowX:'hidden',minWidth:0}}>
+                <main style={{flex:1,minWidth:0,overflowX:'hidden'}}>
                     <div className="dash-stats-grid">
-                        <StatCard t={t} icon={<ListTodo size={18}/>} value={tasks.length} label="Total Tasks" color={t.accent}/>
-                        <StatCard t={t} icon={<Clock size={18}/>} value={tasks.filter(tk=>tk.status==='in_progress').length} label="In Progress" color={t.info}/>
-                        <StatCard t={t} icon={<CheckCircle2 size={18}/>} value={tasks.filter(tk=>tk.status==='completed').length} label="Completed" color={t.success}/>
-                        <StatCard t={t} icon={<AlertCircle size={18}/>} value={tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length} label="Overdue" color={t.danger}/>
+                        <StatCard t={t} icon={<ListTodo size={17}/>} value={tasks.length} label="Total Tasks" color={t.accent}/>
+                        <StatCard t={t} icon={<Clock size={17}/>} value={tasks.filter(tk=>tk.status==='in_progress').length} label="In Progress" color={t.info}/>
+                        <StatCard t={t} icon={<CheckCircle2 size={17}/>} value={tasks.filter(tk=>tk.status==='completed').length} label="Completed" color={t.success}/>
+                        <StatCard t={t} icon={<AlertCircle size={17}/>} value={tasks.filter(tk=>tk.deadline&&new Date(tk.deadline)<new Date()&&tk.status!=='completed').length} label="Overdue" color={t.danger}/>
                     </div>
 
                     {currentView==='dashboard' && (isCompany

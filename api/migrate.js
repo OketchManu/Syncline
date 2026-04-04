@@ -1,4 +1,4 @@
-// api/src/config/migrate.js
+// api/migrate.js
 const { db, initializeDatabase } = require('./database');
 
 const MIGRATIONS = [
