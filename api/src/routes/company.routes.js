@@ -1,17 +1,15 @@
 // api/src/routes/company.routes.js
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 router.use(express.json());
 router.use(express.urlencoded({ extended: true }));
 const { authenticateToken } = require('../middleware/auth');
 const { db, runQuery, getOne, getAll } = require('../config/database');
 const crypto = require('crypto');
-const path = require('path');
-const fs = require('fs');
+const path   = require('path');
+const fs     = require('fs');
 
-// ─────────────────────────────────────────────────────────────────
-// NODEMAILER — invite email sending
-// ─────────────────────────────────────────────────────────────────
+// ─── Nodemailer ───────────────────────────────────────────────────────────────
 let transporter = null;
 try {
     const nodemailer = require('nodemailer');
@@ -24,7 +22,6 @@ try {
         });
         console.log('✅ Email transporter ready (SMTP)');
     } else {
-        // Dev mode: log invite URLs to console instead of sending email
         console.log('ℹ️  No EMAIL_* env vars — invite links will be logged to console');
     }
 } catch (e) {
@@ -39,7 +36,7 @@ async function sendInviteEmail({ toEmail, inviterName, companyName, role, invite
     const html = `
         <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f172a;color:#e2e8f0;border-radius:16px;overflow:hidden;">
             <div style="background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);padding:40px;text-align:center;">
-                <div style="font-size:36px;font-weight:800;color:#fff;letter-spacing:-1px;">⚡ Syncline</div>
+                <div style="font-size:36px;font-weight:800;color:#fff;letter-spacing:-1px;">Syncline</div>
                 <p style="color:rgba(255,255,255,0.8);margin:8px 0 0;font-size:14px;">Real-Time Operations Platform</p>
             </div>
             <div style="padding:40px;">
@@ -50,17 +47,14 @@ async function sendInviteEmail({ toEmail, inviterName, companyName, role, invite
                     <strong style="color:#a5b4fc;">${roleLabel}</strong>.
                 </p>
                 <div style="text-align:center;margin:32px 0;">
-                    <a href="${joinUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600;box-shadow:0 4px 20px rgba(99,102,241,0.4);">
-                        Accept Invitation →
+                    <a href="${joinUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:600;">
+                        Accept Invitation
                     </a>
                 </div>
                 <p style="color:#64748b;font-size:12px;text-align:center;margin:0;">
-                    This invite expires in 7 days. If the button doesn't work, copy this link:<br/>
+                    This invite expires in 7 days.<br/>
                     <a href="${joinUrl}" style="color:#6366f1;">${joinUrl}</a>
                 </p>
-            </div>
-            <div style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);text-align:center;">
-                <p style="color:#475569;font-size:12px;margin:0;">If you didn't expect this email, you can safely ignore it.</p>
             </div>
         </div>`;
 
@@ -86,10 +80,8 @@ async function sendInviteEmail({ toEmail, inviterName, companyName, role, invite
     }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// MULTER — logo uploads
-// ─────────────────────────────────────────────────────────────────
-let uploadLogo = (req, res, next) => next(); // no-op fallback
+// ─── Multer for logo uploads ──────────────────────────────────────────────────
+let uploadLogo = (req, res, next) => next();
 try {
     const multer  = require('multer');
     const logoDir = path.join(__dirname, '../../uploads/logos');
@@ -104,7 +96,7 @@ try {
     });
     const upload = multer({
         storage,
-        limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+        limits: { fileSize: 5 * 1024 * 1024 },
         fileFilter: (_req, file, cb) => {
             if (file.mimetype.startsWith('image/')) cb(null, true);
             else cb(new Error('Only image files are allowed'));
@@ -116,75 +108,56 @@ try {
     console.log('ℹ️  Multer not found — logo uploads disabled');
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HELPER: Role-based access control middleware
-// ─────────────────────────────────────────────────────────────────
-function requireRole(...allowedRoles) {
+// ─── Role middleware ──────────────────────────────────────────────────────────
+function requireCompanyRole(...allowedRoles) {
     return (req, res, next) => {
         if (!req.user || !req.user.company_id) {
             return res.status(403).json({
-                error: 'Company membership required',
-                members: [],
-                invitations: []
+                error:   'You must be a member of a company to do this.',
+                members: [], invitations: [],
             });
         }
         if (!allowedRoles.includes(req.user.role)) {
             return res.status(403).json({
-                error: 'Insufficient permissions',
-                members: [],
-                invitations: []
+                error:   `Only ${allowedRoles.join(' or ')} can perform this action. Your role is: ${req.user.role}.`,
+                members: [], invitations: [],
             });
         }
         next();
     };
 }
 
-// ─────────────────────────────────────────────────────────────────
-// HELPER: Generate invite code
-// ─────────────────────────────────────────────────────────────────
 function generateInviteCode() {
     return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
-// ─────────────────────────────────────────────────────────────────
-// STARTUP DDL
-// Ensures all columns and tables exist on server boot.
-// Uses raw db.run with callbacks — correct for one-time DDL.
-// ─────────────────────────────────────────────────────────────────
-db.run(`
-    CREATE TABLE IF NOT EXISTS join_requests (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_id   INTEGER NOT NULL,
-        user_id      INTEGER NOT NULL,
-        status       TEXT NOT NULL DEFAULT 'pending'
-                     CHECK(status IN ('pending','accepted','declined')),
-        requested_at TEXT NOT NULL DEFAULT (datetime('now')),
-        resolved_at  TEXT,
-        resolved_by  INTEGER,
-        UNIQUE(company_id, user_id)
-    )
-`, [], (err) => { if (err && !err.message.includes('already exists')) console.error('join_requests table:', err.message); });
+// ─── Startup DDL ──────────────────────────────────────────────────────────────
+db.run(`CREATE TABLE IF NOT EXISTS join_requests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id   INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'pending'
+                 CHECK(status IN ('pending','accepted','declined')),
+    requested_at TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at  TEXT,
+    resolved_by  INTEGER,
+    UNIQUE(company_id, user_id)
+)`, [], (err) => { if (err && !err.message.includes('already exists')) console.error('join_requests table:', err.message); });
 
-// ─────────────────────────────────────────────────────────────────
-// STARTUP DDL — team_invitations table
-// ─────────────────────────────────────────────────────────────────
-db.run(`
-    CREATE TABLE IF NOT EXISTS team_invitations (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_id   INTEGER NOT NULL,
-        email        TEXT NOT NULL,
-        invite_code  TEXT NOT NULL UNIQUE,
-        invited_by   INTEGER NOT NULL,
-        role         TEXT NOT NULL DEFAULT 'member',
-        status       TEXT NOT NULL DEFAULT 'pending'
-                     CHECK(status IN ('pending','accepted','expired','revoked')),
-        expires_at   TEXT NOT NULL,
-        used_at      TEXT,
-        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-`, [], (err) => { if (err && !err.message.includes('already exists')) console.error('team_invitations table:', err.message); });
+db.run(`CREATE TABLE IF NOT EXISTS team_invitations (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id   INTEGER NOT NULL,
+    email        TEXT NOT NULL,
+    invite_code  TEXT NOT NULL UNIQUE,
+    invited_by   INTEGER NOT NULL,
+    role         TEXT NOT NULL DEFAULT 'member',
+    status       TEXT NOT NULL DEFAULT 'pending'
+                 CHECK(status IN ('pending','accepted','expired','revoked')),
+    expires_at   TEXT NOT NULL,
+    used_at      TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+)`, [], (err) => { if (err && !err.message.includes('already exists')) console.error('team_invitations table:', err.message); });
 
-// Add columns that may not exist yet (ALTER TABLE fails silently if column exists)
 db.run(`ALTER TABLE users     ADD COLUMN join_status  TEXT`,  [], () => {});
 db.run(`ALTER TABLE companies ADD COLUMN invite_code  TEXT`,  [], () => {});
 db.run(`ALTER TABLE companies ADD COLUMN updated_at   TEXT`,  [], () => {});
@@ -194,18 +167,11 @@ db.run(`ALTER TABLE companies ADD COLUMN website      TEXT`,  [], () => {});
 db.run(`ALTER TABLE companies ADD COLUMN description  TEXT`,  [], () => {});
 db.run(`ALTER TABLE companies ADD COLUMN logo_url     TEXT`,  [], () => {});
 
-// NOTE: Backfill is now in api/src/config/backfill.js and runs after database initialization
-// in api/src/server.js — NOT here, to avoid race conditions.
-
-// ─────────────────────────────────────────────────────────────────
-// GET /api/company/team
-// ── FIXED: now returns { members, company, count }
-// CompanyOnboarding.jsx needs data.company for registration fields
-// ─────────────────────────────────────────────────────────────────
+// ─── GET /api/company/team ────────────────────────────────────────────────────
 router.get('/team', authenticateToken, async (req, res) => {
     try {
         if (!req.user || !req.user.company_id) {
-            return res.status(403).json({ error: 'Company membership required', members: [] });
+            return res.status(403).json({ error: 'You are not a member of any company.', members: [] });
         }
 
         console.log(`📊 Fetching team for company_id: ${req.user.company_id}`);
@@ -216,6 +182,7 @@ router.get('/team', authenticateToken, async (req, res) => {
              FROM users
              WHERE company_id = ?
                AND (join_status = 'accepted' OR join_status IS NULL)
+               AND email NOT LIKE 'deleted_user_%@syncline.local'
              ORDER BY
                  CASE role
                      WHEN 'owner'   THEN 1
@@ -229,36 +196,26 @@ router.get('/team', authenticateToken, async (req, res) => {
 
         const safeMembers = Array.isArray(members) ? members : [];
 
-        // ── ADDED: fetch company so CompanyOnboarding can display registration fields ──
         const company = await getOne(
             `SELECT id, name, industry, size, website, description, invite_code, logo_url
              FROM companies WHERE id = ?`,
             [req.user.company_id]
         );
         if (company) company.member_count = safeMembers.length;
-        // ────────────────────────────────────────────────────────────────────────────────
 
         console.log(`✅ Found ${safeMembers.length} team members`);
 
-        res.json({
-            members: safeMembers,
-            company: company || null,   // ← CompanyOnboarding needs this
-            count:   safeMembers.length
-        });
+        res.json({ members: safeMembers, company: company || null, count: safeMembers.length });
 
     } catch (error) {
         console.error('❌ Get team error:', error.message);
-        res.status(500).json({ error: 'Failed to get team members', members: [] });
+        res.status(500).json({ error: 'Failed to load team. Please try again.', members: [] });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// GET /api/company/invitations
-// ─────────────────────────────────────────────────────────────────
-router.get('/invitations', authenticateToken, requireRole('owner', 'admin'), async (req, res) => {
+// ─── GET /api/company/invitations ────────────────────────────────────────────
+router.get('/invitations', authenticateToken, requireCompanyRole('owner', 'admin'), async (req, res) => {
     try {
-        console.log(`📨 Fetching invitations for company_id: ${req.user.company_id}`);
-
         const invitations = await getAll(
             `SELECT ti.id, ti.email, ti.role, ti.invite_code, ti.status,
                     ti.expires_at, ti.created_at,
@@ -271,47 +228,43 @@ router.get('/invitations', authenticateToken, requireRole('owner', 'admin'), asy
         );
 
         const safeInvitations = Array.isArray(invitations) ? invitations : [];
-        console.log(`✅ Found ${safeInvitations.length} pending invitations`);
-
         res.json({ invitations: safeInvitations, count: safeInvitations.length });
 
     } catch (error) {
         console.error('❌ Get invitations error:', error.message);
-        res.status(500).json({ error: 'Failed to get invitations', invitations: [] });
+        res.status(500).json({ error: 'Failed to load invitations. Please try again.', invitations: [] });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// POST /api/company/team/invite
-// ─────────────────────────────────────────────────────────────────
-router.post('/team/invite', authenticateToken, requireRole('owner', 'admin'), async (req, res) => {
+// ─── POST /api/company/team/invite ───────────────────────────────────────────
+router.post('/team/invite', authenticateToken, requireCompanyRole('owner', 'admin'), async (req, res) => {
     try {
         const { email, role } = req.body;
 
         if (!email || !/\S+@\S+\.\S+/.test(email))
-            return res.status(400).json({ error: 'Valid email is required' });
+            return res.status(400).json({ error: 'A valid email address is required.' });
 
         const validRoles = ['admin', 'manager', 'member'];
         if (!role || !validRoles.includes(role))
-            return res.status(400).json({ error: 'Valid role is required (admin, manager, member)' });
+            return res.status(400).json({ error: 'Please select a valid role: admin, manager, or member.' });
 
         const allowedRoles = req.user.role === 'owner' ? ['admin', 'manager', 'member'] : ['member'];
         if (!allowedRoles.includes(role))
-            return res.status(403).json({ error: 'You cannot assign that role' });
+            return res.status(403).json({ error: `You do not have permission to assign the "${role}" role.` });
 
         const existingUser = await getOne(
             'SELECT id FROM users WHERE email = ? AND company_id = ?',
             [email, req.user.company_id]
         );
         if (existingUser)
-            return res.status(400).json({ error: 'User is already a member of this company' });
+            return res.status(400).json({ error: `${email} is already a member of your company.` });
 
         const pendingInvite = await getOne(
             'SELECT id FROM team_invitations WHERE email = ? AND company_id = ? AND status = ?',
             [email, req.user.company_id, 'pending']
         );
         if (pendingInvite)
-            return res.status(400).json({ error: 'Invitation already sent to this email' });
+            return res.status(400).json({ error: `An invitation has already been sent to ${email}. Check your pending invitations.` });
 
         const inviteCode = generateInviteCode();
         const expiresAt  = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -322,19 +275,16 @@ router.post('/team/invite', authenticateToken, requireRole('owner', 'admin'), as
             [req.user.company_id, email, inviteCode, req.user.id, role, expiresAt.toISOString()]
         );
 
-        // ── Respond immediately, send email in background ────────────────
         const inviter = await getOne('SELECT full_name, email FROM users WHERE id = ?', [req.user.id]);
         const company = await getOne('SELECT name FROM companies WHERE id = ?', [req.user.company_id]);
 
         console.log(`✅ Invitation created for ${email} with code ${inviteCode}`);
 
-        // Respond to client right away — don't await email
         res.json({
-            message: 'Invitation sent successfully',
-            invitation: { email, role, invite_code: inviteCode, expires_at: expiresAt }
+            message:    `Invitation sent to ${email} successfully.`,
+            invitation: { email, role, invite_code: inviteCode, expires_at: expiresAt },
         });
 
-        // Fire-and-forget email (won't block or fail the request)
         sendInviteEmail({
             toEmail:     email,
             inviterName: inviter?.full_name || inviter?.email || 'A team admin',
@@ -342,21 +292,17 @@ router.post('/team/invite', authenticateToken, requireRole('owner', 'admin'), as
             role,
             inviteCode,
         }).then(emailRes => {
-            if (emailRes?.previewUrl) console.log(`📧 Email preview: ${emailRes.previewUrl}`);
-            else if (emailRes?.logged) console.log(`📧 Email logged (no transporter) — join URL: http://localhost:3000/join/${inviteCode}`);
+            if (emailRes?.logged)  console.log(`📧 Join URL (no email transport): http://localhost:3000/join/${inviteCode}`);
             else if (emailRes?.error) console.error(`📧 Email failed: ${emailRes.error}`);
         }).catch(e => console.error('📧 Email error:', e.message));
 
     } catch (error) {
         console.error('❌ Invite error:', error.message);
-        res.status(500).json({ error: 'Failed to send invitation', details: error.message });
+        res.status(500).json({ error: 'Failed to send invitation. Please try again.', details: error.message });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// GET /api/company/invite-info/:code  (PUBLIC — no auth required)
-// Frontend uses this to preview the invite before the user logs in
-// ─────────────────────────────────────────────────────────────────
+// ─── GET /api/company/invite-info/:code (PUBLIC) ─────────────────────────────
 router.get('/invite-info/:code', async (req, res) => {
     try {
         const code = req.params.code.toUpperCase().trim();
@@ -373,42 +319,37 @@ router.get('/invite-info/:code', async (req, res) => {
         );
 
         if (!invitation)
-            return res.status(404).json({ error: 'Invalid invite link' });
+            return res.status(404).json({ error: 'This invite link is invalid or has already been used.' });
 
         if (invitation.status !== 'pending')
-            return res.status(400).json({ error: `This invite has already been ${invitation.status}` });
+            return res.status(400).json({ error: `This invite has already been ${invitation.status}.` });
 
         if (new Date(invitation.expires_at) < new Date())
-            return res.status(400).json({ error: 'This invite link has expired' });
+            return res.status(400).json({ error: 'This invite link has expired. Ask your admin to send a new one.' });
 
         res.json({
-            companyName:  invitation.company_name,
-            role:         invitation.role,
-            inviterName:  invitation.inviter_name || invitation.inviter_email || null,
-            expiresAt:    invitation.expires_at,
+            companyName: invitation.company_name,
+            role:        invitation.role,
+            inviterName: invitation.inviter_name || invitation.inviter_email || null,
+            expiresAt:   invitation.expires_at,
         });
     } catch (error) {
         console.error('❌ Invite info error:', error.message);
-        res.status(500).json({ error: 'Failed to load invite info' });
+        res.status(500).json({ error: 'Failed to load invite information. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// POST /api/company/join/:code
-// ── FIXED: supports BOTH invite flows:
-//   1. companies.invite_code  → join_requests (pending approval)
-//   2. team_invitations code  → immediate acceptance (your original flow)
-// ─────────────────────────────────────────────────────────────────
+// ─── POST /api/company/join/:code ────────────────────────────────────────────
 router.post('/join/:code', authenticateToken, async (req, res) => {
     try {
         const code = req.params.code.toUpperCase().trim();
 
-        // ── Flow 1: company invite_code (requires admin approval) ──────────────
+        // Flow 1: company invite_code (requires admin approval)
         const company = await getOne('SELECT * FROM companies WHERE invite_code = ?', [code]);
         if (company) {
             const currentUser = await getOne('SELECT company_id, join_status FROM users WHERE id = ?', [req.user.id]);
             if (currentUser.company_id && currentUser.join_status === 'accepted')
-                return res.status(400).json({ error: 'You are already a member of a company.' });
+                return res.status(400).json({ error: 'You are already a member of a company. Leave it first before joining another.' });
 
             const existing = await getOne(
                 'SELECT * FROM join_requests WHERE company_id = ? AND user_id = ?',
@@ -416,10 +357,9 @@ router.post('/join/:code', authenticateToken, async (req, res) => {
             );
             if (existing) {
                 if (existing.status === 'pending')
-                    return res.status(400).json({ error: 'You already have a pending request for this company.' });
+                    return res.status(400).json({ error: 'You already have a pending request for this company. Please wait for an admin to review it.' });
                 if (existing.status === 'accepted')
                     return res.status(400).json({ error: 'You are already a member of this company.' });
-                // Declined — allow re-apply
                 await runQuery(
                     `UPDATE join_requests SET status='pending', requested_at=datetime('now'), resolved_at=NULL, resolved_by=NULL WHERE id=?`,
                     [existing.id]
@@ -435,15 +375,15 @@ router.post('/join/:code', authenticateToken, async (req, res) => {
                 [company.id, req.user.id]
             );
             return res.json({
-                message: 'Join request sent. An admin will review it.',
-                status: 'pending',
-                company: { id: company.id, name: company.name }
+                message: 'Join request sent successfully. An admin will review it shortly.',
+                status:  'pending',
+                company: { id: company.id, name: company.name },
             });
         }
 
-        // ── Flow 2: team_invitations email-invite (immediate acceptance) ───────
+        // Flow 2: team_invitations email-invite (immediate acceptance)
         if (req.user.company_id)
-            return res.status(400).json({ error: 'You already belong to a company' });
+            return res.status(400).json({ error: 'You already belong to a company. Leave it first before joining another.' });
 
         const invitation = await getOne(
             `SELECT ti.*, c.name as company_name
@@ -453,20 +393,20 @@ router.post('/join/:code', authenticateToken, async (req, res) => {
             [code]
         );
         if (!invitation)
-            return res.status(404).json({ error: 'Invalid or expired invite code' });
+            return res.status(404).json({ error: 'This invite code is invalid or has already been used.' });
 
         if (new Date(invitation.expires_at) < new Date()) {
             await runQuery('UPDATE team_invitations SET status = ? WHERE id = ?', ['expired', invitation.id]);
-            return res.status(400).json({ error: 'Invite code has expired' });
+            return res.status(400).json({ error: 'This invite code has expired. Ask your admin to send a new invite.' });
         }
 
         await runQuery(
-            'UPDATE users SET company_id = ?, role = ?, join_status = \'accepted\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            `UPDATE users SET company_id = ?, role = ?, join_status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
             [invitation.company_id, invitation.role, req.user.id]
         );
         await runQuery(
-            'UPDATE team_invitations SET status = ?, used_at = datetime(\'now\') WHERE id = ?',
-            ['accepted', invitation.id]
+            `UPDATE team_invitations SET status = 'accepted', used_at = datetime('now') WHERE id = ?`,
+            [invitation.id]
         );
 
         const joinedCompany = await getOne(
@@ -475,17 +415,19 @@ router.post('/join/:code', authenticateToken, async (req, res) => {
         );
 
         console.log(`✅ User ${req.user.email} joined company ${joinedCompany.name}`);
-        return res.json({ message: 'Successfully joined company', status: 'accepted', company: joinedCompany });
+        return res.json({
+            message: `You have successfully joined ${joinedCompany.name}!`,
+            status:  'accepted',
+            company: joinedCompany,
+        });
 
     } catch (error) {
         console.error('❌ Join company error:', error.message);
-        res.status(500).json({ error: 'Failed to join company', details: error.message });
+        res.status(500).json({ error: 'Failed to join company. Please try again.', details: error.message });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// GET /api/company/my-status  ← ADDED (CompanyOnboarding JoinView polls this)
-// ─────────────────────────────────────────────────────────────────
+// ─── GET /api/company/my-status ──────────────────────────────────────────────
 router.get('/my-status', authenticateToken, async (req, res) => {
     try {
         const u = await getOne('SELECT company_id, join_status FROM users WHERE id = ?', [req.user.id]);
@@ -493,14 +435,12 @@ router.get('/my-status', authenticateToken, async (req, res) => {
         const company = await getOne('SELECT id, name FROM companies WHERE id = ?', [u.company_id]);
         res.json({ status: u.join_status || null, company });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to get status' });
+        res.status(500).json({ error: 'Failed to get your company status. Please try again.' });
     }
 });
 
-// ────────────────────���────────────────────────────────────────────
-// GET /api/company/join-requests  ← ADDED (CompanyOnboarding JoinRequestsPanel)
-// ─────────────────────────────────────────────────────────────────
-router.get('/join-requests', authenticateToken, requireRole('owner', 'admin', 'manager'), async (req, res) => {
+// ─── GET /api/company/join-requests ──────────────────────────────────────────
+router.get('/join-requests', authenticateToken, requireCompanyRole('owner', 'admin', 'manager'), async (req, res) => {
     try {
         const requests = await getAll(
             `SELECT jr.id, jr.status, jr.requested_at,
@@ -514,21 +454,19 @@ router.get('/join-requests', authenticateToken, requireRole('owner', 'admin', 'm
         res.json({ requests });
     } catch (error) {
         console.error('❌ Get join requests error:', error.message);
-        res.status(500).json({ error: 'Failed to get join requests' });
+        res.status(500).json({ error: 'Failed to load join requests. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// PATCH /api/company/join-requests/:id/accept  ← ADDED
-// ─────────────────────────────────────────────────────────────────
-router.patch('/join-requests/:id/accept', authenticateToken, requireRole('owner', 'admin', 'manager'), async (req, res) => {
+// ─── PATCH /api/company/join-requests/:id/accept ─────────────────────────────
+router.patch('/join-requests/:id/accept', authenticateToken, requireCompanyRole('owner', 'admin', 'manager'), async (req, res) => {
     try {
         const request = await getOne(
             'SELECT * FROM join_requests WHERE id = ? AND company_id = ?',
             [req.params.id, req.user.company_id]
         );
-        if (!request) return res.status(404).json({ error: 'Request not found' });
-        if (request.status !== 'pending') return res.status(400).json({ error: 'Request already resolved' });
+        if (!request) return res.status(404).json({ error: 'Join request not found.' });
+        if (request.status !== 'pending') return res.status(400).json({ error: 'This request has already been resolved.' });
 
         await runQuery(
             `UPDATE join_requests SET status='accepted', resolved_at=datetime('now'), resolved_by=? WHERE id=?`,
@@ -543,21 +481,19 @@ router.patch('/join-requests/:id/accept', authenticateToken, requireRole('owner'
         res.json({ message: `${u?.full_name || 'User'} has been accepted into the company.` });
     } catch (error) {
         console.error('❌ Accept error:', error.message);
-        res.status(500).json({ error: 'Failed to accept request' });
+        res.status(500).json({ error: 'Failed to accept request. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// PATCH /api/company/join-requests/:id/decline  ← ADDED
-// ─────────────────────────────────────────────────────────────────
-router.patch('/join-requests/:id/decline', authenticateToken, requireRole('owner', 'admin', 'manager'), async (req, res) => {
+// ─── PATCH /api/company/join-requests/:id/decline ────────────────────────────
+router.patch('/join-requests/:id/decline', authenticateToken, requireCompanyRole('owner', 'admin', 'manager'), async (req, res) => {
     try {
         const request = await getOne(
             'SELECT * FROM join_requests WHERE id = ? AND company_id = ?',
             [req.params.id, req.user.company_id]
         );
-        if (!request) return res.status(404).json({ error: 'Request not found' });
-        if (request.status !== 'pending') return res.status(400).json({ error: 'Request already resolved' });
+        if (!request) return res.status(404).json({ error: 'Join request not found.' });
+        if (request.status !== 'pending') return res.status(400).json({ error: 'This request has already been resolved.' });
 
         await runQuery(
             `UPDATE join_requests SET status='declined', resolved_at=datetime('now'), resolved_by=? WHERE id=?`,
@@ -572,85 +508,77 @@ router.patch('/join-requests/:id/decline', authenticateToken, requireRole('owner
         res.json({ message: `${u?.full_name || 'User'}'s request has been declined.` });
     } catch (error) {
         console.error('❌ Decline error:', error.message);
-        res.status(500).json({ error: 'Failed to decline request' });
+        res.status(500).json({ error: 'Failed to decline request. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// DELETE /api/company/invitations/:id
-// ─────────────────────────────────────────────────────────────────
-router.delete('/invitations/:id', authenticateToken, requireRole('owner', 'admin'), async (req, res) => {
+// ─── DELETE /api/company/invitations/:id ─────────────────────────────────────
+router.delete('/invitations/:id', authenticateToken, requireCompanyRole('owner', 'admin'), async (req, res) => {
     try {
         const result = await runQuery(
             'DELETE FROM team_invitations WHERE id = ? AND company_id = ?',
             [req.params.id, req.user.company_id]
         );
         if (result.changes === 0)
-            return res.status(404).json({ error: 'Invitation not found' });
+            return res.status(404).json({ error: 'Invitation not found.' });
 
-        console.log(`✅ Invitation ${req.params.id} revoked`);
-        res.json({ message: 'Invitation revoked successfully' });
+        res.json({ message: 'Invitation revoked successfully.' });
 
     } catch (error) {
         console.error('❌ Revoke invitation error:', error.message);
-        res.status(500).json({ error: 'Failed to revoke invitation', details: error.message });
+        res.status(500).json({ error: 'Failed to revoke invitation. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// PATCH /api/company/team/:userId/role
-// ─────────────────────────────────────────────────────────────────
-router.patch('/team/:userId/role', authenticateToken, requireRole('owner', 'admin'), async (req, res) => {
+// ─── PATCH /api/company/team/:userId/role ────────────────────────────────────
+router.patch('/team/:userId/role', authenticateToken, requireCompanyRole('owner', 'admin'), async (req, res) => {
     try {
         const { userId } = req.params;
         const { role }   = req.body;
 
         const validRoles = ['owner', 'admin', 'manager', 'member'];
         if (!role || !validRoles.includes(role))
-            return res.status(400).json({ error: 'Valid role is required' });
+            return res.status(400).json({ error: 'Please provide a valid role: owner, admin, manager, or member.' });
         if (parseInt(userId) === req.user.id)
-            return res.status(400).json({ error: 'Cannot change your own role' });
+            return res.status(400).json({ error: 'You cannot change your own role.' });
 
         const targetUser = await getOne(
             'SELECT id, role, full_name, email FROM users WHERE id = ? AND company_id = ?',
             [userId, req.user.company_id]
         );
-        if (!targetUser) return res.status(404).json({ error: 'User not found in your company' });
-        if (targetUser.role === 'owner') return res.status(403).json({ error: 'Cannot change owner role' });
+        if (!targetUser) return res.status(404).json({ error: 'This user is not a member of your company.' });
+        if (targetUser.role === 'owner') return res.status(403).json({ error: 'The company owner\'s role cannot be changed.' });
         if (req.user.role === 'admin' && ['owner', 'admin'].includes(role))
-            return res.status(403).json({ error: 'Admins cannot assign admin or owner roles' });
+            return res.status(403).json({ error: 'Admins cannot assign owner or admin roles.' });
 
         await runQuery('UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [role, userId]);
         console.log(`✅ Changed ${targetUser.full_name || targetUser.email} role to ${role}`);
-        res.json({ message: 'Role updated successfully', user: { id: targetUser.id, role } });
+        res.json({ message: `${targetUser.full_name || targetUser.email}'s role has been updated to ${role}.`, user: { id: targetUser.id, role } });
 
     } catch (error) {
         console.error('❌ Update role error:', error.message);
-        res.status(500).json({ error: 'Failed to update role', details: error.message });
+        res.status(500).json({ error: 'Failed to update role. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// DELETE /api/company/team/:userId
-// ─────────────────────────────────────────────────────────────────
-router.delete('/team/:userId', authenticateToken, requireRole('owner', 'admin'), async (req, res) => {
+// ─── DELETE /api/company/team/:userId ────────────────────────────────────────
+router.delete('/team/:userId', authenticateToken, requireCompanyRole('owner', 'admin'), async (req, res) => {
     try {
         const { userId } = req.params;
         if (parseInt(userId) === req.user.id)
-            return res.status(400).json({ error: 'Cannot remove yourself from the company' });
+            return res.status(400).json({ error: 'You cannot remove yourself from the company.' });
 
         const targetUser = await getOne(
             'SELECT id, role, full_name, email FROM users WHERE id = ? AND company_id = ?',
             [userId, req.user.company_id]
         );
-        if (!targetUser) return res.status(404).json({ error: 'User not found in your company' });
-        if (targetUser.role === 'owner') return res.status(403).json({ error: 'Cannot remove company owner' });
+        if (!targetUser) return res.status(404).json({ error: 'This user is not a member of your company.' });
+        if (targetUser.role === 'owner') return res.status(403).json({ error: 'The company owner cannot be removed.' });
 
         await runQuery(
-            'UPDATE users SET company_id = NULL, role = \'member\', join_status = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            `UPDATE users SET company_id = NULL, role = 'member', join_status = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
             [userId]
         );
-        // Also clean up any join_requests for this user
         try {
             await runQuery(
                 `UPDATE join_requests SET status = 'declined' WHERE user_id = ? AND company_id = ?`,
@@ -659,57 +587,55 @@ router.delete('/team/:userId', authenticateToken, requireRole('owner', 'admin'),
         } catch (_) {}
 
         console.log(`✅ Removed ${targetUser.full_name || targetUser.email} from company`);
-        res.json({ message: 'User removed from company successfully', user: { id: targetUser.id, name: targetUser.full_name || targetUser.email } });
+        res.json({ message: `${targetUser.full_name || targetUser.email} has been removed from the company.` });
 
     } catch (error) {
         console.error('❌ Remove user error:', error.message);
-        res.status(500).json({ error: 'Failed to remove user', details: error.message });
+        res.status(500).json({ error: 'Failed to remove user. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// PATCH /api/company/team/:userId/status
-// ─────────────────────────────────────────────────────────────────
-router.patch('/team/:userId/status', authenticateToken, requireRole('owner', 'admin'), async (req, res) => {
+// ─── PATCH /api/company/team/:userId/status ──────────────────────────────────
+router.patch('/team/:userId/status', authenticateToken, requireCompanyRole('owner', 'admin'), async (req, res) => {
     try {
         const { userId }  = req.params;
         const { isActive } = req.body;
 
         if (typeof isActive !== 'boolean')
-            return res.status(400).json({ error: 'isActive must be true or false' });
+            return res.status(400).json({ error: 'isActive must be true or false.' });
         if (parseInt(userId) === req.user.id)
-            return res.status(400).json({ error: 'Cannot change your own status' });
+            return res.status(400).json({ error: 'You cannot change your own active status.' });
 
         const targetUser = await getOne(
             'SELECT id, role, full_name, email FROM users WHERE id = ? AND company_id = ?',
             [userId, req.user.company_id]
         );
-        if (!targetUser) return res.status(404).json({ error: 'User not found in your company' });
-        if (targetUser.role === 'owner') return res.status(403).json({ error: 'Cannot deactivate company owner' });
+        if (!targetUser) return res.status(404).json({ error: 'This user is not a member of your company.' });
+        if (targetUser.role === 'owner') return res.status(403).json({ error: 'The company owner cannot be deactivated.' });
 
         await runQuery(
             'UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [isActive ? 1 : 0, userId]
         );
-        console.log(`✅ ${isActive ? 'Activated' : 'Deactivated'} ${targetUser.full_name || targetUser.email}`);
-        res.json({ message: `User ${isActive ? 'activated' : 'deactivated'} successfully`, user: { id: targetUser.id, is_active: isActive } });
+        res.json({
+            message: `${targetUser.full_name || targetUser.email} has been ${isActive ? 'activated' : 'deactivated'}.`,
+            user: { id: targetUser.id, is_active: isActive },
+        });
 
     } catch (error) {
         console.error('❌ Update status error:', error.message);
-        res.status(500).json({ error: 'Failed to update user status', details: error.message });
+        res.status(500).json({ error: 'Failed to update user status. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// GET /api/company/details
-// ─────────────────────────────────────────────────────────────────
+// ─── GET /api/company/details ─────────────────────────────────────────────────
 router.get('/details', authenticateToken, async (req, res) => {
     try {
         if (!req.user.company_id)
-            return res.status(404).json({ error: 'Not part of any company' });
+            return res.status(404).json({ error: 'You are not part of any company.' });
 
         const company = await getOne('SELECT * FROM companies WHERE id = ?', [req.user.company_id]);
-        if (!company) return res.status(404).json({ error: 'Company not found' });
+        if (!company) return res.status(404).json({ error: 'Company not found.' });
 
         const memberCountResult = await getOne(
             'SELECT COUNT(*) as count FROM users WHERE company_id = ?',
@@ -720,25 +646,23 @@ router.get('/details', authenticateToken, async (req, res) => {
 
     } catch (error) {
         console.error('❌ Get company details error:', error.message);
-        res.status(500).json({ error: 'Failed to get company details', details: error.message });
+        res.status(500).json({ error: 'Failed to load company details. Please try again.' });
     }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// PATCH /api/company/details
-// Handles both:
-//   • JSON body (no logo)          → Content-Type: application/json
-//   • multipart/form-data (+ logo) → Content-Type: multipart/form-data
-// ─────────────────────────────────────────────────────────────────
-router.patch('/details', uploadLogo, authenticateToken, requireRole('owner', 'admin'), async (req, res) => {
+// ─── PATCH /api/company/details ───────────────────────────────────────────────
+// FIX: authenticateToken MUST come before uploadLogo in middleware chain.
+// Previously uploadLogo ran first which could consume the request body before
+// auth had a chance to verify the token, causing 404 "user not found" errors
+// on JSON requests when the content-type header wasn't multipart.
+router.patch('/details', authenticateToken, requireCompanyRole('owner', 'admin'), uploadLogo, async (req, res) => {
     try {
         const { name, industry, size, website, description } = req.body || {};
 
-        // If a logo file was uploaded, build its public URL
         let logoUrl = null;
         if (req.file) {
-           const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
-logoUrl = `${BASE_URL}/uploads/logos/${req.file.filename}`;
+            const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
+            logoUrl = `${BASE_URL}/uploads/logos/${req.file.filename}`;
         }
 
         await runQuery(
@@ -757,18 +681,18 @@ logoUrl = `${BASE_URL}/uploads/logos/${req.file.filename}`;
                 size        || null,
                 website     || null,
                 description || null,
-                logoUrl,                   // null = keep existing logo
+                logoUrl,
                 req.user.company_id,
             ]
         );
 
         const updated = await getOne('SELECT * FROM companies WHERE id = ?', [req.user.company_id]);
         console.log(`✅ Company ${updated.name} updated`);
-        res.json({ message: 'Company updated successfully', company: updated });
+        res.json({ message: 'Company details updated successfully.', company: updated });
 
     } catch (error) {
         console.error('❌ Update company error:', error.message);
-        res.status(500).json({ error: 'Failed to update company', details: error.message });
+        res.status(500).json({ error: 'Failed to update company details. Please try again.' });
     }
 });
 
