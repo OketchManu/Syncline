@@ -102,6 +102,10 @@ const MIGRATIONS = [
     { name: 'tasks — add flag_reason', sql: `ALTER TABLE tasks ADD COLUMN flag_reason TEXT` },
     { name: 'tasks — add deadline',    sql: `ALTER TABLE tasks ADD COLUMN deadline DATETIME` },
     { name: 'tasks — add updated_at',  sql: `ALTER TABLE tasks ADD COLUMN updated_at DATETIME` },
+    {
+    name: 'tasks — add visibility column',
+    sql: `ALTER TABLE tasks ADD COLUMN visibility TEXT DEFAULT 'personal'`,
+},
 
     // ── indexes ────────────────────────────────────────────────────────────────
     { name: 'companies — add invite_code index',     sql: `CREATE INDEX IF NOT EXISTS idx_companies_invite_code ON companies(invite_code)` },

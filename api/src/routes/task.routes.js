@@ -191,7 +191,6 @@ router.post('/', scopeUser, async (req, res) => {
         // FIX: Build INSERT directly instead of going through Task model
         // which may have scope issues. This guarantees company_id is set correctly.
         const companyId  = req.user.company_id || null;
-        const visibility = companyId ? 'company' : 'personal';
 
         const result = await runQuery(
            `INSERT INTO tasks
