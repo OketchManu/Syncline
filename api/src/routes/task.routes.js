@@ -5,7 +5,6 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { db, runQuery, getOne, getAll }   = require('../config/database');
 
 // ─── Startup DDL ──────────────────────────────────────────────────────────────
-db.run(`ALTER TABLE tasks ADD COLUMN visibility  TEXT DEFAULT 'personal'`, [], () => {});
 db.run(`ALTER TABLE tasks ADD COLUMN company_id  INTEGER`,                 [], () => {});
 db.run(`ALTER TABLE tasks ADD COLUMN flagged     INTEGER DEFAULT 0`,       [], () => {});
 db.run(`ALTER TABLE tasks ADD COLUMN flag_reason TEXT`,                    [], () => {});
@@ -206,7 +205,6 @@ router.post('/', scopeUser, async (req, res) => {
                 assigneeId || null,
                 companyId,
                 companyId, // org_id mirrors company_id
-                visibility,
                 deadline || null,
             ]
         );

@@ -21,16 +21,6 @@ db.serialize(() => {
         }
     });
 
-    // Add visibility to tasks
-    db.run(`ALTER TABLE tasks ADD COLUMN visibility VARCHAR(20) DEFAULT 'company'`, (err) => {
-        if (err && !err.message.includes('duplicate column')) {
-            console.error('❌ Error adding visibility:', err.message);
-        } else if (err) {
-            console.log('ℹ️  tasks.visibility already exists');
-        } else {
-            console.log('✅ Added visibility to tasks');
-        }
-    });
 
     // Create task_audit_log
     db.run(`
