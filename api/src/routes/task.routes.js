@@ -1,27 +1,29 @@
-// api/src/routes/task.routes.js
+// api/src/routes/tasks.routes.js
 const express = require('express');
 const router  = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { db, runQuery, getOne, getAll } = require('../config/database');
 
-// ─── SELF-HEALING SCHEMA CHECK ───────────────────────────────────────────────
-// This ensures that even if migrations failed on Render, the columns exist.
+// ─── SELF-HEALING SCHEMA ─────────────────────────────────────────────────────
+// This ensures missing columns are added even if migrations failed.
 db.serialize(() => {
-    const columns = [
+    const taskColumns = [
         { name: 'visibility',  type: "TEXT DEFAULT 'personal'" },
         { name: 'company_id',  type: "INTEGER" },
         { name: 'org_id',      type: "INTEGER" },
         { name: 'assignee_id', type: "INTEGER" },
-        { name: 'deadline',    type: "TEXT" },
+        { name: 'deadline',    type: "DATETIME" },
         { name: 'flagged',     type: "INTEGER DEFAULT 0" },
         { name: 'flag_reason', type: "TEXT" },
-        { name: 'updated_at',  type: "TEXT" }
+        { name: 'updated_at',  type: "DATETIME" }
     ];
 
-    columns.forEach(col => {
+    taskColumns.forEach(col => {
         db.run(`ALTER TABLE tasks ADD COLUMN ${col.name} ${col.type}`, (err) => {
             if (err && !err.message.includes('duplicate column name')) {
-                console.error(`Error adding column ${col.name}:`, err.message);
+                console.error(`🔧 Schema Heal: Error adding ${col.name}:`, err.message);
+            } else if (!err) {
+                console.log(`✅ Schema Heal: Added missing column [${col.name}] to tasks`);
             }
         });
     });
@@ -85,7 +87,7 @@ router.get('/', scopeUser, async (req, res) => {
         const tasks = await getAll(query, params);
         res.json({ tasks: tasks || [] });
     } catch (error) {
-        console.error('Get tasks error:', error);
+        console.error('❌ GET /tasks error:', error);
         res.status(500).json({ error: 'Failed to load tasks.' });
     }
 });
@@ -97,11 +99,11 @@ router.post('/', scopeUser, async (req, res) => {
 
         if (!title) return res.status(400).json({ error: 'Title is required' });
 
-        const userId    = req.user.id;
-        const companyId = req.user.company_id || null;
+        const userId     = req.user.id;
+        const companyId  = req.user.company_id || null;
         const visibility = companyId ? 'company' : 'personal';
 
-        // 13 Columns, 13 Values
+        // Match the 13 columns expected by your frontend/INSERT logic
         const sql = `
             INSERT INTO tasks (
                 title, description, status, priority, 
@@ -118,7 +120,7 @@ router.post('/', scopeUser, async (req, res) => {
             userId,
             assigneeId || null,
             companyId,
-            companyId, // org_id defaults to company_id
+            companyId, 
             visibility,
             deadline || null
         ]);
@@ -126,7 +128,7 @@ router.post('/', scopeUser, async (req, res) => {
         const task = await getTaskById(result.id, req.userContext);
         res.status(201).json({ message: 'Task created', task });
     } catch (error) {
-        console.error('Create task error:', error);
+        console.error('❌ POST /tasks error:', error);
         res.status(500).json({ error: error.message });
     }
 });
