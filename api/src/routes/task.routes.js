@@ -5,6 +5,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { db, runQuery, getOne, getAll }   = require('../config/database');
 
 // ─── Startup DDL ──────────────────────────────────────────────────────────────
+db.run(`ALTER TABLE tasks ADD COLUMN visibility  TEXT DEFAULT 'personal'`, [], () => {});
 db.run(`ALTER TABLE tasks ADD COLUMN company_id  INTEGER`,                 [], () => {});
 db.run(`ALTER TABLE tasks ADD COLUMN flagged     INTEGER DEFAULT 0`,       [], () => {});
 db.run(`ALTER TABLE tasks ADD COLUMN flag_reason TEXT`,                    [], () => {});
@@ -190,6 +191,7 @@ router.post('/', scopeUser, async (req, res) => {
         // FIX: Build INSERT directly instead of going through Task model
         // which may have scope issues. This guarantees company_id is set correctly.
         const companyId  = req.user.company_id || null;
+        const visibility = companyId ? 'company' : 'personal';
 
         const result = await runQuery(
            `INSERT INTO tasks
@@ -205,6 +207,7 @@ router.post('/', scopeUser, async (req, res) => {
                 assigneeId || null,
                 companyId,
                 companyId, // org_id mirrors company_id
+                visibility,
                 deadline || null,
             ]
         );
