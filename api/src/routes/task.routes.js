@@ -194,10 +194,10 @@ router.post('/', scopeUser, async (req, res) => {
         const visibility = companyId ? 'company' : 'personal';
 
         const result = await runQuery(
-            `INSERT INTO tasks
-                (title, description, status, priority, created_by, assignee_id,
-                 company_id, org_id, visibility, deadline, flagged, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+           `INSERT INTO tasks
+    (title, description, status, priority, created_by, assignee_id,
+     company_id, org_id, deadline, flagged, created_at, updated_at)
+ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
             [
                 title.trim(),
                 description || null,

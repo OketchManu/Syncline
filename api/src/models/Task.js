@@ -11,10 +11,10 @@ async function createTask(data) {
     } = data;
 
     const result = await runQuery(
-        `INSERT INTO tasks (title, description, status, priority, assignee_id, created_by, deadline, company_id, visibility) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [title, description, status, priority, assigneeId, createdBy, deadline, companyId, visibility]
-    );
+    `INSERT INTO tasks (title, description, status, priority, assignee_id, created_by, deadline, company_id) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [title, description, status, priority, assigneeId, createdBy, deadline, companyId]
+);
 
     await logAuditEntry({
         taskId: result.id,
