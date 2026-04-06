@@ -10,38 +10,47 @@ const fs      = require('fs');
 const { initializeFirebase } = require('./config/firebase');
 initializeFirebase();
 
-// ─── RESET_DB: delete the stale DB file BEFORE requiring database.js ─────────
-// database.js opens a SQLite connection the moment it is require()'d.
-// If the DB file is corrupted (users_old ghost in sqlite_master), we must
-// delete it BEFORE that connection is made — otherwise the ghost persists
-// in the open connection no matter what migrations do afterward.
-// To use: set RESET_DB=true in Render env vars, deploy once, then remove it.
+// ─── RESET_DB: wipe ALL possible DB locations BEFORE requiring database.js ────
+// database.js opens SQLite the moment it is require()'d, so deletion must
+// happen here — before any require('./config/database') call.
+// Set RESET_DB=true in Render env vars, deploy once, then remove the var.
 if (process.env.RESET_DB === 'true') {
-  const possiblePaths = [
-    path.join(__dirname, '../../database/syncline.db'),
+  const allPossibleDBPaths = [
+    // Primary path used by database.js on Render
     path.join(__dirname, '../../../database/syncline.db'),
-    path.join(__dirname, '../data/syncline.db'),
+    // Fallback path used by database.js
+    path.join(__dirname, '../../data/syncline.db'),
+    // Stray DB file found inside api/src/
+    path.join(__dirname, 'database.sqlite'),
+    // Old duplicate config path
+    path.join(__dirname, '../../config/syncline.db'),
+    // Any other sqlite files in api/src
+    path.join(__dirname, 'syncline.db'),
   ];
-  let deleted = false;
-  for (const dbPath of possiblePaths) {
+
+  console.log('🗑️  RESET_DB=true — scanning for database files to delete...');
+  let anyDeleted = false;
+  for (const dbPath of allPossibleDBPaths) {
     if (fs.existsSync(dbPath)) {
       try {
         fs.unlinkSync(dbPath);
-        console.log('🗑️  RESET_DB=true — deleted stale database file:', dbPath);
-        deleted = true;
+        console.log('🗑️  Deleted:', dbPath);
+        anyDeleted = true;
       } catch (e) {
-        console.error('❌ RESET_DB: could not delete', dbPath, e.message);
+        console.error('❌ Could not delete', dbPath, ':', e.message);
       }
     }
   }
-  if (!deleted) {
-    console.log('ℹ️  RESET_DB=true — no database file found at expected paths');
+  if (!anyDeleted) {
+    console.log('ℹ️  RESET_DB=true — no database files found at any expected path');
+    console.log('    Searched:', allPossibleDBPaths.join('\n    '));
   }
+  console.log('✅ RESET_DB complete — fresh DB will be created on next connect');
 }
 
-// ─── NOW safe to require database (connects to the fresh/existing DB) ─────────
+// ─── NOW safe to require database (connects to fresh/existing DB) ─────────────
 const { initializeDatabase, resetDatabaseIfStale } = require('./config/database');
-const { runMigrations }    = require('./config/migrate');
+const { runMigrations }       = require('./config/migrate');
 const { backfillInviteCodes } = require('./config/backfill');
 const { initializeWebSocket } = require('./config/websocket');
 
@@ -108,11 +117,10 @@ if (!fs.existsSync(logosDir)) {
   console.log('✅ Logo uploads enabled');
 }
 
-// ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'Syncline API' });
-});
-
+// ─── Health ───────────────────────────────────────────────────────────────────
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'Syncline API' })
+);
 app.get('/',    (req, res) => res.json({ message: 'Syncline API v1.0', status: 'running' }));
 app.get('/api', (req, res) => res.json({ message: 'Syncline API v1.0' }));
 
