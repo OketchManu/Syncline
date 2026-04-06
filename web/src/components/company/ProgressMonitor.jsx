@@ -1,4 +1,4 @@
-﻿// web/src/components/dashboard/ProgressMonitor.jsx
+// web/src/components/dashboard/ProgressMonitor.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../firebase.js';

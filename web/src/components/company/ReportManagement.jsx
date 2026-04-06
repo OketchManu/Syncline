@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-dupe-keys */
+/* eslint-disable no-dupe-keys */
 // web/src/components/company/ReportManagement.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
