@@ -1,4 +1,3 @@
-// api/src/server.js
 require('dotenv').config();
 const express = require('express');
 const http    = require('http');
@@ -11,8 +10,6 @@ const { initializeFirebase } = require('./config/firebase');
 initializeFirebase();
 
 // ✅ 2. PRE-EMPTIVE RESET (Solves "users_old" ghost table error)
-// If RESET_DB=true is set, we delete the file BEFORE requiring database.js
-// This ensures no stale connection is held.
 if (process.env.RESET_DB === 'true') {
     console.log('⚠️  RESET_DB=true detected. Attempting to wipe stale database...');
     const dbPaths = [
@@ -33,10 +30,10 @@ if (process.env.RESET_DB === 'true') {
 }
 
 // ✅ 3. Now require Database (Safe connection)
-const { initializeDatabase } = require('./config/database');
-const { runMigrations }      = require('./config/migrate');
-const { backfillInviteCodes } = require('./config/backfill');
-const { initializeWebSocket } = require('./config/websocket');
+const { initializeDatabase, ensureTaskSchema } = require('./config/database');
+const { runMigrations }       = require('./config/migrate');
+const { backfillInviteCodes }  = require('./config/backfill');
+const { initializeWebSocket }  = require('./config/websocket');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -91,6 +88,10 @@ async function startServer() {
     try {
         console.log('🔄 Initializing Database...');
         await initializeDatabase();
+        
+        console.log('🔄 Running Schema Heal...');
+        // This MUST run after initializeDatabase so tables exist
+        await ensureTaskSchema();
         
         console.log('🔄 Running Migrations...');
         await runMigrations();
