@@ -1,17 +1,56 @@
 // api/src/config/migrate.js
 const { runQuery, getAll, getDatabase } = require('./database');
 
-// ─── Atomic table rebuild ─────────────────────────────────────────────────────
-// Wraps the users-table rebuild in a single BEGIN/COMMIT so it never leaves
-// a half-finished users_old behind.
+// ─── Cleanup any orphaned users_old ──────────────────────────────────────────
+// If a previous partial migration left users_old behind, drop it now.
+async function cleanupOrphanedUsersOld() {
+    const tables = await getAll(`SELECT name FROM sqlite_master WHERE type='table' AND name='users_old'`);
+    if (tables.length === 0) return;
+    console.log('🧹 Found orphaned users_old table — cleaning up...');
+    await runQuery(`DROP TABLE IF EXISTS users_old`);
+    console.log('✅ users_old dropped');
+}
+
+// ─── Atomic users table rebuild ───────────────────────────────────────────────
+// Rebuilds the users table to remove NOT NULL from password_hash.
+// Dynamically reads which columns exist in users_old so it never references
+// a column that hasn't been added yet.
 async function rebuildUsersTableIfNeeded() {
     const tableInfo = await getAll(`PRAGMA table_info(users)`);
-    const pwCol = tableInfo.find(c => c.name === 'password_hash');
+    if (tableInfo.length === 0) return; // table doesn't exist yet — migrations will create it
 
-    // Nothing to do — schema is already correct
-    if (!pwCol || pwCol.notnull === 0) return;
+    const pwCol = tableInfo.find(c => c.name === 'password_hash');
+    if (!pwCol || pwCol.notnull === 0) return; // already fixed — nothing to do
 
     console.log('🔧 Rebuilding users table to remove NOT NULL from password_hash...');
+
+    // Full target column list for the new table
+    const targetColumns = [
+        { name: 'id',            def: 'INTEGER PRIMARY KEY AUTOINCREMENT' },
+        { name: 'email',         def: 'TEXT UNIQUE NOT NULL' },
+        { name: 'password_hash', def: 'TEXT' },
+        { name: 'full_name',     def: 'TEXT' },
+        { name: 'account_type',  def: "TEXT DEFAULT 'personal'" },
+        { name: 'role',          def: "TEXT DEFAULT 'member'" },
+        { name: 'firebase_uid',  def: 'TEXT UNIQUE' },
+        { name: 'avatar_url',    def: 'TEXT' },
+        { name: 'company_id',    def: 'INTEGER' },
+        { name: 'org_id',        def: 'INTEGER' },
+        { name: 'is_active',     def: 'INTEGER DEFAULT 1' },
+        { name: 'join_status',   def: "TEXT DEFAULT 'active'" },
+        { name: 'last_seen',     def: 'DATETIME' },
+        { name: 'updated_at',    def: 'DATETIME' },
+        { name: 'created_at',    def: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
+    ];
+
+    // Only copy columns that actually exist in users_old
+    const existingColNames = tableInfo.map(c => c.name);
+    const colsToCopy = targetColumns
+        .filter(c => existingColNames.includes(c.name))
+        .map(c => c.name);
+
+    const colDefsSQL  = targetColumns.map(c => `${c.name} ${c.def}`).join(',\n                    ');
+    const colListSQL  = colsToCopy.join(', ');
 
     const db = getDatabase();
 
@@ -23,42 +62,16 @@ async function rebuildUsersTableIfNeeded() {
                 if (err) { db.run('ROLLBACK'); return reject(err); }
             });
 
-            db.run(`
-                CREATE TABLE users (
-                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email         TEXT UNIQUE NOT NULL,
-                    password_hash TEXT,
-                    full_name     TEXT,
-                    account_type  TEXT DEFAULT 'personal',
-                    role          TEXT DEFAULT 'member',
-                    firebase_uid  TEXT UNIQUE,
-                    avatar_url    TEXT,
-                    company_id    INTEGER,
-                    org_id        INTEGER,
-                    is_active     INTEGER DEFAULT 1,
-                    join_status   TEXT DEFAULT 'active',
-                    last_seen     DATETIME,
-                    updated_at    DATETIME,
-                    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            `, (err) => {
+            db.run(`CREATE TABLE users (\n                    ${colDefsSQL}\n                )`, (err) => {
                 if (err) { db.run('ROLLBACK'); return reject(err); }
             });
 
-            db.run(`
-                INSERT INTO users (
-                    id, email, password_hash, full_name, account_type, role,
-                    firebase_uid, avatar_url, company_id, org_id, is_active,
-                    join_status, last_seen, updated_at, created_at
-                )
-                SELECT
-                    id, email, password_hash, full_name, account_type, role,
-                    firebase_uid, avatar_url, company_id, org_id, is_active,
-                    join_status, last_seen, updated_at, created_at
-                FROM users_old
-            `, (err) => {
-                if (err) { db.run('ROLLBACK'); return reject(err); }
-            });
+            db.run(
+                `INSERT INTO users (${colListSQL}) SELECT ${colListSQL} FROM users_old`,
+                (err) => {
+                    if (err) { db.run('ROLLBACK'); return reject(err); }
+                }
+            );
 
             db.run(`DROP TABLE IF EXISTS users_old`, (err) => {
                 if (err) { db.run('ROLLBACK'); return reject(err); }
@@ -73,20 +86,7 @@ async function rebuildUsersTableIfNeeded() {
     });
 }
 
-// ─── Cleanup any orphaned users_old ──────────────────────────────────────────
-// If a previous partial migration left users_old behind, drop it now.
-async function cleanupOrphanedUsersOld() {
-    const tables = await getAll(`SELECT name FROM sqlite_master WHERE type='table' AND name='users_old'`);
-    if (tables.length === 0) return;
-
-    console.log('🧹 Found orphaned users_old table — cleaning up...');
-    await runQuery(`DROP TABLE IF EXISTS users_old`);
-    console.log('✅ users_old dropped');
-}
-
 // ─── Migrations list ──────────────────────────────────────────────────────────
-// Simple ALTER TABLE migrations — errors for "duplicate column" / "already exists"
-// are silently skipped.
 const MIGRATIONS = [
     // ── Users ─────────────────────────────────────────────────────────────────
     { name: 'users — add account_type', sql: `ALTER TABLE users ADD COLUMN account_type TEXT DEFAULT 'personal'` },
@@ -216,10 +216,8 @@ async function runMigrations() {
     // Step 1: Drop any orphaned users_old left by a previous partial run
     await cleanupOrphanedUsersOld();
 
-    // Step 2: Rebuild users table atomically if the schema is stale
-    await rebuildUsersTableIfNeeded();
-
-    // Step 3: Run all remaining migrations
+    // Step 2: Run all ALTER TABLE / CREATE TABLE migrations first
+    //         so every column exists before the rebuild reads the schema
     let ran = 0, skipped = 0;
 
     for (const migration of MIGRATIONS) {
@@ -243,6 +241,10 @@ async function runMigrations() {
             }
         }
     }
+
+    // Step 3: NOW rebuild users table atomically if password_hash was NOT NULL.
+    //         All columns are guaranteed to exist in users at this point.
+    await rebuildUsersTableIfNeeded();
 
     // Step 4: Ensure indexes
     for (const sql of INDEXES) {
