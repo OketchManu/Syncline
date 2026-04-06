@@ -50,7 +50,6 @@ function initializeDatabase() {
             createMinimalSchema(resolve, reject);
             return;
         }
-
         const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
         db.exec(schema, (err) => {
             if (err) {
@@ -71,7 +70,7 @@ function createMinimalSchema(resolve, reject) {
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             email         TEXT UNIQUE NOT NULL,
             password_hash TEXT,
-            full_name     TEXT NOT NULL,
+            full_name     TEXT,
             account_type  TEXT DEFAULT 'personal',
             role          TEXT DEFAULT 'member',
             firebase_uid  TEXT UNIQUE,
@@ -216,20 +215,17 @@ function closeDatabase() {
 
 function getDatabase() { return db; }
 
-// ─── resetDatabaseIfStale — REMOVED ──────────────────────────────────────────
-// This function previously renamed users → users_old then called process.exit(0).
-// If the process exited between the rename and the new table creation, SQLite
-// retained users_old as a ghost reference causing all subsequent INSERT INTO tasks
-// to fail with "no such table: main.users_old".
-// The users table rebuild is now handled safely inside migrate.js using a
-// BEGIN/COMMIT transaction, so this function is no longer needed.
+// ─── resetDatabaseIfStale — no-op ────────────────────────────────────────────
+// Removed: previously renamed users→users_old then called process.exit(0),
+// leaving a ghost schema reference that broke all subsequent INSERTs.
+// DB reset is now handled via RESET_DB=true env var in server.js.
 async function resetDatabaseIfStale() {
-    // No-op — kept for import compatibility with server.js
     return Promise.resolve();
 }
 
 module.exports = {
     db,
+    DB_PATH,          // ← exported so server.js can delete the file on RESET_DB
     getDatabase,
     initializeDatabase,
     resetDatabaseIfStale,

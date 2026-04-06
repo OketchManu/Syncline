@@ -6,22 +6,15 @@ const cors    = require('cors');
 const path    = require('path');
 const fs      = require('fs');
 
-// ✅ Initialize Firebase FIRST, before anything else
+// ✅ Initialize Firebase FIRST
 const { initializeFirebase } = require('./config/firebase');
 initializeFirebase();
 
-// ✅ Import backfill function
-const { backfillInviteCodes } = require('./config/backfill');
-
-// ✅ Import database initialization
-const { initializeDatabase } = require('./config/database');
-
-// ✅ Import migrations
-const { runMigrations } = require('./config/migrate');
-
-// ✅ Import WebSocket initialization
-const { initializeWebSocket } = require('./config/websocket');
-const { resetDatabaseIfStale } = require('./config/database');
+const { backfillInviteCodes }            = require('./config/backfill');
+const { initializeDatabase, getDB_PATH } = require('./config/database');
+const { runMigrations }                  = require('./config/migrate');
+const { initializeWebSocket }            = require('./config/websocket');
+const { resetDatabaseIfStale }           = require('./config/database');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -50,9 +43,7 @@ app.use((req, res, next) => {
 
 // ─── Static uploads ───────────────────────────────────────────────────────────
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'avatars');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ─── Multer ───────────────────────────────────────────────────────────────────
@@ -93,55 +84,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'Syncline API' });
 });
 
-// ─── API info ─────────────────────────────────────────────────────────────────
-app.get('/', (req, res) => {
-  res.json({ message: 'Syncline API v1.0', status: 'running' });
-});
-
-app.get('/api', (req, res) => {
-  res.json({
-    message: 'Syncline API v1.0',
-    endpoints: {
-      auth: {
-        register: 'POST /api/auth/register',
-        login:    'POST /api/auth/login',
-        refresh:  'POST /api/auth/refresh',
-        me:       'GET /api/auth/me',
-        logout:   'POST /api/auth/logout',
-      },
-      tasks: {
-        getAll:     'GET /api/tasks',
-        getById:    'GET /api/tasks/:id',
-        getMy:      'GET /api/tasks/my',
-        getStats:   'GET /api/tasks/stats',
-        getOverdue: 'GET /api/tasks/overdue',
-        create:     'POST /api/tasks',
-        update:     'PUT /api/tasks/:id',
-        flag:       'PATCH /api/tasks/:id/flag',
-        unflag:     'PATCH /api/tasks/:id/unflag',
-        delete:     'DELETE /api/tasks/:id',
-        audit:      'GET /api/tasks/:id/audit',
-      },
-      users: {
-        getAll:         'GET /api/users',
-        getOnline:      'GET /api/users/online',
-        getMe:          'GET /api/users/me',
-        updateMe:       'PUT /api/users/me',
-        changePassword: 'PUT /api/users/me/password',
-        deleteMe:       'DELETE /api/users/me',
-      },
-      company: {
-        team:         'GET /api/company/team',
-        invite:       'POST /api/company/team/invite',
-        invitations:  'GET /api/company/invitations',
-        join:         'POST /api/company/join/:code',
-        updateRole:   'PATCH /api/company/team/:id/role',
-        removeMember: 'DELETE /api/company/team/:id',
-      },
-      websocket: 'ws://localhost:3001/ws',
-    },
-  });
-});
+app.get('/',    (req, res) => res.json({ message: 'Syncline API v1.0', status: 'running' }));
+app.get('/api', (req, res) => res.json({ message: 'Syncline API v1.0' }));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 const authRoutes        = require('./routes/auth.routes');
@@ -159,9 +103,7 @@ app.use('/api/company',      companyRoutes);
 console.log('✅ All routes loaded successfully');
 
 // ─── 404 ──────────────────────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found', path: req.path });
-});
+app.use((req, res) => res.status(404).json({ error: 'Not Found', path: req.path }));
 
 // ─── Error handler ────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
@@ -175,10 +117,23 @@ app.use((err, req, res, next) => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function startServer() {
   try {
-    await resetDatabaseIfStale();
-    await initializeDatabase();  // create tables if they don't exist
-    await runMigrations();       // add any missing columns / tables to existing DB
-    await backfillInviteCodes(); // backfill invite codes for companies
+    // ── RESET_DB: nuclear option ─────────────────────────────────────────────
+    // Set RESET_DB=true in Render env vars to wipe and recreate the DB.
+    // After one successful deploy, remove the env var so it doesn't reset again.
+    if (process.env.RESET_DB === 'true') {
+      const { DB_PATH } = require('./config/database');
+      if (fs.existsSync(DB_PATH)) {
+        fs.unlinkSync(DB_PATH);
+        console.log('🗑️  RESET_DB=true — deleted stale database file:', DB_PATH);
+      } else {
+        console.log('ℹ️  RESET_DB=true — no database file found to delete');
+      }
+    }
+
+    await resetDatabaseIfStale();   // no-op now, kept for safety
+    await initializeDatabase();     // create tables
+    await runMigrations();          // add missing columns / fix schema
+    await backfillInviteCodes();    // backfill invite codes
 
     const server = http.createServer(app);
     initializeWebSocket(server);
