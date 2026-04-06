@@ -7,10 +7,10 @@ const fs      = require('fs');
 let DB_PATH;
 let SCHEMA_PATH;
 
-const repoDB     = path.join(__dirname, '../../../database/syncline.db');
-const repoSchema = path.join(__dirname, '../../../database/schema.sql');
-const localDB    = path.join(__dirname, '../../data/syncline.db');
-const localSchema= path.join(__dirname, '../../data/schema.sql');
+const repoDB      = path.join(__dirname, '../../../database/syncline.db');
+const repoSchema  = path.join(__dirname, '../../../database/schema.sql');
+const localDB     = path.join(__dirname, '../../data/syncline.db');
+const localSchema = path.join(__dirname, '../../data/schema.sql');
 
 const repoDir = path.dirname(repoDB);
 try {
@@ -50,13 +50,15 @@ function initializeDatabase() {
             createMinimalSchema(resolve, reject);
             return;
         }
+
         const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
         db.exec(schema, (err) => {
             if (err) {
-                console.error('❌ Error initializing database:', err.message);
-                createMinimalSchema(resolve, reject);
+                console.warn('ℹ️  Schema already exists or partial error:', err.message);
+                // We resolve anyway to allow migrations to handle individual columns
+                resolve();
             } else {
-                console.log('✅ Database initialized successfully');
+                console.log('✅ Database schema applied successfully');
                 resolve();
             }
         });
@@ -67,102 +69,102 @@ function createMinimalSchema(resolve, reject) {
     console.log('⚙️  Creating minimal schema...');
     const minimal = `
         CREATE TABLE IF NOT EXISTS users (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            email         TEXT UNIQUE NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
             password_hash TEXT,
-            full_name     TEXT,
-            account_type  TEXT DEFAULT 'personal',
-            role          TEXT DEFAULT 'member',
-            firebase_uid  TEXT UNIQUE,
-            avatar_url    TEXT,
-            company_id    INTEGER,
-            org_id        INTEGER,
-            is_active     INTEGER DEFAULT 1,
-            join_status   TEXT DEFAULT 'active',
-            created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_seen     DATETIME,
-            updated_at    DATETIME
+            full_name TEXT,
+            account_type TEXT DEFAULT 'personal',
+            role TEXT DEFAULT 'member',
+            firebase_uid TEXT UNIQUE,
+            avatar_url TEXT,
+            company_id INTEGER,
+            org_id INTEGER,
+            is_active INTEGER DEFAULT 1,
+            join_status TEXT DEFAULT 'active',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME,
+            updated_at DATETIME
         );
 
         CREATE TABLE IF NOT EXISTS companies (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            name        TEXT NOT NULL,
-            owner_id    INTEGER,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            owner_id INTEGER,
             invite_code TEXT UNIQUE,
-            industry    TEXT,
-            size        TEXT,
+            industry TEXT,
+            size TEXT,
             description TEXT,
-            website     TEXT,
-            logo_url    TEXT,
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at  DATETIME
+            website TEXT,
+            logo_url TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME
         );
 
         CREATE TABLE IF NOT EXISTS tasks (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            title       TEXT NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
             description TEXT,
-            status      TEXT DEFAULT 'pending',
-            priority    TEXT DEFAULT 'medium',
-            created_by  INTEGER,
+            status TEXT DEFAULT 'pending',
+            priority TEXT DEFAULT 'medium',
+            created_by INTEGER,
             assignee_id INTEGER,
-            company_id  INTEGER,
-            org_id      INTEGER,
-            deadline    DATETIME,
-            flagged     INTEGER DEFAULT 0,
+            company_id INTEGER,
+            org_id INTEGER,
+            deadline DATETIME,
+            flagged INTEGER DEFAULT 0,
             flag_reason TEXT,
-            visibility  TEXT DEFAULT 'personal',
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at  DATETIME
+            visibility TEXT DEFAULT 'personal',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME
         );
 
         CREATE TABLE IF NOT EXISTS company_members (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             company_id INTEGER NOT NULL,
-            user_id    INTEGER NOT NULL,
-            role       TEXT DEFAULT 'member',
-            status     TEXT DEFAULT 'active',
-            joined_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            user_id INTEGER NOT NULL,
+            role TEXT DEFAULT 'member',
+            status TEXT DEFAULT 'active',
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(company_id, user_id)
         );
 
         CREATE TABLE IF NOT EXISTS join_requests (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             company_id INTEGER NOT NULL,
-            user_id    INTEGER NOT NULL,
-            status     TEXT DEFAULT 'pending',
+            user_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS task_reports (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            task_id      INTEGER,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
             submitted_by INTEGER,
-            title        TEXT,
-            summary      TEXT,
-            hours_spent  REAL,
-            blockers     TEXT,
-            next_steps   TEXT,
-            status       TEXT DEFAULT 'pending',
-            feedback     TEXT,
-            created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+            title TEXT,
+            summary TEXT,
+            hours_spent REAL,
+            blockers TEXT,
+            next_steps TEXT,
+            status TEXT DEFAULT 'pending',
+            feedback TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS invitations (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id  INTEGER,
-            email       TEXT,
-            role        TEXT DEFAULT 'member',
-            token       TEXT UNIQUE,
-            status      TEXT DEFAULT 'pending',
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-            expires_at  DATETIME
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER,
+            email TEXT,
+            role TEXT DEFAULT 'member',
+            token TEXT UNIQUE,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME
         );
 
         CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
-        CREATE INDEX IF NOT EXISTS idx_users_email        ON users(email);
-        CREATE INDEX IF NOT EXISTS idx_tasks_created_by  ON tasks(created_by);
-        CREATE INDEX IF NOT EXISTS idx_tasks_company_id  ON tasks(company_id);
+        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);
+        CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id);
     `;
 
     db.exec(minimal, (err) => {
@@ -180,8 +182,8 @@ function createMinimalSchema(resolve, reject) {
 function runQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function(err) {
-            if (err) { console.error('❌ runQuery error:', err.message, '\nSQL:', sql); reject(err); }
-            else      { resolve({ id: this.lastID, changes: this.changes }); }
+            if (err) { reject(err); }
+            else { resolve({ id: this.lastID, changes: this.changes }); }
         });
     });
 }
@@ -189,8 +191,8 @@ function runQuery(sql, params = []) {
 function getOne(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.get(sql, params, (err, row) => {
-            if (err) { console.error('❌ getOne error:', err.message, '\nSQL:', sql); reject(err); }
-            else      { resolve(row || null); }
+            if (err) { reject(err); }
+            else { resolve(row || null); }
         });
     });
 }
@@ -198,8 +200,8 @@ function getOne(sql, params = []) {
 function getAll(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.all(sql, params, (err, rows) => {
-            if (err) { console.error('❌ getAll error:', err.message, '\nSQL:', sql); reject(err); }
-            else      { resolve(Array.isArray(rows) ? rows : rows ? [rows] : []); }
+            if (err) { reject(err); }
+            else { resolve(Array.isArray(rows) ? rows : rows ? [rows] : []); }
         });
     });
 }
@@ -213,24 +215,12 @@ function closeDatabase() {
     });
 }
 
-function getDatabase() { return db; }
-
-// ─── resetDatabaseIfStale — no-op ────────────────────────────────────────────
-// Removed: previously renamed users→users_old then called process.exit(0),
-// leaving a ghost schema reference that broke all subsequent INSERTs.
-// DB reset is now handled via RESET_DB=true env var in server.js.
-async function resetDatabaseIfStale() {
-    return Promise.resolve();
-}
-
 module.exports = {
     db,
-    DB_PATH,          // ← exported so server.js can delete the file on RESET_DB
-    getDatabase,
     initializeDatabase,
-    resetDatabaseIfStale,
     runQuery,
     getOne,
     getAll,
     closeDatabase,
+    getDatabase: () => db
 };
