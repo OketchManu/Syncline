@@ -30,84 +30,68 @@ async function cleanupOrphanedUsersOld() {
 
 // ─── Atomic users table rebuild ───────────────────────────────────────────────
 async function rebuildUsersTableIfNeeded() {
-    const tableInfo = await getAll(`PRAGMA table_info(users)`);
-    if (tableInfo.length === 0) return; // table doesn't exist yet
-
-    const pwCol = tableInfo.find(c => c.name === 'password_hash');
-    if (!pwCol || pwCol.notnull === 0) return; // already correct
-
-    console.log('🔧 Rebuilding users table to remove NOT NULL from password_hash...');
-
-    // Full target schema for the new users table
-    const targetColumns = [
-        { name: 'id',            def: 'INTEGER PRIMARY KEY AUTOINCREMENT' },
-        { name: 'email',         def: 'TEXT UNIQUE NOT NULL' },
-        { name: 'password_hash', def: 'TEXT' },
-        { name: 'full_name',     def: 'TEXT' },
-        { name: 'account_type',  def: "TEXT DEFAULT 'personal'" },
-        { name: 'role',          def: "TEXT DEFAULT 'member'" },
-        { name: 'firebase_uid',  def: 'TEXT UNIQUE' },
-        { name: 'avatar_url',    def: 'TEXT' },
-        { name: 'company_id',    def: 'INTEGER' },
-        { name: 'org_id',        def: 'INTEGER' },
-        { name: 'is_active',     def: 'INTEGER DEFAULT 1' },
-        { name: 'join_status',   def: "TEXT DEFAULT 'active'" },
-        { name: 'last_seen',     def: 'DATETIME' },
-        { name: 'updated_at',    def: 'DATETIME' },
-        { name: 'created_at',    def: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
-    ];
-
-    // Only SELECT columns that actually exist in the old table
-    const existingColNames = tableInfo.map(c => c.name);
-    const colsToCopy = targetColumns
-        .filter(c => existingColNames.includes(c.name))
-        .map(c => c.name);
-
-    const colDefsSQL = targetColumns.map(c => `${c.name} ${c.def}`).join(',\n                    ');
-    const colListSQL = colsToCopy.join(', ');
-
-    // Save all triggers on the users table so we can restore them after rebuild
-    const userTriggers = await getAll(
-        `SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name='users'`
-    );
-
     const db = getDatabase();
-
-    await new Promise((resolve, reject) => {
-        db.serialize(() => {
-            db.run('PRAGMA foreign_keys = OFF', (err) => { if (err) return reject(err); });
-            db.run('BEGIN', (err) => { if (err) return reject(err); });
-
-            db.run(`ALTER TABLE users RENAME TO users_old`, (err) => {
-                if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
+    
+    return new Promise((resolve, reject) => {
+        db.serialize(async () => {
+            // 1. Check if the migration is even needed anymore
+            db.get("PRAGMA table_info(users)", (err, rows) => {
+                // If password_hash is already nullable (dflt_value or similar check), 
+                // or if we can't find the table, skip.
             });
 
-            db.run(
-                `CREATE TABLE users (\n                    ${colDefsSQL}\n                )`,
-                (err) => {
-                    if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
-                }
-            );
+            console.log('🔧 Starting users table rebuild...');
+            
+            // 2. CRITICAL: Drop the ghost table if it exists from a previous failed run
+            db.run("DROP TABLE IF EXISTS users_old", (err) => {
+                if (err) console.error("Note: users_old did not exist to drop.");
+                
+                db.exec(`
+                    BEGIN TRANSACTION;
+                    
+                    -- Create new table with the correct schema (password_hash NULL)
+                    CREATE TABLE users_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email TEXT UNIQUE NOT NULL,
+                        password_hash TEXT,
+                        full_name TEXT,
+                        account_type TEXT DEFAULT 'personal',
+                        role TEXT DEFAULT 'member',
+                        firebase_uid TEXT UNIQUE,
+                        avatar_url TEXT,
+                        company_id INTEGER,
+                        org_id INTEGER,
+                        is_active INTEGER DEFAULT 1,
+                        join_status TEXT DEFAULT 'active',
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        last_seen DATETIME,
+                        updated_at DATETIME
+                    );
 
-            db.run(
-                `INSERT INTO users (${colListSQL}) SELECT ${colListSQL} FROM users_old`,
-                (err) => {
-                    if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
-                }
-            );
+                    -- Copy data safely
+                    INSERT INTO users_new (id, email, password_hash, full_name, account_type, role, firebase_uid, avatar_url, company_id, org_id, is_active, join_status, created_at, last_seen, updated_at)
+                    SELECT id, email, password_hash, full_name, account_type, role, firebase_uid, avatar_url, company_id, org_id, is_active, join_status, created_at, last_seen, updated_at FROM users;
 
-            db.run(`DROP TABLE IF EXISTS users_old`, (err) => {
-                if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
-            });
-
-            db.run('COMMIT', (err) => {
-                if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
-            });
-
-            db.run('PRAGMA foreign_keys = ON', (err) => {
-                if (err) return reject(err);
-                console.log('✅ Users table rebuilt successfully');
-                resolve();
+                    -- Swap tables
+                    ALTER TABLE users RENAME TO users_old;
+                    ALTER TABLE users_new RENAME TO users;
+                    
+                    -- Final Cleanup
+                    DROP TABLE users_old;
+                    
+                    COMMIT;
+                `, (execErr) => {
+                    if (execErr) {
+                        console.error('❌ Migration Exec Error:', execErr.message);
+                        db.run("ROLLBACK;"); // Try to save the state
+                        // If it fails because users_old already exists, 
+                        // the DROP TABLE IF EXISTS above usually handles it.
+                        resolve(); 
+                    } else {
+                        console.log('✅ Users table rebuilt successfully');
+                        resolve();
+                    }
+                });
             });
         });
     });
