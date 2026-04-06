@@ -15,7 +15,8 @@ if (process.env.RESET_DB === 'true') {
     const dbPaths = [
         path.join(__dirname, '../../../database/syncline.db'),
         path.join(__dirname, '../../data/syncline.db'),
-        path.join(__dirname, '../data/syncline.db')
+        path.join(__dirname, '../data/syncline.db'),
+        path.join(__dirname, './database/syncline.db')
     ];
     dbPaths.forEach(p => {
         if (fs.existsSync(p)) {
@@ -29,7 +30,7 @@ if (process.env.RESET_DB === 'true') {
     });
 }
 
-// ✅ 3. Now require Database (Safe connection)
+// ✅ 3. Require Database logic after potential reset
 const { initializeDatabase, ensureTaskSchema } = require('./config/database');
 const { runMigrations }       = require('./config/migrate');
 const { backfillInviteCodes }  = require('./config/backfill');
@@ -60,10 +61,11 @@ app.use((req, res, next) => {
     next();
 });
 
-// Static uploads
-const uploadsDir = path.join(__dirname, '..', 'uploads', 'avatars');
+// Static uploads (Ensuring path exists relative to src)
+const baseDir = path.join(__dirname, '..');
+const uploadsDir = path.join(baseDir, 'uploads', 'avatars');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads', express.static(path.join(baseDir, 'uploads')));
 
 // Health checks
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'Syncline API' }));
@@ -90,10 +92,11 @@ async function startServer() {
         await initializeDatabase();
         
         console.log('🔄 Running Schema Heal...');
-        // This MUST run after initializeDatabase so tables exist
+        // Runs specifically for the tasks table
         await ensureTaskSchema();
         
         console.log('🔄 Running Migrations...');
+        // Runs complex table rebuilds (like users_old)
         await runMigrations();
         
         console.log('🔄 Maintenance: Backfilling codes...');

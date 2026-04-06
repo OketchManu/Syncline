@@ -52,13 +52,11 @@ function initializeDatabase() {
         }
 
         const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
-        
-        // Use serialize to ensure schema execution completes before moving to migrations
         db.serialize(() => {
             db.exec(schema, (err) => {
                 if (err) {
                     console.log('ℹ️  Note: Schema might already be partially applied.');
-                    resolve(); // Resolve anyway to allow migrations to handle specifics
+                    resolve(); 
                 } else {
                     console.log('✅ Database schema applied successfully');
                     resolve();
@@ -185,11 +183,8 @@ function createMinimalSchema(resolve, reject) {
 function runQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function(err) {
-            if (err) { 
-                reject(err); 
-            } else { 
-                resolve({ id: this.lastID, changes: this.changes }); 
-            }
+            if (err) { reject(err); }
+            else { resolve({ id: this.lastID, changes: this.changes }); }
         });
     });
 }
@@ -223,36 +218,39 @@ function closeDatabase() {
 
 function getDatabase() { return db; }
 
-/**
- * resetDatabaseIfStale — no-op replacement.
- * Destructive file system operations are now handled in server.js BEFORE connection.
- */
 async function resetDatabaseIfStale() {
     return Promise.resolve();
 }
 
-/**
- * ensureTaskSchema — manual repair for common Render deployment schema gaps
- */
 async function ensureTaskSchema() {
     return new Promise((resolve) => {
         db.serialize(() => {
             db.all(`PRAGMA table_info(tasks)`, (err, rows) => {
-                if (err || !rows || rows.length === 0) return resolve();
+                if (err || !rows || rows.length === 0) {
+                    console.log('⚠️  Tasks table not ready for Healing');
+                    return resolve();
+                }
                 const columns = rows.map(r => r.name);
                 const needed = [
                     { name: 'visibility', sql: "ALTER TABLE tasks ADD COLUMN visibility TEXT DEFAULT 'personal'" },
                     { name: 'flagged',    sql: "ALTER TABLE tasks ADD COLUMN flagged INTEGER DEFAULT 0" },
                     { name: 'deadline',   sql: "ALTER TABLE tasks ADD COLUMN deadline DATETIME" },
-                    { name: 'company_id', sql: "ALTER TABLE tasks ADD COLUMN company_id INTEGER" }
+                    { name: 'company_id', sql: "ALTER TABLE tasks ADD COLUMN company_id INTEGER" },
+                    { name: 'org_id',     sql: "ALTER TABLE tasks ADD COLUMN org_id INTEGER" },
+                    { name: 'assignee_id',sql: "ALTER TABLE tasks ADD COLUMN assignee_id INTEGER" }
                 ];
                 
-                needed.forEach(async (col) => {
-                    if (!columns.includes(col.name)) {
-                        try { await runQuery(col.sql); } catch (e) {}
-                    }
+                db.serialize(() => {
+                    needed.forEach((col) => {
+                        if (!columns.includes(col.name)) {
+                            db.run(col.sql, (err) => {
+                                if (err) console.error(`🔧 Heal failed for ${col.name}:`, err.message);
+                                else console.log(`🔧 Added missing column: ${col.name}`);
+                            });
+                        }
+                    });
+                    resolve();
                 });
-                resolve();
             });
         });
     });
