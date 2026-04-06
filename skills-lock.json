@@ -24,7 +24,7 @@
     "firebase-auth-basics": {
       "source": "firebase/agent-skills",
       "sourceType": "github",
-      "computedHash": "3d85cfda10a68f0afabdad69d40ad83357f47acf9f5ba4d88a23182f6a59a5b4"
+      "computedHash": "a8fb7b1bfaf9f7d1bd1ebd7e1d2718f42f51361c8b2776ed1cdc17548334fe51"
     },
     "firebase-basics": {
       "source": "firebase/agent-skills",
@@ -39,12 +39,12 @@
     "firebase-firestore-enterprise-native-mode": {
       "source": "firebase/agent-skills",
       "sourceType": "github",
-      "computedHash": "f04ca2e7f4d07c0389eae37af6285a6e404bd85ea48cb1a50686848b110e5761"
+      "computedHash": "26a8074d01189118a59c0e70dbe6492945e446c3d0d721e60f5dcc5004d1bf97"
     },
     "firebase-firestore-standard": {
       "source": "firebase/agent-skills",
       "sourceType": "github",
-      "computedHash": "b6a8e3d169026dbfd519cc855abc9f103858acf9221895fbfc37b4f3b280ba84"
+      "computedHash": "82820bddbe8acd17df8b9d0555e79cd1783ffd3cdba1306a0c794c35cc5c1919"
     },
     "firebase-hosting-basics": {
       "source": "firebase/agent-skills",

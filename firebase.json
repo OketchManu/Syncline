@@ -1,6 +1,5 @@
 {
   "hosting": {
-    "site": "syncline-8010e",
     "public": "dist",
     "ignore": [
       "firebase.json",
