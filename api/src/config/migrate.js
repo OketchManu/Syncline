@@ -1,10 +1,27 @@
 // api/src/config/migrate.js
 const { runQuery, getAll, getDatabase } = require('./database');
 
-// ─── Cleanup any orphaned users_old ──────────────────────────────────────────
-// If a previous partial migration left users_old behind, drop it now.
+// ─── Drop any triggers that reference users_old ───────────────────────────────
+// SQLite sometimes retains stale trigger definitions after a table rename.
+// These cause completely unrelated queries (like INSERT INTO tasks) to fail
+// with "no such table: main.users_old".
+async function dropStaleTriggersReferencingUsersOld() {
+    const triggers = await getAll(
+        `SELECT name, sql FROM sqlite_master WHERE type = 'trigger'`
+    );
+    for (const trigger of triggers) {
+        if (trigger.sql && trigger.sql.toLowerCase().includes('users_old')) {
+            console.log(`🧹 Dropping stale trigger referencing users_old: ${trigger.name}`);
+            await runQuery(`DROP TRIGGER IF EXISTS "${trigger.name}"`).catch(() => {});
+        }
+    }
+}
+
+// ─── Cleanup any orphaned users_old table ────────────────────────────────────
 async function cleanupOrphanedUsersOld() {
-    const tables = await getAll(`SELECT name FROM sqlite_master WHERE type='table' AND name='users_old'`);
+    const tables = await getAll(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='users_old'`
+    );
     if (tables.length === 0) return;
     console.log('🧹 Found orphaned users_old table — cleaning up...');
     await runQuery(`DROP TABLE IF EXISTS users_old`);
@@ -12,19 +29,16 @@ async function cleanupOrphanedUsersOld() {
 }
 
 // ─── Atomic users table rebuild ───────────────────────────────────────────────
-// Rebuilds the users table to remove NOT NULL from password_hash.
-// Dynamically reads which columns exist in users_old so it never references
-// a column that hasn't been added yet.
 async function rebuildUsersTableIfNeeded() {
     const tableInfo = await getAll(`PRAGMA table_info(users)`);
-    if (tableInfo.length === 0) return; // table doesn't exist yet — migrations will create it
+    if (tableInfo.length === 0) return; // table doesn't exist yet
 
     const pwCol = tableInfo.find(c => c.name === 'password_hash');
-    if (!pwCol || pwCol.notnull === 0) return; // already fixed — nothing to do
+    if (!pwCol || pwCol.notnull === 0) return; // already correct
 
     console.log('🔧 Rebuilding users table to remove NOT NULL from password_hash...');
 
-    // Full target column list for the new table
+    // Full target schema for the new users table
     const targetColumns = [
         { name: 'id',            def: 'INTEGER PRIMARY KEY AUTOINCREMENT' },
         { name: 'email',         def: 'TEXT UNIQUE NOT NULL' },
@@ -43,47 +57,69 @@ async function rebuildUsersTableIfNeeded() {
         { name: 'created_at',    def: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
     ];
 
-    // Only copy columns that actually exist in users_old
+    // Only SELECT columns that actually exist in the old table
     const existingColNames = tableInfo.map(c => c.name);
     const colsToCopy = targetColumns
         .filter(c => existingColNames.includes(c.name))
         .map(c => c.name);
 
-    const colDefsSQL  = targetColumns.map(c => `${c.name} ${c.def}`).join(',\n                    ');
-    const colListSQL  = colsToCopy.join(', ');
+    const colDefsSQL = targetColumns.map(c => `${c.name} ${c.def}`).join(',\n                    ');
+    const colListSQL = colsToCopy.join(', ');
+
+    // Save all triggers on the users table so we can restore them after rebuild
+    const userTriggers = await getAll(
+        `SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name='users'`
+    );
 
     const db = getDatabase();
 
     await new Promise((resolve, reject) => {
         db.serialize(() => {
+            db.run('PRAGMA foreign_keys = OFF', (err) => { if (err) return reject(err); });
             db.run('BEGIN', (err) => { if (err) return reject(err); });
 
             db.run(`ALTER TABLE users RENAME TO users_old`, (err) => {
-                if (err) { db.run('ROLLBACK'); return reject(err); }
+                if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
             });
 
-            db.run(`CREATE TABLE users (\n                    ${colDefsSQL}\n                )`, (err) => {
-                if (err) { db.run('ROLLBACK'); return reject(err); }
-            });
+            db.run(
+                `CREATE TABLE users (\n                    ${colDefsSQL}\n                )`,
+                (err) => {
+                    if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
+                }
+            );
 
             db.run(
                 `INSERT INTO users (${colListSQL}) SELECT ${colListSQL} FROM users_old`,
                 (err) => {
-                    if (err) { db.run('ROLLBACK'); return reject(err); }
+                    if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
                 }
             );
 
             db.run(`DROP TABLE IF EXISTS users_old`, (err) => {
-                if (err) { db.run('ROLLBACK'); return reject(err); }
+                if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
             });
 
             db.run('COMMIT', (err) => {
-                if (err) { db.run('ROLLBACK'); return reject(err); }
+                if (err) { db.run('ROLLBACK'); db.run('PRAGMA foreign_keys = ON'); return reject(err); }
+            });
+
+            db.run('PRAGMA foreign_keys = ON', (err) => {
+                if (err) return reject(err);
                 console.log('✅ Users table rebuilt successfully');
                 resolve();
             });
         });
     });
+
+    // Restore any triggers that were on the users table
+    for (const trigger of userTriggers) {
+        if (trigger.sql) {
+            await runQuery(trigger.sql).catch((err) => {
+                console.warn(`⚠️  Could not restore trigger ${trigger.name}:`, err.message);
+            });
+        }
+    }
 }
 
 // ─── Migrations list ──────────────────────────────────────────────────────────
@@ -213,11 +249,13 @@ const INDEXES = [
 async function runMigrations() {
     console.log('🔄 Running database migrations...');
 
-    // Step 1: Drop any orphaned users_old left by a previous partial run
+    // Step 1: Drop any stale triggers that reference users_old
+    await dropStaleTriggersReferencingUsersOld();
+
+    // Step 2: Drop orphaned users_old table if present
     await cleanupOrphanedUsersOld();
 
-    // Step 2: Run all ALTER TABLE / CREATE TABLE migrations first
-    //         so every column exists before the rebuild reads the schema
+    // Step 3: Run all ALTER TABLE / CREATE TABLE migrations first
     let ran = 0, skipped = 0;
 
     for (const migration of MIGRATIONS) {
@@ -242,11 +280,13 @@ async function runMigrations() {
         }
     }
 
-    // Step 3: NOW rebuild users table atomically if password_hash was NOT NULL.
-    //         All columns are guaranteed to exist in users at this point.
+    // Step 4: Rebuild users table atomically (all columns guaranteed to exist now)
     await rebuildUsersTableIfNeeded();
 
-    // Step 4: Ensure indexes
+    // Step 5: Drop any triggers that still reference users_old after rebuild
+    await dropStaleTriggersReferencingUsersOld();
+
+    // Step 6: Ensure indexes
     for (const sql of INDEXES) {
         await runQuery(sql).catch(() => {});
     }
