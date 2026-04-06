@@ -46,18 +46,19 @@ db.run('PRAGMA journal_mode = WAL');
 function initializeDatabase() {
     return new Promise((resolve, reject) => {
         if (!fs.existsSync(SCHEMA_PATH)) {
-            console.warn('⚠️  Schema file not found, creating minimal...');
-            return createMinimalSchema(resolve, reject);
+            console.warn('⚠️  Schema file not found at:', SCHEMA_PATH);
+            createMinimalSchema(resolve, reject);
+            return;
         }
 
         const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
         
-        // Use serialize to ensure tables are created before returning
+        // Use serialize to ensure schema execution completes before moving to migrations
         db.serialize(() => {
             db.exec(schema, (err) => {
                 if (err) {
-                    console.log('ℹ️  Note: Schema tables might already exist.');
-                    resolve();
+                    console.log('ℹ️  Note: Schema might already be partially applied.');
+                    resolve(); // Resolve anyway to allow migrations to handle specifics
                 } else {
                     console.log('✅ Database schema applied successfully');
                     resolve();
@@ -68,6 +69,7 @@ function initializeDatabase() {
 }
 
 function createMinimalSchema(resolve, reject) {
+    console.log('⚙️  Creating minimal schema...');
     const minimal = `
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +88,21 @@ function createMinimalSchema(resolve, reject) {
             last_seen DATETIME,
             updated_at DATETIME
         );
+
+        CREATE TABLE IF NOT EXISTS companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            owner_id INTEGER,
+            invite_code TEXT UNIQUE,
+            industry TEXT,
+            size TEXT,
+            description TEXT,
+            website TEXT,
+            logo_url TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME
+        );
+
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -103,49 +120,64 @@ function createMinimalSchema(resolve, reject) {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME
         );
+
+        CREATE TABLE IF NOT EXISTS company_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT DEFAULT 'member',
+            status TEXT DEFAULT 'active',
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(company_id, user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS join_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS task_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            submitted_by INTEGER,
+            title TEXT,
+            summary TEXT,
+            hours_spent REAL,
+            blockers TEXT,
+            next_steps TEXT,
+            status TEXT DEFAULT 'pending',
+            feedback TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS invitations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER,
+            email TEXT,
+            role TEXT DEFAULT 'member',
+            token TEXT UNIQUE,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
+        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);
+        CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id);
     `;
-    db.exec(minimal, (err) => err ? reject(err) : resolve());
-}
 
-// ─── Schema Healing (Ensures all columns exist) ───────────────────────────────
-async function ensureTaskSchema() {
-    return new Promise((resolve) => {
-        db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'", (err, row) => {
-            if (err || !row) {
-                console.error('❌ Schema Heal: tasks table not found.');
-                return resolve();
-            }
-
-            db.all(`PRAGMA table_info(tasks)`, (err, rows) => {
-                if (err || !rows) return resolve();
-                const columns = rows.map(r => r.name);
-                const needed = [
-                    { name: 'visibility', sql: "ALTER TABLE tasks ADD COLUMN visibility TEXT DEFAULT 'personal'" },
-                    { name: 'flagged',    sql: "ALTER TABLE tasks ADD COLUMN flagged INTEGER DEFAULT 0" },
-                    { name: 'flag_reason',sql: "ALTER TABLE tasks ADD COLUMN flag_reason TEXT" },
-                    { name: 'deadline',   sql: "ALTER TABLE tasks ADD COLUMN deadline DATETIME" },
-                    { name: 'updated_at', sql: "ALTER TABLE tasks ADD COLUMN updated_at DATETIME" },
-                    { name: 'assignee_id',sql: "ALTER TABLE tasks ADD COLUMN assignee_id INTEGER" },
-                    { name: 'company_id', sql: "ALTER TABLE tasks ADD COLUMN company_id INTEGER" },
-                    { name: 'org_id',     sql: "ALTER TABLE tasks ADD COLUMN org_id INTEGER" }
-                ];
-
-                const updates = needed.filter(c => !columns.includes(c.name));
-                if (updates.length === 0) return resolve();
-
-                db.serialize(async () => {
-                    for (const col of updates) {
-                        try {
-                            await runQuery(col.sql);
-                            console.log(`🔧 Added missing column: ${col.name}`);
-                        } catch (e) {
-                            // Silent catch for duplicate column errors
-                        }
-                    }
-                    resolve();
-                });
-            });
-        });
+    db.exec(minimal, (err) => {
+        if (err) {
+            console.error('❌ Minimal schema error:', err.message);
+            reject(err);
+        } else {
+            console.log('✅ Minimal schema created successfully');
+            resolve();
+        }
     });
 }
 
@@ -153,17 +185,87 @@ async function ensureTaskSchema() {
 function runQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function(err) {
-            if (err) reject(err);
-            else resolve({ id: this.lastID, changes: this.changes });
+            if (err) { 
+                reject(err); 
+            } else { 
+                resolve({ id: this.lastID, changes: this.changes }); 
+            }
         });
     });
 }
 
-module.exports = {
-    db,
-    initializeDatabase,
+function getOne(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) { reject(err); }
+            else { resolve(row || null); }
+        });
+    });
+}
+
+function getAll(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) { reject(err); }
+            else { resolve(Array.isArray(rows) ? rows : rows ? [rows] : []); }
+        });
+    });
+}
+
+function closeDatabase() {
+    return new Promise((resolve, reject) => {
+        db.close((err) => {
+            if (err) reject(err);
+            else { console.log('✅ Database connection closed'); resolve(); }
+        });
+    });
+}
+
+function getDatabase() { return db; }
+
+/**
+ * resetDatabaseIfStale — no-op replacement.
+ * Destructive file system operations are now handled in server.js BEFORE connection.
+ */
+async function resetDatabaseIfStale() {
+    return Promise.resolve();
+}
+
+/**
+ * ensureTaskSchema — manual repair for common Render deployment schema gaps
+ */
+async function ensureTaskSchema() {
+    return new Promise((resolve) => {
+        db.serialize(() => {
+            db.all(`PRAGMA table_info(tasks)`, (err, rows) => {
+                if (err || !rows || rows.length === 0) return resolve();
+                const columns = rows.map(r => r.name);
+                const needed = [
+                    { name: 'visibility', sql: "ALTER TABLE tasks ADD COLUMN visibility TEXT DEFAULT 'personal'" },
+                    { name: 'flagged',    sql: "ALTER TABLE tasks ADD COLUMN flagged INTEGER DEFAULT 0" },
+                    { name: 'deadline',   sql: "ALTER TABLE tasks ADD COLUMN deadline DATETIME" },
+                    { name: 'company_id', sql: "ALTER TABLE tasks ADD COLUMN company_id INTEGER" }
+                ];
+                
+                needed.forEach(async (col) => {
+                    if (!columns.includes(col.name)) {
+                        try { await runQuery(col.sql); } catch (e) {}
+                    }
+                });
+                resolve();
+            });
+        });
+    });
+}
+
+module.exports = { 
+    db, 
+    getDatabase, 
+    initializeDatabase, 
+    resetDatabaseIfStale, 
     ensureTaskSchema,
-    runQuery,
-    getOne: (sql, p) => new Promise((res, rej) => db.get(sql, p, (err, r) => err ? rej(err) : res(r))),
-    getAll: (sql, p) => new Promise((res, rej) => db.all(sql, p, (err, r) => err ? rej(err) : res(r)))
+    runQuery, 
+    getOne, 
+    getAll, 
+    closeDatabase 
 };
