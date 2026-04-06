@@ -10,11 +10,40 @@ const fs      = require('fs');
 const { initializeFirebase } = require('./config/firebase');
 initializeFirebase();
 
-const { backfillInviteCodes }            = require('./config/backfill');
-const { initializeDatabase, getDB_PATH } = require('./config/database');
-const { runMigrations }                  = require('./config/migrate');
-const { initializeWebSocket }            = require('./config/websocket');
-const { resetDatabaseIfStale }           = require('./config/database');
+// ─── RESET_DB: delete the stale DB file BEFORE requiring database.js ─────────
+// database.js opens a SQLite connection the moment it is require()'d.
+// If the DB file is corrupted (users_old ghost in sqlite_master), we must
+// delete it BEFORE that connection is made — otherwise the ghost persists
+// in the open connection no matter what migrations do afterward.
+// To use: set RESET_DB=true in Render env vars, deploy once, then remove it.
+if (process.env.RESET_DB === 'true') {
+  const possiblePaths = [
+    path.join(__dirname, '../../database/syncline.db'),
+    path.join(__dirname, '../../../database/syncline.db'),
+    path.join(__dirname, '../data/syncline.db'),
+  ];
+  let deleted = false;
+  for (const dbPath of possiblePaths) {
+    if (fs.existsSync(dbPath)) {
+      try {
+        fs.unlinkSync(dbPath);
+        console.log('🗑️  RESET_DB=true — deleted stale database file:', dbPath);
+        deleted = true;
+      } catch (e) {
+        console.error('❌ RESET_DB: could not delete', dbPath, e.message);
+      }
+    }
+  }
+  if (!deleted) {
+    console.log('ℹ️  RESET_DB=true — no database file found at expected paths');
+  }
+}
+
+// ─── NOW safe to require database (connects to the fresh/existing DB) ─────────
+const { initializeDatabase, resetDatabaseIfStale } = require('./config/database');
+const { runMigrations }    = require('./config/migrate');
+const { backfillInviteCodes } = require('./config/backfill');
+const { initializeWebSocket } = require('./config/websocket');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -117,23 +146,10 @@ app.use((err, req, res, next) => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function startServer() {
   try {
-    // ── RESET_DB: nuclear option ─────────────────────────────────────────────
-    // Set RESET_DB=true in Render env vars to wipe and recreate the DB.
-    // After one successful deploy, remove the env var so it doesn't reset again.
-    if (process.env.RESET_DB === 'true') {
-      const { DB_PATH } = require('./config/database');
-      if (fs.existsSync(DB_PATH)) {
-        fs.unlinkSync(DB_PATH);
-        console.log('🗑️  RESET_DB=true — deleted stale database file:', DB_PATH);
-      } else {
-        console.log('ℹ️  RESET_DB=true — no database file found to delete');
-      }
-    }
-
-    await resetDatabaseIfStale();   // no-op now, kept for safety
-    await initializeDatabase();     // create tables
-    await runMigrations();          // add missing columns / fix schema
-    await backfillInviteCodes();    // backfill invite codes
+    await resetDatabaseIfStale();
+    await initializeDatabase();
+    await runMigrations();
+    await backfillInviteCodes();
 
     const server = http.createServer(app);
     initializeWebSocket(server);
