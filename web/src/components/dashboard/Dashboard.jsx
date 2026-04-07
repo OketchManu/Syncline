@@ -15,6 +15,7 @@ import {
     User, Camera, Shield, Smartphone, Save, Eye, EyeOff,
     AlertTriangle, Building2, Users, TrendingUp, FileText, LayoutDashboard,
     ChevronLeft, Lock, ArrowRight, Sparkles, Menu, ChevronDown, UserPlus,
+    UserCircle,
 } from 'lucide-react';
 
 const API_ORIGIN = 'https://syncline-1.onrender.com';
@@ -248,106 +249,361 @@ const DeleteTaskModal = ({ t, task, onConfirm, onCancel, loading }) => (
     </div>
 );
 
+// ── Profile Modal — fully rewritten delete tab ────────────────────────────────
 const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) => {
-    const [tab,setTab]=useState('profile');
-    const [fullName,setFullName]=useState(user?.fullName||'');
-    const [avatarPreview,setAvatarPreview]=useState(resolveAvatar(user?.avatar||user?.avatar_url));
-    const [avatarFile,setAvatarFile]=useState(null);
-    const [currentPw,setCurrentPw]=useState('');
-    const [newPw,setNewPw]=useState('');
-    const [confirmPw,setConfirmPw]=useState('');
-    const [showCur,setShowCur]=useState(false);
-    const [showNew,setShowNew]=useState(false);
-    const [loading,setLoading]=useState(false);
-    const [status,setStatus]=useState(null);
-    const [delConfirm,setDelConfirm]=useState('');
-    const [delStep,setDelStep]=useState(1);
-    const [delError,setDelError]=useState('');
-    const fileRef=useRef();
-    const device=getDeviceInfo();
-    const pwS=newPw.length===0?0:newPw.length<6?1:newPw.length<8?2:newPw.length<12?3:4;
-    const pwC=['','#ef4444','#f59e0b','#3b82f6','#10b981'];
+    const [tab,        setTab]        = useState('profile');
+    const [fullName,   setFullName]   = useState(user?.fullName||'');
+    const [avatarPreview, setAvatarPreview] = useState(resolveAvatar(user?.avatar||user?.avatar_url));
+    const [avatarFile, setAvatarFile] = useState(null);
+    const [currentPw,  setCurrentPw]  = useState('');
+    const [newPw,      setNewPw]      = useState('');
+    const [confirmPw,  setConfirmPw]  = useState('');
+    const [showCur,    setShowCur]    = useState(false);
+    const [showNew,    setShowNew]    = useState(false);
+    const [loading,    setLoading]    = useState(false);
+    const [status,     setStatus]     = useState(null);
 
-    const saveProfile=async()=>{if(!isOnline){setStatus({type:'error',msg:'You are offline.'});return;}setLoading(true);setStatus(null);const ap=avatarFile?avatarFile:avatarPreview===null?null:undefined;const err=await onSave({fullName,avatar:ap},'profile',device);setLoading(false);setStatus(err?{type:'error',msg:err}:{type:'success',msg:'Profile updated!'});};
-    const savePassword=async()=>{if(!isOnline){setStatus({type:'error',msg:'You are offline.'});return;}if(newPw!==confirmPw){setStatus({type:'error',msg:'Passwords do not match.'});return;}if(newPw.length<8){setStatus({type:'error',msg:'Min 8 characters.'});return;}setLoading(true);setStatus(null);const err=await onSave({currentPassword:currentPw,newPassword:newPw},'password',device);setLoading(false);if(err)setStatus({type:'error',msg:err});else{setStatus({type:'success',msg:'Password updated!'});setCurrentPw('');setNewPw('');setConfirmPw('');}};
-    const doDelete=async()=>{if(delConfirm!=='DELETE'){setDelError('Type DELETE to confirm.');return;}setLoading(true);setDelError('');const r=await onDeleteAccount(device);if(r&&!r.success){setDelError(r.error||'Failed.');setLoading(false);}};
+    // Delete state — completely redesigned
+    const [delStep,       setDelStep]       = useState(1); // 1=warn, 2=confirm-text, 3=password(email users)
+    const [delConfirm,    setDelConfirm]    = useState('');
+    const [delPassword,   setDelPassword]   = useState('');
+    const [showDelPw,     setShowDelPw]     = useState(false);
+    const [delError,      setDelError]      = useState('');
 
-    const TABS=[{id:'profile',icon:<User size={12}/>,label:'Profile'},{id:'security',icon:<Shield size={12}/>,label:'Security'},{id:'danger',icon:<AlertTriangle size={12}/>,label:'Danger'}];
+    const fileRef  = useRef();
+    const device   = getDeviceInfo();
+
+    // Detect if user signed in with Google or email/password
+    const isGoogleUser = auth.currentUser?.providerData?.some(p => p.providerId === 'google.com') ?? false;
+
+    const pwS = newPw.length===0?0:newPw.length<6?1:newPw.length<8?2:newPw.length<12?3:4;
+    const pwC = ['','#ef4444','#f59e0b','#3b82f6','#10b981'];
+
+    const saveProfile = async () => {
+        if (!isOnline) { setStatus({type:'error',msg:'You are offline.'}); return; }
+        setLoading(true); setStatus(null);
+        const ap = avatarFile ? avatarFile : avatarPreview===null ? null : undefined;
+        const err = await onSave({fullName,avatar:ap},'profile',device);
+        setLoading(false);
+        setStatus(err ? {type:'error',msg:err} : {type:'success',msg:'Profile updated!'});
+    };
+
+    const savePassword = async () => {
+        if (!isOnline) { setStatus({type:'error',msg:'You are offline.'}); return; }
+        if (newPw !== confirmPw) { setStatus({type:'error',msg:'Passwords do not match.'}); return; }
+        if (newPw.length < 8)   { setStatus({type:'error',msg:'Min 8 characters.'}); return; }
+        setLoading(true); setStatus(null);
+        const err = await onSave({currentPassword:currentPw,newPassword:newPw},'password',device);
+        setLoading(false);
+        if (err) setStatus({type:'error',msg:err});
+        else { setStatus({type:'success',msg:'Password updated!'}); setCurrentPw(''); setNewPw(''); setConfirmPw(''); }
+    };
+
+    // The actual deletion call — passes currentPassword for email users
+    const doDelete = async () => {
+        if (delConfirm !== 'DELETE') { setDelError('Type DELETE to confirm.'); return; }
+        if (!isGoogleUser && !delPassword) { setDelError('Please enter your password.'); return; }
+
+        setLoading(true);
+        setDelError('');
+
+        const result = await onDeleteAccount(device, !isGoogleUser ? delPassword : null);
+
+        if (result && !result.success) {
+            setDelError(result.error || 'Deletion failed. Please try again.');
+            setLoading(false);
+        }
+        // On success, AuthContext clears everything and redirects — no need to do anything here
+    };
+
+    const resetDelState = () => { setDelStep(1); setDelConfirm(''); setDelPassword(''); setDelError(''); setShowDelPw(false); };
+
+    const accountTypeLabel = (user?.accountType || user?.account_type || 'personal') === 'company' ? 'Company' : 'Personal';
+    const accountTypeIcon  = accountTypeLabel === 'Company' ? <Building2 size={11}/> : <UserCircle size={11}/>;
+    const accountTypeColor = accountTypeLabel === 'Company' ? t.info : t.accent;
+
+    const TABS = [
+        {id:'profile',  icon:<User size={12}/>,          label:'Profile'},
+        {id:'security', icon:<Shield size={12}/>,        label:'Security'},
+        {id:'danger',   icon:<AlertTriangle size={12}/>, label:'Danger Zone'},
+    ];
+
     return (
         <div style={{ position:'fixed', inset:0, background:t.overlay, backdropFilter:'blur(10px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1500, padding:'12px' }} onClick={onClose}>
             <div style={{ background:t.modalBg, border:`1px solid ${t.borderMid}`, borderRadius:'20px', width:'100%', maxWidth:'460px', maxHeight:'92vh', display:'flex', flexDirection:'column', boxShadow:'0 50px 100px rgba(0,0,0,0.6)' }} onClick={e=>e.stopPropagation()}>
+
+                {/* Header */}
                 <div style={{ padding:'16px 18px 0', borderBottom:`1px solid ${t.border}`, flexShrink:0 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' }}>
-                        <div><h2 style={{ margin:0, fontSize:'15px', fontWeight:'700', color:t.textPrimary }}>Account Settings</h2><p style={{ margin:'2px 0 0', fontSize:'10px', color:t.textMuted }}><Smartphone size={10}/> {device}</p></div>
+                        <div>
+                            <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'3px' }}>
+                                <h2 style={{ margin:0, fontSize:'15px', fontWeight:'700', color:t.textPrimary }}>Account Settings</h2>
+                                {/* Account type badge */}
+                                <span style={{
+                                    display:'inline-flex', alignItems:'center', gap:'3px',
+                                    padding:'2px 7px', borderRadius:'20px', fontSize:'10px', fontWeight:'700',
+                                    background:`${accountTypeColor}18`, color:accountTypeColor,
+                                    border:`1px solid ${accountTypeColor}35`,
+                                }}>
+                                    {accountTypeIcon} {accountTypeLabel}
+                                </span>
+                            </div>
+                            <p style={{ margin:0, fontSize:'10px', color:t.textMuted, display:'flex', alignItems:'center', gap:'4px' }}>
+                                <Smartphone size={10}/> {device}
+                            </p>
+                        </div>
                         <button onClick={onClose} style={{ background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:'7px', color:t.textMuted, cursor:'pointer', padding:'6px', display:'flex' }}><X size={13}/></button>
                     </div>
                     <div style={{ display:'flex', overflowX:'auto' }}>
-                        {TABS.map(tb=><button key={tb.id} onClick={()=>{setTab(tb.id);setStatus(null);setDelError('');}} style={{ padding:'7px 13px', background:'none', border:'none', whiteSpace:'nowrap', borderBottom:`2px solid ${tab===tb.id?t.accent:'transparent'}`, color:tab===tb.id?t.accent:t.textMuted, fontSize:'12px', fontWeight:tab===tb.id?'700':'400', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px', fontFamily:'inherit', flexShrink:0 }}>{tb.icon}{tb.label}</button>)}
+                        {TABS.map(tb => (
+                            <button key={tb.id} onClick={()=>{setTab(tb.id);setStatus(null);resetDelState();}} style={{
+                                padding:'7px 13px', background:'none', border:'none', whiteSpace:'nowrap',
+                                borderBottom:`2px solid ${tab===tb.id?t.accent:'transparent'}`,
+                                color: tab===tb.id ? t.accent : t.textMuted,
+                                fontSize:'12px', fontWeight:tab===tb.id?'700':'400', cursor:'pointer',
+                                display:'flex', alignItems:'center', gap:'5px', fontFamily:'inherit', flexShrink:0,
+                            }}>{tb.icon}{tb.label}</button>
+                        ))}
                     </div>
                 </div>
-                <div style={{ padding:'16px 18px', overflowY:'auto', flex:1 }}>
-                    {status && <div style={{marginBottom:'12px'}}><AlertBox t={t} type={status.type}>{status.type==='success'?<CheckCircle2 size={13}/>:<AlertCircle size={13}/>} {status.msg}</AlertBox></div>}
 
+                {/* Body */}
+                <div style={{ padding:'16px 18px', overflowY:'auto', flex:1 }}>
+                    {status && (
+                        <div style={{marginBottom:'12px'}}>
+                            <AlertBox t={t} type={status.type}>
+                                {status.type==='success'?<CheckCircle2 size={13}/>:<AlertCircle size={13}/>} {status.msg}
+                            </AlertBox>
+                        </div>
+                    )}
+
+                    {/* ── Profile tab ── */}
                     {tab==='profile' && (
                         <div style={{ display:'flex', flexDirection:'column', gap:'14px' }}>
+                            {/* Account type info card */}
+                            <div style={{
+                                padding:'11px 13px', borderRadius:'11px',
+                                background:`${accountTypeColor}10`, border:`1px solid ${accountTypeColor}28`,
+                                display:'flex', alignItems:'center', gap:'10px',
+                            }}>
+                                <div style={{ width:'32px', height:'32px', borderRadius:'8px', background:`${accountTypeColor}20`, color:accountTypeColor, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                                    {accountTypeLabel==='Company' ? <Building2 size={16}/> : <UserCircle size={16}/>}
+                                </div>
+                                <div>
+                                    <p style={{ margin:'0 0 1px', fontSize:'12px', fontWeight:'700', color:t.textPrimary }}>
+                                        {accountTypeLabel} Account
+                                    </p>
+                                    <p style={{ margin:0, fontSize:'10px', color:t.textMuted }}>
+                                        {accountTypeLabel==='Company'
+                                            ? `${user?.role || 'member'} · ${user?.companyId ? 'Workspace active' : 'No workspace yet'}`
+                                            : 'Personal task management'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Avatar */}
                             <div style={{ display:'flex', alignItems:'center', gap:'12px', padding:'13px', background:t.accentBg, border:`1px solid ${t.accentBorder}`, borderRadius:'12px', flexWrap:'wrap' }}>
                                 <div style={{ position:'relative', flexShrink:0 }}>
-                                    <div style={{ width:'56px', height:'56px', borderRadius:'50%', overflow:'hidden', border:`3px solid ${t.accentBorder}` }}>{avatarPreview?<img src={avatarPreview} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',fontWeight:'800',color:'#fff'}}>{(user?.fullName||user?.email||'?').charAt(0).toUpperCase()}</div>}</div>
+                                    <div style={{ width:'56px', height:'56px', borderRadius:'50%', overflow:'hidden', border:`3px solid ${t.accentBorder}` }}>
+                                        {avatarPreview
+                                            ? <img src={avatarPreview} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                                            : <div style={{width:'100%',height:'100%',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',fontWeight:'800',color:'#fff'}}>{(user?.fullName||user?.email||'?').charAt(0).toUpperCase()}</div>
+                                        }
+                                    </div>
                                     <button onClick={()=>fileRef.current.click()} style={{ position:'absolute', bottom:0, right:0, width:'19px', height:'19px', borderRadius:'50%', background:t.accent, border:`2px solid ${t.modalBg}`, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}><Camera size={9}/></button>
                                     <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(!f)return;if(f.size>3*1024*1024){setStatus({type:'error',msg:'Max 3 MB'});return;}setAvatarFile(f);const r=new FileReader();r.onload=ev=>setAvatarPreview(ev.target.result);r.readAsDataURL(f);}}/>
                                 </div>
                                 <div style={{flex:1,minWidth:'110px'}}>
                                     <p style={{margin:'0 0 2px',fontSize:'12px',fontWeight:'600',color:t.textPrimary}}>Profile Photo</p>
-                                    <p style={{margin:'0 0 7px',fontSize:'11px',color:t.textMuted}}>JPG, PNG &middot; Max 3 MB</p>
+                                    <p style={{margin:'0 0 7px',fontSize:'11px',color:t.textMuted}}>JPG, PNG · Max 3 MB</p>
                                     <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
                                         <Btn t={t} variant="ghost" size="sm" onClick={()=>fileRef.current.click()} style={{border:`1px solid ${t.accentBorder}`,color:t.accentLight}}>Upload</Btn>
                                         {avatarPreview&&<Btn t={t} variant="danger" size="sm" onClick={()=>{setAvatarPreview(null);setAvatarFile(null);}}>Remove</Btn>}
                                     </div>
                                 </div>
                             </div>
+
                             <Input t={t} label="Full Name" type="text" value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Your full name"/>
-                            <div><Input t={t} label="Email" type="email" value={user?.email||''} readOnly style={{opacity:0.5,cursor:'not-allowed'}}/><p style={{margin:'4px 0 0',fontSize:'10px',color:t.textMuted}}>Email changes require support.</p></div>
-                            <div style={{display:'flex',justifyContent:'flex-end'}}><Btn t={t} variant="primary" onClick={saveProfile} disabled={loading||!isOnline}><Save size={13}/>{loading?'Saving...':'Save'}</Btn></div>
+                            <div>
+                                <Input t={t} label="Email" type="email" value={user?.email||''} readOnly style={{opacity:0.5,cursor:'not-allowed'}}/>
+                                <p style={{margin:'4px 0 0',fontSize:'10px',color:t.textMuted}}>Email changes require support.</p>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'flex-end'}}>
+                                <Btn t={t} variant="primary" onClick={saveProfile} disabled={loading||!isOnline}><Save size={13}/>{loading?'Saving...':'Save Changes'}</Btn>
+                            </div>
                         </div>
                     )}
 
+                    {/* ── Security tab ── */}
                     {tab==='security' && (
                         <div style={{ display:'flex', flexDirection:'column', gap:'13px' }}>
-                            <AlertBox t={t} type="info"><Shield size={13}/> Password changes sign out all devices.</AlertBox>
-                            {[['Current Password',currentPw,setCurrentPw,showCur,setShowCur],['New Password',newPw,setNewPw,showNew,setShowNew]].map(([lbl,val,setter,show,setShow],idx)=>(
-                                <div key={lbl}>
-                                    <label style={{display:'block',fontSize:'11px',fontWeight:'600',color:t.textMuted,marginBottom:'5px',letterSpacing:'0.06em',textTransform:'uppercase'}}>{lbl}</label>
-                                    <div style={{position:'relative'}}>
-                                        <input type={show?'text':'password'} value={val} onChange={e=>setter(e.target.value)} placeholder={idx===0?'Current password':'Min. 8 characters'} style={{width:'100%',padding:'10px 38px 10px 12px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',fontSize:'13px',color:t.textPrimary,boxSizing:'border-box',fontFamily:'inherit',outline:'none'}}/>
-                                        <button type="button" onClick={()=>setShow(!show)} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:t.textMuted,cursor:'pointer',display:'flex'}}>{show?<EyeOff size={13}/>:<Eye size={13}/>}</button>
+                            {isGoogleUser ? (
+                                <AlertBox t={t} type="info">
+                                    <Shield size={13}/>
+                                    <div>
+                                        <strong>Google Account</strong><br/>
+                                        Your password is managed by Google. To change it, visit your Google Account settings.
                                     </div>
-                                    {idx===1&&newPw&&<div style={{marginTop:'5px'}}><div style={{display:'flex',gap:'3px',marginBottom:'2px'}}>{[1,2,3,4].map(i=><div key={i} style={{flex:1,height:'3px',borderRadius:'2px',background:i<=pwS?pwC[pwS]:t.border}}/>)}</div><span style={{fontSize:'10px',color:pwC[pwS],fontWeight:'600'}}>{['','Too weak','Weak','Good','Strong'][pwS]}</span></div>}
-                                </div>
-                            ))}
-                            <Input t={t} label="Confirm New Password" type="password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} placeholder="Re-enter new password"/>
-                            <div style={{display:'flex',justifyContent:'flex-end'}}><Btn t={t} variant="primary" onClick={savePassword} disabled={loading||!isOnline||!currentPw||!newPw||!confirmPw}><Shield size={13}/>{loading?'Updating...':'Update Password'}</Btn></div>
+                                </AlertBox>
+                            ) : (
+                                <>
+                                    <AlertBox t={t} type="info"><Shield size={13}/> Password changes sign out all devices.</AlertBox>
+                                    {[['Current Password',currentPw,setCurrentPw,showCur,setShowCur],['New Password',newPw,setNewPw,showNew,setShowNew]].map(([lbl,val,setter,show,setShow],idx)=>(
+                                        <div key={lbl}>
+                                            <label style={{display:'block',fontSize:'11px',fontWeight:'600',color:t.textMuted,marginBottom:'5px',letterSpacing:'0.06em',textTransform:'uppercase'}}>{lbl}</label>
+                                            <div style={{position:'relative'}}>
+                                                <input type={show?'text':'password'} value={val} onChange={e=>setter(e.target.value)} placeholder={idx===0?'Current password':'Min. 8 characters'} style={{width:'100%',padding:'10px 38px 10px 12px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',fontSize:'13px',color:t.textPrimary,boxSizing:'border-box',fontFamily:'inherit',outline:'none'}}/>
+                                                <button type="button" onClick={()=>setShow(!show)} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:t.textMuted,cursor:'pointer',display:'flex'}}>{show?<EyeOff size={13}/>:<Eye size={13}/>}</button>
+                                            </div>
+                                            {idx===1&&newPw&&<div style={{marginTop:'5px'}}><div style={{display:'flex',gap:'3px',marginBottom:'2px'}}>{[1,2,3,4].map(i=><div key={i} style={{flex:1,height:'3px',borderRadius:'2px',background:i<=pwS?pwC[pwS]:t.border}}/>)}</div><span style={{fontSize:'10px',color:pwC[pwS],fontWeight:'600'}}>{['','Too weak','Weak','Good','Strong'][pwS]}</span></div>}
+                                        </div>
+                                    ))}
+                                    <Input t={t} label="Confirm New Password" type="password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} placeholder="Re-enter new password"/>
+                                    <div style={{display:'flex',justifyContent:'flex-end'}}>
+                                        <Btn t={t} variant="primary" onClick={savePassword} disabled={loading||!isOnline||!currentPw||!newPw||!confirmPw}><Shield size={13}/>{loading?'Updating...':'Update Password'}</Btn>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 
+                    {/* ── Danger Zone tab — fully redesigned ── */}
                     {tab==='danger' && (
                         <div style={{ display:'flex', flexDirection:'column', gap:'13px' }}>
-                            <AlertBox t={t} type="error"><AlertTriangle size={13}/> Deletion is permanent and irreversible.</AlertBox>
-                            {delStep===1
-                                ?<div style={{padding:'15px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,borderRadius:'11px'}}>
-                                    <h4 style={{margin:'0 0 7px',fontSize:'13px',fontWeight:'700',color:t.danger}}>Delete My Account</h4>
-                                    <p style={{margin:'0 0 13px',fontSize:'12px',color:t.text,lineHeight:1.6}}>Your name stays on historical tasks. Your login access is permanently removed.</p>
-                                    <Btn t={t} onClick={()=>setDelStep(2)} style={{background:t.danger,color:'#fff',border:'none'}}><Trash2 size={13}/> I understand, proceed</Btn>
-                                </div>
-                                :<div style={{padding:'15px',background:t.dangerBg,border:`1px solid ${t.dangerBorder}`,borderRadius:'11px',display:'flex',flexDirection:'column',gap:'11px'}}>
-                                    <p style={{margin:0,fontSize:'12px',color:t.text}}>Type <strong style={{color:t.danger,fontFamily:'monospace'}}>DELETE</strong> to confirm:</p>
-                                    <input value={delConfirm} onChange={e=>{setDelConfirm(e.target.value);setDelError('');}} placeholder="Type DELETE here" style={{width:'100%',padding:'10px 12px',background:t.inputBg,border:`2px solid ${delConfirm==='DELETE'?t.danger:t.dangerBorder}`,borderRadius:'8px',fontSize:'14px',color:t.textPrimary,boxSizing:'border-box',fontFamily:'monospace',outline:'none'}}/>
-                                    {delError && <AlertBox t={t} type="error"><AlertCircle size={13}/> {delError}</AlertBox>}
-                                    <div style={{display:'flex',gap:'9px'}}>
-                                        <Btn t={t} variant="ghost" disabled={loading} onClick={()=>{setDelStep(1);setDelConfirm('');setDelError('');}} style={{flex:1,justifyContent:'center'}}>Cancel</Btn>
-                                        <Btn t={t} disabled={delConfirm!=='DELETE'||loading} onClick={doDelete} style={{flex:1,justifyContent:'center',background:delConfirm==='DELETE'?t.danger:t.inputBg,color:delConfirm==='DELETE'?'#fff':t.textMuted,border:'none'}}>{loading?'Deleting...':'Delete Forever'}</Btn>
+
+                            {/* Step 1: Warning + summary of what will be deleted */}
+                            {delStep === 1 && (
+                                <>
+                                    <AlertBox t={t} type="error">
+                                        <AlertTriangle size={13}/>
+                                        <span>Deleting your account is <strong>permanent and irreversible</strong>. There is no recovery.</span>
+                                    </AlertBox>
+
+                                    <div style={{ padding:'14px', background:t.dangerBg, border:`1px solid ${t.dangerBorder}`, borderRadius:'12px', display:'flex', flexDirection:'column', gap:'10px' }}>
+                                        <h4 style={{ margin:0, fontSize:'13px', fontWeight:'700', color:t.danger, display:'flex', alignItems:'center', gap:'6px' }}>
+                                            <Trash2 size={14}/> What gets deleted
+                                        </h4>
+                                        {[
+                                            ['Your login access', 'You will be permanently signed out and cannot log back in'],
+                                            ['Your Firebase account', 'Deleted from Firebase — Google sign-in with this email will not work'],
+                                            ['Your profile data', 'Email, password, and avatar are permanently removed'],
+                                            ['Your company membership', accountTypeLabel==='Company'?'Ownership transferred or company dissolved':'Removed from any teams'],
+                                        ].map(([title, desc]) => (
+                                            <div key={title} style={{ display:'flex', gap:'9px', alignItems:'flex-start' }}>
+                                                <div style={{ width:'16px', height:'16px', borderRadius:'50%', background:t.dangerBg, border:`1px solid ${t.dangerBorder}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:'1px' }}>
+                                                    <X size={9} color={t.danger}/>
+                                                </div>
+                                                <div>
+                                                    <p style={{ margin:'0 0 1px', fontSize:'12px', fontWeight:'600', color:t.textPrimary }}>{title}</p>
+                                                    <p style={{ margin:0, fontSize:'11px', color:t.textMuted, lineHeight:1.5 }}>{desc}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div style={{ display:'flex', gap:'9px', alignItems:'flex-start' }}>
+                                            <div style={{ width:'16px', height:'16px', borderRadius:'50%', background:t.successBg, border:`1px solid ${t.successBorder}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:'1px' }}>
+                                                <CheckCircle2 size={9} color={t.success}/>
+                                            </div>
+                                            <div>
+                                                <p style={{ margin:'0 0 1px', fontSize:'12px', fontWeight:'600', color:t.textPrimary }}>Your name on tasks is kept</p>
+                                                <p style={{ margin:0, fontSize:'11px', color:t.textMuted, lineHeight:1.5 }}>Task history shows your name for team record-keeping</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Btn t={t} onClick={()=>setDelStep(2)} style={{ background:t.danger, color:'#fff', border:'none', width:'100%', justifyContent:'center' }}>
+                                        <Trash2 size={13}/> I understand, continue with deletion
+                                    </Btn>
+                                </>
+                            )}
+
+                            {/* Step 2: Type DELETE + password (email users) */}
+                            {delStep === 2 && (
+                                <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+                                    <div style={{ display:'flex', alignItems:'center', gap:'9px', padding:'11px 13px', background:t.dangerBg, border:`1px solid ${t.dangerBorder}`, borderRadius:'11px' }}>
+                                        <Trash2 size={16} color={t.danger}/>
+                                        <div>
+                                            <p style={{ margin:0, fontSize:'12px', fontWeight:'700', color:t.textPrimary }}>Final confirmation</p>
+                                            <p style={{ margin:'1px 0 0', fontSize:'11px', color:t.textMuted }}>This action cannot be undone</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Confirm text */}
+                                    <div>
+                                        <label style={{ display:'block', fontSize:'11px', fontWeight:'600', color:t.textMuted, marginBottom:'5px', letterSpacing:'0.06em', textTransform:'uppercase' }}>
+                                            Type <span style={{ color:t.danger, fontFamily:'monospace' }}>DELETE</span> to confirm
+                                        </label>
+                                        <input
+                                            value={delConfirm}
+                                            onChange={e=>{setDelConfirm(e.target.value);setDelError('');}}
+                                            placeholder="Type DELETE here"
+                                            style={{
+                                                width:'100%', padding:'10px 12px', boxSizing:'border-box',
+                                                background:t.inputBg, borderRadius:'8px', fontFamily:'monospace',
+                                                fontSize:'14px', color:t.textPrimary, outline:'none',
+                                                border:`2px solid ${delConfirm==='DELETE'?t.danger:t.dangerBorder}`,
+                                                transition:'border-color 0.2s',
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Password field — only for email/password users */}
+                                    {!isGoogleUser && (
+                                        <div>
+                                            <label style={{ display:'block', fontSize:'11px', fontWeight:'600', color:t.textMuted, marginBottom:'5px', letterSpacing:'0.06em', textTransform:'uppercase' }}>
+                                                Enter your password to confirm
+                                            </label>
+                                            <div style={{ position:'relative' }}>
+                                                <input
+                                                    type={showDelPw?'text':'password'}
+                                                    value={delPassword}
+                                                    onChange={e=>{setDelPassword(e.target.value);setDelError('');}}
+                                                    placeholder="Your current password"
+                                                    style={{ width:'100%', padding:'10px 38px 10px 12px', background:t.inputBg, border:`1px solid ${t.dangerBorder}`, borderRadius:'8px', fontSize:'13px', color:t.textPrimary, boxSizing:'border-box', fontFamily:'inherit', outline:'none' }}
+                                                />
+                                                <button type="button" onClick={()=>setShowDelPw(!showDelPw)} style={{ position:'absolute', right:'10px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:t.textMuted, cursor:'pointer', display:'flex' }}>
+                                                    {showDelPw?<EyeOff size={13}/>:<Eye size={13}/>}
+                                                </button>
+                                            </div>
+                                            <p style={{ margin:'4px 0 0', fontSize:'10px', color:t.textMuted }}>Required to verify it's really you</p>
+                                        </div>
+                                    )}
+
+                                    {/* Google notice */}
+                                    {isGoogleUser && (
+                                        <AlertBox t={t} type="info">
+                                            <Shield size={13}/>
+                                            <span>You'll be asked to confirm with Google during deletion.</span>
+                                        </AlertBox>
+                                    )}
+
+                                    {delError && (
+                                        <AlertBox t={t} type="error"><AlertCircle size={13}/> {delError}</AlertBox>
+                                    )}
+
+                                    <div style={{ display:'flex', gap:'9px' }}>
+                                        <Btn t={t} variant="ghost" disabled={loading} onClick={resetDelState} style={{ flex:1, justifyContent:'center' }}>
+                                            Cancel
+                                        </Btn>
+                                        <Btn t={t}
+                                            disabled={
+                                                delConfirm !== 'DELETE' ||
+                                                (!isGoogleUser && !delPassword) ||
+                                                loading
+                                            }
+                                            onClick={doDelete}
+                                            style={{
+                                                flex:1, justifyContent:'center',
+                                                background: delConfirm==='DELETE'&&(isGoogleUser||delPassword) ? t.danger : t.inputBg,
+                                                color:      delConfirm==='DELETE'&&(isGoogleUser||delPassword) ? '#fff' : t.textMuted,
+                                                border:'none',
+                                            }}
+                                        >
+                                            <Trash2 size={13}/>{loading ? 'Deleting…' : 'Delete My Account'}
+                                        </Btn>
                                     </div>
                                 </div>
-                            }
+                            )}
                         </div>
                     )}
                 </div>
@@ -356,13 +612,12 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
     );
 };
 
-// ── Sidebar content ───────────────────────────────────────────────────────────
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 const SidebarContent = ({ t, currentView, onNavigate, collapsed, onToggle, isCompany, onMobileClose }) => {
     const personalNav=[{id:'dashboard',icon:<LayoutDashboard size={15}/>,label:'Dashboard'},{id:'reports',icon:<FileText size={15}/>,label:'My Reports'},{id:'company-setup',icon:<Building2 size={15}/>,label:'Upgrade to Team'}];
     const companyNav=[{id:'dashboard',icon:<LayoutDashboard size={15}/>,label:'Dashboard'},{id:'company-setup',icon:<Building2 size={15}/>,label:'Company'},{id:'team',icon:<Users size={15}/>,label:'Team'},{id:'progress',icon:<TrendingUp size={15}/>,label:'Progress'},{id:'reports',icon:<FileText size={15}/>,label:'Reports'}];
-    const nav=isCompany?companyNav:personalNav;
-
-    const go = (id) => { onNavigate(id); if (onMobileClose) onMobileClose(); };
+    const nav = isCompany ? companyNav : personalNav;
+    const go  = (id) => { onNavigate(id); if (onMobileClose) onMobileClose(); };
 
     return (
         <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
@@ -376,7 +631,7 @@ const SidebarContent = ({ t, currentView, onNavigate, collapsed, onToggle, isCom
             )}
             <nav style={{ flex:1, display:'flex', flexDirection:'column', gap:'2px', padding:collapsed?'10px 6px':'6px 8px', overflowY:'auto' }}>
                 {nav.map(item=>{
-                    const active=currentView===item.id;
+                    const active = currentView===item.id;
                     return (
                         <button key={item.id} onClick={()=>go(item.id)} style={{ padding:collapsed?'10px':'9px 10px', background:active?t.sidebarActive:'transparent', border:`1px solid ${active?t.sidebarActiveBorder:'transparent'}`, borderRadius:'8px', color:active?t.accentLight:t.textMuted, fontSize:'12px', fontWeight:active?'700':'400', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', justifyContent:collapsed?'center':'flex-start', width:'100%', transition:'all 0.13s', textAlign:'left', whiteSpace:'nowrap', fontFamily:'inherit' }}
                             onMouseEnter={e=>{if(!active){e.currentTarget.style.background=t.sidebarActive+'88';e.currentTarget.style.color=t.text;}}}
@@ -498,7 +753,7 @@ const CompanyDashboard = ({t,user,tasks,isOnline,wsConnected,recentActivity,filt
                         <div style={{width:'28px',height:'28px',borderRadius:'7px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Building2 size={14} color="#fff"/></div>
                         <div><p style={{margin:0,fontSize:'9px',color:t.accentLight,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em'}}>Company</p><h2 style={{margin:0,fontSize:'clamp(14px,3.5vw,17px)',fontWeight:'800',color:t.textPrimary}}>{companyName||'Team Overview'}</h2></div>
                     </div>
-                    <p style={{margin:0,fontSize:'11px',color:t.textMuted}}>Welcome, <strong style={{color:t.text}}>{user?.fullName}</strong> &middot; {user?.role}</p>
+                    <p style={{margin:0,fontSize:'11px',color:t.textMuted}}>Welcome, <strong style={{color:t.text}}>{user?.fullName}</strong> · {user?.role}</p>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
                     <div style={{fontSize:'clamp(20px,5vw,28px)',fontWeight:'900',color:t.textPrimary,lineHeight:1}}>{rate}%</div>
@@ -534,7 +789,7 @@ const CompanyDashboard = ({t,user,tasks,isOnline,wsConnected,recentActivity,filt
     );
 };
 
-const LockedView=({t,label,onSetup})=>(
+const LockedView = ({t,label,onSetup}) => (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'300px',gap:'12px',padding:'32px 16px'}}>
         <div style={{width:'46px',height:'46px',borderRadius:'13px',background:t.inputBg,border:`1px solid ${t.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}><Lock size={20} color={t.textMuted}/></div>
         <div style={{textAlign:'center'}}><h3 style={{margin:'0 0 5px',fontSize:'16px',fontWeight:'700',color:t.textPrimary}}>{label}</h3><p style={{margin:0,fontSize:'13px',color:t.textMuted}}>Requires a company workspace.</p></div>
@@ -542,50 +797,47 @@ const LockedView=({t,label,onSetup})=>(
     </div>
 );
 
-// ── Main Dashboard ─────────────────────────────────────────────────────────────
+// ── Main Dashboard ────────────────────────────────────────────────────────────
 const Dashboard = () => {
     const { user, logout, updateUser, deleteAccount } = useAuth();
 
     const [dark,setDark]=useState(()=>{const s=localStorage.getItem('syncline_theme');if(s)return s==='dark';return window.matchMedia('(prefers-color-scheme: dark)').matches;});
-    const isCompany=user?.accountType==='company'||user?.account_type==='company';
+    const isCompany = user?.accountType==='company' || user?.account_type==='company';
     const t = THEMES[dark?'dark':'light'][isCompany?'company':'personal'];
 
     const [currentView,setCurrentView]=useState(()=>{const s=sessionStorage.getItem('syncline_view');const v=['dashboard','company-setup','team','progress','reports'];return(s&&v.includes(s))?s:'dashboard';});
     const navigateTo=(view)=>{setCurrentView(view);sessionStorage.setItem('syncline_view',view);};
 
-    // ── FIX: sidebar state uses CSS classes, NOT window.innerWidth in render ──
-    // window.innerWidth in render doesn't update on resize and causes the
-    // desktop sidebar to render on mobile, making main content invisible.
-    const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
-    const [mobileSidebarOpen,setMobileSidebarOpen]=useState(false);
+    const [sidebarCollapsed,  setSidebarCollapsed]  = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-    const [tasks,setTasks]=useState([]);
-    const [loading,setLoading]=useState(true);
-    const [filter,setFilter]=useState('all');
-    const [searchQuery,setSearchQuery]=useState('');
-    const [showCreateModal,setShowCreateModal]=useState(false);
-    const [editTask,setEditTask]=useState(null);
-    const [deleteTarget,setDeleteTarget]=useState(null);
-    const [deleteLoading,setDeleteLoading]=useState(false);
-    const [showProfile,setShowProfile]=useState(false);
+    const [tasks,          setTasks]          = useState([]);
+    const [loading,        setLoading]        = useState(true);
+    const [filter,         setFilter]         = useState('all');
+    const [searchQuery,    setSearchQuery]    = useState('');
+    const [showCreateModal,setShowCreateModal]= useState(false);
+    const [editTask,       setEditTask]       = useState(null);
+    const [deleteTarget,   setDeleteTarget]   = useState(null);
+    const [deleteLoading,  setDeleteLoading]  = useState(false);
+    const [showProfile,    setShowProfile]    = useState(false);
     const [showLogoutConfirm,setShowLogoutConfirm]=useState(false);
-    const [wsConnected,setWsConnected]=useState(false);
-    const [recentActivity,setRecentActivity]=useState([]);
-    const [notifications,setNotifications]=useState([]);
+    const [wsConnected,    setWsConnected]    = useState(false);
+    const [recentActivity, setRecentActivity] = useState([]);
+    const [notifications,  setNotifications]  = useState([]);
     const [showNotifications,setShowNotifications]=useState(false);
-    const [updatingStatus,setUpdatingStatus]=useState(null);
-    const [isOnline,setIsOnline]=useState(navigator.onLine);
-    const [companyName,setCompanyName]=useState(user?.companyName||user?.company_name||null);
-    const [companyLogo,setCompanyLogo]=useState(null);
-    const [assigningTask,setAssigningTask]=useState(null);
+    const [updatingStatus, setUpdatingStatus] = useState(null);
+    const [isOnline,       setIsOnline]       = useState(navigator.onLine);
+    const [companyName,    setCompanyName]    = useState(user?.companyName||user?.company_name||null);
+    const [companyLogo,    setCompanyLogo]    = useState(null);
+    const [assigningTask,  setAssigningTask]  = useState(null);
 
-    const userIdRef=useRef(user?.id);
+    const userIdRef = useRef(user?.id);
     useEffect(()=>{userIdRef.current=user?.id;},[user?.id]);
 
-    const addActivity=useCallback((msg)=>setRecentActivity(prev=>[{id:Date.now()+Math.random(),message:msg,timestamp:new Date()},...prev].slice(0,12)),[]);
-    const addNotification=useCallback((title,message,type='info')=>setNotifications(prev=>[{id:Date.now(),title,message,type,read:false},...prev].slice(0,20)),[]);
+    const addActivity    = useCallback((msg)=>setRecentActivity(prev=>[{id:Date.now()+Math.random(),message:msg,timestamp:new Date()},...prev].slice(0,12)),[]);
+    const addNotification= useCallback((title,message,type='info')=>setNotifications(prev=>[{id:Date.now(),title,message,type,read:false},...prev].slice(0,20)),[]);
 
-    const fetchTasks=useCallback(async()=>{
+    const fetchTasks = useCallback(async()=>{
         try{const res=await taskAPI.getAll();setTasks(res.data.tasks||[]);}
         catch(err){console.error('fetchTasks:',err);}
     },[]);
@@ -606,25 +858,30 @@ const Dashboard = () => {
         return()=>{clearInterval(pi);wsService.off('task:created',onC);wsService.off('task:updated',onU);wsService.off('task:deleted',onD);wsService.off('task:flagged',onF);};
     },[addActivity,addNotification,fetchTasks]);
 
-    const filteredTasks=tasks.filter(task=>{
+    const filteredTasks = tasks.filter(task=>{
         const mF=filter==='all'||task.status===filter;
         const mS=task.title.toLowerCase().includes(searchQuery.toLowerCase())||(task.description||'').toLowerCase().includes(searchQuery.toLowerCase());
         return mF&&mS;
     });
 
-    const updateTaskStatus=async(taskId,newStatus)=>{if(!isOnline)return;const prev=tasks;setTasks(p=>p.map(tk=>tk.id===taskId?{...tk,status:newStatus}:tk));setUpdatingStatus(taskId);try{await taskAPI.update(taskId,{status:newStatus});addActivity(`Task → ${S_LABEL[newStatus]}`);}catch{setTasks(prev);}finally{setUpdatingStatus(null);}};
+    const updateTaskStatus = async(taskId,newStatus)=>{if(!isOnline)return;const prev=tasks;setTasks(p=>p.map(tk=>tk.id===taskId?{...tk,status:newStatus}:tk));setUpdatingStatus(taskId);try{await taskAPI.update(taskId,{status:newStatus});addActivity(`Task → ${S_LABEL[newStatus]}`);}catch{setTasks(prev);}finally{setUpdatingStatus(null);}};
 
-    const confirmDeleteTask=async()=>{if(!deleteTarget||!isOnline){setDeleteTarget(null);return;}setDeleteLoading(true);try{await taskAPI.delete(deleteTarget.id);setTasks(prev=>prev.filter(tk=>tk.id!==deleteTarget.id));addActivity(`Deleted "${deleteTarget.title}"`);setDeleteTarget(null);}catch(err){addNotification('Delete Failed',err.response?.data?.error||'Failed','error');}finally{setDeleteLoading(false);}};
+    const confirmDeleteTask = async()=>{if(!deleteTarget||!isOnline){setDeleteTarget(null);return;}setDeleteLoading(true);try{await taskAPI.delete(deleteTarget.id);setTasks(prev=>prev.filter(tk=>tk.id!==deleteTarget.id));addActivity(`Deleted "${deleteTarget.title}"`);setDeleteTarget(null);}catch(err){addNotification('Delete Failed',err.response?.data?.error||'Failed','error');}finally{setDeleteLoading(false);}};
 
-    const handleProfileSave=async(data,type,device)=>{try{if(type==='profile'){let u;if(data.avatar instanceof File){const f=new FormData();f.append('avatar',data.avatar,data.avatar.name);f.append('fullName',data.fullName||'');f.append('device',device);const r=await userAPI.updateProfile(f);u=r.data?.user??r.data;}else if(data.avatar===null){const r=await userAPI.updateProfile({fullName:data.fullName,removeAvatar:true,device});u=r.data?.user??r.data;}else{const r=await userAPI.updateProfile({fullName:data.fullName,device});u=r.data?.user??r.data;}if(u&&updateUser)updateUser(u);}else if(type==='password'){await userAPI.changePassword({currentPassword:data.currentPassword,newPassword:data.newPassword,device});}return null;}catch(err){return err.response?.data?.error||err.response?.data?.message||err.message||`Failed to update ${type}`;}};
+    const handleProfileSave = async(data,type,device)=>{try{if(type==='profile'){let u;if(data.avatar instanceof File){const f=new FormData();f.append('avatar',data.avatar,data.avatar.name);f.append('fullName',data.fullName||'');f.append('device',device);const r=await userAPI.updateProfile(f);u=r.data?.user??r.data;}else if(data.avatar===null){const r=await userAPI.updateProfile({fullName:data.fullName,removeAvatar:true,device});u=r.data?.user??r.data;}else{const r=await userAPI.updateProfile({fullName:data.fullName,device});u=r.data?.user??r.data;}if(u&&updateUser)updateUser(u);}else if(type==='password'){await userAPI.changePassword({currentPassword:data.currentPassword,newPassword:data.newPassword,device});}return null;}catch(err){return err.response?.data?.error||err.response?.data?.message||err.message||`Failed to update ${type}`;}};
 
-    const handleDeleteAccount=async(device)=>{try{localStorage.clear();}catch(_){}try{sessionStorage.clear();}catch(_){}return await deleteAccount({device});};
+    // handleDeleteAccount now passes currentPassword through to AuthContext.deleteAccount
+    const handleDeleteAccount = async(device, currentPassword=null) => {
+        try{localStorage.clear();}catch(_){}
+        try{sessionStorage.clear();}catch(_){}
+        return await deleteAccount({ device, currentPassword });
+    };
 
-    const unreadCount=notifications.filter(n=>!n.read).length;
-    const headerLabel=isCompany?(companyName||'Company'):'Syncline';
-    const shared={t,user,tasks,isOnline,wsConnected,recentActivity,filteredTasks,filter,setFilter,searchQuery,setSearchQuery,setShowCreateModal,updateTaskStatus,setDeleteTarget,setEditTask,updatingStatus};
+    const unreadCount  = notifications.filter(n=>!n.read).length;
+    const headerLabel  = isCompany ? (companyName||'Company') : 'Syncline';
+    const shared       = {t,user,tasks,isOnline,wsConnected,recentActivity,filteredTasks,filter,setFilter,searchQuery,setSearchQuery,setShowCreateModal,updateTaskStatus,setDeleteTarget,setEditTask,updatingStatus};
 
-    if(loading)return(
+    if(loading) return (
         <div style={{minHeight:'100vh',background:t.bg,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px',fontFamily:"'DM Sans',system-ui,sans-serif"}}>
             <div style={{width:'38px',height:'38px',border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:'50%',animation:'spin 0.75s linear infinite'}}/>
             <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -646,51 +903,44 @@ const Dashboard = () => {
                 ::-webkit-scrollbar-thumb{background:${t.border};border-radius:2px}
                 select option{background:${t.surfaceRaised};color:${t.textPrimary}}
                 @media(max-width:768px){input,select,textarea{font-size:16px!important}}
-
-                /* Stats: 4 cols → 2 cols on mobile */
                 .sl-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;padding:11px 10px 0}
                 @media(max-width:580px){.sl-stats{grid-template-columns:repeat(2,1fr);gap:7px;padding:9px 8px 0}}
-
-                /* Content grid: 2 cols on wide, 1 on narrow */
                 .sl-grid{grid-template-columns:1fr 230px}
                 @media(max-width:820px){.sl-grid{grid-template-columns:1fr!important}}
-
-                /* Desktop sidebar: always visible above 600px */
                 .sl-sidebar-desktop{display:flex!important}
                 @media(max-width:600px){.sl-sidebar-desktop{display:none!important}}
-
-                /* Hamburger: only on mobile */
                 .sl-hamburger{display:none}
                 @media(max-width:600px){.sl-hamburger{display:flex!important}}
-
-                /* Header name: hide on very small */
                 .sl-hname{display:flex}
                 @media(max-width:440px){.sl-hname{display:none!important}}
-
-                /* Status label: hide text on mobile — keep dot */
                 .sl-status-label{display:inline}
                 @media(max-width:440px){.sl-status-label{display:none}}
             `}</style>
 
-            {/* ── Header ─────────────────────────────────────────────────────── */}
+            {/* ── Header ── */}
             <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 10px',background:t.sidebarBg,borderBottom:`1px solid ${t.sidebarBorder}`,position:'sticky',top:0,zIndex:100,height:'52px',flexShrink:0,gap:'6px'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'7px',minWidth:0}}>
-                    {/* Hamburger (mobile only via CSS) */}
                     <button className="sl-hamburger" onClick={()=>setMobileSidebarOpen(o=>!o)}
                         style={{padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'7px',color:t.text,cursor:'pointer',alignItems:'center',justifyContent:'center',flexShrink:0,display:'none'}}>
                         <Menu size={15}/>
                     </button>
-
-                    {/* Logo */}
                     <div style={{display:'flex',alignItems:'center',gap:'7px',flexShrink:0}}>
                         {companyLogo
                             ?<img src={companyLogo.startsWith('http')?companyLogo:`${API_ORIGIN}${companyLogo}`} alt="logo" style={{width:'27px',height:'27px',borderRadius:'6px',objectFit:'cover',border:`1px solid ${t.border}`}}/>
                             :<div style={{width:'25px',height:'25px',borderRadius:'6px',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center'}}><Zap size={12} color="#fff"/></div>
                         }
                         <span className="sl-hname" style={{fontSize:'14px',fontWeight:'800',color:t.textPrimary,letterSpacing:'-0.2px',whiteSpace:'nowrap'}}>{headerLabel}</span>
+                        {/* Account type badge in header */}
+                        <span className="sl-hname" style={{
+                            display:'inline-flex', alignItems:'center', gap:'3px',
+                            padding:'2px 6px', borderRadius:'20px', fontSize:'9px', fontWeight:'700',
+                            background:`${t.accent}18`, color:t.accentLight,
+                            border:`1px solid ${t.accentBorder}`,
+                        }}>
+                            {isCompany ? <Building2 size={9}/> : <UserCircle size={9}/>}
+                            {isCompany ? 'Company' : 'Personal'}
+                        </span>
                     </div>
-
-                    {/* Connection dot + label (label hidden on mobile) */}
                     <div style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 7px',background:isOnline?t.onlineBg:t.offlineBg,borderRadius:'20px',border:`1px solid ${isOnline?t.successBorder:t.dangerBorder}`,flexShrink:0}}>
                         {isOnline?<Wifi size={9} color={t.online}/>:<WifiOff size={9} color={t.offline}/>}
                         <span className="sl-status-label" style={{fontSize:'9px',color:isOnline?t.online:t.offline,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.05em'}}>
@@ -703,15 +953,12 @@ const Dashboard = () => {
                     <button onClick={()=>{const n=!dark;setDark(n);localStorage.setItem('syncline_theme',n?'dark':'light');}} style={{padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'6px',color:t.text,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {dark?<Sun size={13}/>:<Moon size={13}/>}
                     </button>
-
-                    {/* Notifications — fixed position panel, never off-screen */}
                     <div style={{position:'relative'}}>
                         <button onClick={()=>setShowNotifications(!showNotifications)} style={{padding:'6px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'6px',color:t.text,cursor:'pointer',display:'flex',position:'relative'}}>
                             <Bell size={13}/>
                             {unreadCount>0&&<span style={{position:'absolute',top:'1px',right:'1px',width:'13px',height:'13px',borderRadius:'50%',background:t.danger,color:'#fff',fontSize:'7px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center',border:`2px solid ${t.sidebarBg}`}}>{unreadCount>9?'9+':unreadCount}</span>}
                         </button>
                         {showNotifications&&(
-                            // FIX: position:fixed + right:10px → always visible, never clips off screen
                             <div style={{position:'fixed',top:'56px',right:'10px',width:'min(290px,calc(100vw - 20px))',background:t.modalBg,border:`1px solid ${t.borderMid}`,borderRadius:'13px',boxShadow:'0 20px 50px rgba(0,0,0,0.35)',zIndex:500,overflow:'hidden',animation:'slideDown 0.15s ease'}}>
                                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px',borderBottom:`1px solid ${t.border}`}}>
                                     <span style={{fontSize:'12px',fontWeight:'700',color:t.textPrimary}}>Notifications</span>
@@ -727,14 +974,15 @@ const Dashboard = () => {
                         )}
                     </div>
 
-                    {/* Profile */}
                     <button onClick={()=>setShowProfile(true)} style={{display:'flex',alignItems:'center',gap:'5px',padding:'3px 7px 3px 3px',background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:'8px',cursor:'pointer'}}>
                         <div style={{width:'22px',height:'22px',borderRadius:'5px',overflow:'hidden',flexShrink:0}}>
                             {(user?.avatar||user?.avatar_url)?<img src={resolveAvatar(user.avatar||user.avatar_url)} alt="av" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{width:'100%',height:'100%',background:t.accentGrad,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:'800',color:'#fff'}}>{(user?.fullName||user?.email||'?').charAt(0).toUpperCase()}</div>}
                         </div>
                         <div className="sl-hname" style={{textAlign:'left'}}>
                             <div style={{fontSize:'11px',fontWeight:'700',color:t.textPrimary,maxWidth:'75px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.fullName||user?.email}</div>
-                            <div style={{fontSize:'9px',color:t.textMuted,textTransform:'capitalize'}}>{user?.role}</div>
+                            <div style={{fontSize:'9px',color:t.accentLight,fontWeight:'600',textTransform:'capitalize'}}>
+                                {isCompany ? `${user?.role||'member'} · Company` : 'Personal'}
+                            </div>
                         </div>
                         <ChevronDown size={9} color={t.textMuted}/>
                     </button>
@@ -747,23 +995,12 @@ const Dashboard = () => {
 
             {!isOnline&&<div style={{padding:'6px 14px',background:t.offlineBg,borderBottom:`1px solid ${t.dangerBorder}`,display:'flex',alignItems:'center',gap:'7px',justifyContent:'center'}}><WifiOff size={11} color={t.offline}/><span style={{fontSize:'12px',color:t.offline,fontWeight:'600'}}>Offline — some features limited.</span></div>}
 
-            {/* ── Body ───────────────────────────────────────────────────────── */}
+            {/* ── Body ── */}
             <div style={{display:'flex',width:'100%',flex:1,position:'relative'}}>
-
-                {/* Desktop sidebar — hidden on mobile via CSS class */}
-                <div className="sl-sidebar-desktop" style={{
-                    width: sidebarCollapsed?'52px':'192px',
-                    minWidth: sidebarCollapsed?'52px':'192px',
-                    height:'calc(100vh - 52px)',
-                    position:'sticky', top:'52px',
-                    background:t.sidebarBg, borderRight:`1px solid ${t.sidebarBorder}`,
-                    flexShrink:0, transition:'width 0.22s ease, min-width 0.22s ease',
-                    overflow:'hidden',
-                }}>
+                <div className="sl-sidebar-desktop" style={{width:sidebarCollapsed?'52px':'192px',minWidth:sidebarCollapsed?'52px':'192px',height:'calc(100vh - 52px)',position:'sticky',top:'52px',background:t.sidebarBg,borderRight:`1px solid ${t.sidebarBorder}`,flexShrink:0,transition:'width 0.22s ease, min-width 0.22s ease',overflow:'hidden'}}>
                     <SidebarContent t={t} currentView={currentView} onNavigate={navigateTo} collapsed={sidebarCollapsed} onToggle={()=>setSidebarCollapsed(!sidebarCollapsed)} isCompany={isCompany}/>
                 </div>
 
-                {/* Mobile drawer — rendered in DOM only when open */}
                 {mobileSidebarOpen&&(
                     <>
                         <div onClick={()=>setMobileSidebarOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:140}}/>
@@ -774,7 +1011,6 @@ const Dashboard = () => {
                 )}
 
                 <main style={{flex:1,width:0,minWidth:0,overflowX:'hidden'}}>
-                    {/* Stats row */}
                     <div className="sl-stats">
                         <StatCard t={t} icon={<ListTodo size={15}/>} value={tasks.length} label="Total" color={t.accent}/>
                         <StatCard t={t} icon={<Clock size={15}/>} value={tasks.filter(tk=>tk.status==='in_progress').length} label="In Progress" color={t.info}/>
@@ -790,7 +1026,7 @@ const Dashboard = () => {
                 </main>
             </div>
 
-            {/* ── Modals ─────────────────────────────────────────────────────── */}
+            {/* ── Modals ── */}
             {showCreateModal&&<TaskModal t={t} title="Create New Task" onClose={()=>setShowCreateModal(false)} isOnline={isOnline} onSave={async(data)=>{try{await taskAPI.create(data);setShowCreateModal(false);addActivity(`Created "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to create task. Please try again.';}}}/>}
             {editTask&&<TaskModal t={t} title="Edit Task" initialData={editTask} onClose={()=>setEditTask(null)} isOnline={isOnline} onSave={async(data)=>{try{await taskAPI.update(editTask.id,data);setEditTask(null);addActivity(`Updated "${data.title}"`);fetchTasks();}catch(err){return err.response?.data?.error||'Failed to update task.';}}}/>}
             {deleteTarget&&<DeleteTaskModal t={t} task={deleteTarget} loading={deleteLoading} onConfirm={confirmDeleteTask} onCancel={()=>!deleteLoading&&setDeleteTarget(null)}/>}
