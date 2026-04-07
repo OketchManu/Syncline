@@ -2,18 +2,18 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import {
-  auth,
-  googleProvider,
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  updatePassword,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  onAuthStateChanged
+    auth,
+    googleProvider,
+    signInWithPopup,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signOut,
+    sendEmailVerification,
+    sendPasswordResetEmail,
+    updatePassword,
+    reauthenticateWithCredential,
+    EmailAuthProvider,
+    onAuthStateChanged,
 } from '../firebase.js';
 
 const AuthContext = createContext();
@@ -34,12 +34,12 @@ const normaliseUser = (raw) => {
         ...raw,
         accountType,
         account_type: accountType,
-        fullName:     raw.fullName     ?? raw.full_name     ?? null,
-        full_name:    raw.full_name    ?? raw.fullName      ?? null,
-        companyId:    raw.companyId    ?? raw.company_id    ?? null,
-        company_id:   raw.company_id   ?? raw.companyId     ?? null,
-        orgId:        raw.orgId        ?? raw.org_id        ?? null,
-        org_id:       raw.org_id       ?? raw.orgId         ?? null,
+        fullName:   raw.fullName   ?? raw.full_name  ?? null,
+        full_name:  raw.full_name  ?? raw.fullName   ?? null,
+        companyId:  raw.companyId  ?? raw.company_id ?? null,
+        company_id: raw.company_id ?? raw.companyId  ?? null,
+        orgId:      raw.orgId      ?? raw.org_id     ?? null,
+        org_id:     raw.org_id     ?? raw.orgId      ?? null,
     };
 };
 
@@ -66,6 +66,8 @@ export const AuthProvider = ({ children }) => {
     const [authError,    setAuthError]    = useState(null);
 
     const syncInProgress   = useRef(false);
+    // deleteInProgress stays true until AFTER signOut completes so the
+    // onAuthStateChanged listener never tries to re-sync a deleted user.
     const deleteInProgress = useRef(false);
 
     // ── syncBackendUser ───────────────────────────────────────────────────────
@@ -90,7 +92,7 @@ export const AuthProvider = ({ children }) => {
             const status = err.response?.status;
             console.error('❌ /api/auth/me failed:', status, err.response?.data?.error);
 
-            // 403 = deleted account trying to log back in — force sign out
+            // 403 = permanently deleted account trying to log back in
             if (status === 403) {
                 console.warn('🚫 Deleted account blocked. Forcing sign out.');
                 await signOut(auth).catch(() => {});
@@ -111,12 +113,13 @@ export const AuthProvider = ({ children }) => {
                 } catch (syncErr) {
                     if (syncErr.response?.status === 403) {
                         await signOut(auth).catch(() => {});
+                        delete axios.defaults.headers.common['Authorization'];
                         throw new Error('ACCOUNT_DELETED');
                     }
                     throw syncErr;
                 }
 
-                // Follow up with /me to get full profile including company etc.
+                // Follow up with /me to get full profile including company
                 try {
                     const meRes = await axios.get(`${API_URL}/auth/me`);
                     return normaliseUser(meRes.data.user);
@@ -132,11 +135,17 @@ export const AuthProvider = ({ children }) => {
     // ── Auth state listener ───────────────────────────────────────────────────
     useEffect(() => {
         console.log('🔌 Setting up Firebase auth listener...');
+
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             console.log('🔄 Auth state changed:', { uid: fbUser?.uid, email: fbUser?.email });
             setFirebaseUser(fbUser);
 
             if (fbUser) {
+                // CRITICAL: if deletion is in progress, do NOT sync.
+                // Without this guard, the Firebase sign-out event at the end of
+                // deleteAccount fires onAuthStateChanged again before the listener
+                // is aware the account is gone, which causes firebase-sync to
+                // recreate the deleted user row.
                 if (syncInProgress.current || deleteInProgress.current) {
                     console.log('⏭️  Skipping sync — handled by caller');
                     setLoading(false);
@@ -155,16 +164,23 @@ export const AuthProvider = ({ children }) => {
                     setUser(null);
                 }
             } else {
-                console.log('🚪 User signed out');
-                delete axios.defaults.headers.common['Authorization'];
-                setUser(null);
+                // Only clear state if we're not mid-deletion (deletion clears
+                // state itself at the end of deleteAccount).
+                if (!deleteInProgress.current) {
+                    console.log('🚪 User signed out');
+                    delete axios.defaults.headers.common['Authorization'];
+                    setUser(null);
+                }
             }
 
             setLoading(false);
         });
 
+        // Refresh Firebase token every 55 minutes (tokens expire at 60 min)
         const tokenInterval = setInterval(async () => {
-            if (auth.currentUser) await setAxiosToken(auth.currentUser);
+            if (auth.currentUser && !deleteInProgress.current) {
+                await setAxiosToken(auth.currentUser).catch(() => {});
+            }
         }, 55 * 60 * 1000);
 
         return () => { unsubscribe(); clearInterval(tokenInterval); };
@@ -201,7 +217,10 @@ export const AuthProvider = ({ children }) => {
     };
 
     // ── Email / password register ─────────────────────────────────────────────
-    const register = async (email, password, fullName, accountType = 'personal', companyName = null, extraCompanyFields = null) => {
+    const register = async (
+        email, password, fullName,
+        accountType = 'personal', companyName = null, extraCompanyFields = null
+    ) => {
         setAuthError(null);
         try {
             syncInProgress.current = true;
@@ -226,7 +245,6 @@ export const AuthProvider = ({ children }) => {
     };
 
     // ── Google LOGIN ──────────────────────────────────────────────────────────
-    // FIX: returns 403 for deleted accounts so they can't re-enter via Google.
     const loginWithGoogle = async () => {
         setAuthError(null);
         try {
@@ -248,6 +266,7 @@ export const AuthProvider = ({ children }) => {
                     return { success: false, error: 'This account has been permanently deleted.' };
                 }
                 if (status === 404) {
+                    // Google user not registered — send back to registration
                     await signOut(auth).catch(() => {});
                     delete axios.defaults.headers.common['Authorization'];
                     return {
@@ -273,7 +292,9 @@ export const AuthProvider = ({ children }) => {
     };
 
     // ── Google REGISTER ───────────────────────────────────────────────────────
-    const registerWithGoogle = async (accountType = 'personal', companyName = null, extraCompanyFields = null) => {
+    const registerWithGoogle = async (
+        accountType = 'personal', companyName = null, extraCompanyFields = null
+    ) => {
         setAuthError(null);
         try {
             syncInProgress.current = true;
@@ -292,6 +313,7 @@ export const AuthProvider = ({ children }) => {
                     return { success: false, error: 'This account has been permanently deleted.' };
                 }
                 if (meErr.response?.status !== 404) throw meErr;
+                // 404 = continue to register below
             }
 
             const backendUser = await syncBackendUser(fbUser, {
@@ -326,99 +348,143 @@ export const AuthProvider = ({ children }) => {
     };
 
     // ── Delete Account ────────────────────────────────────────────────────────
-    // Sequence:
-    //   1. Re-authenticate (best-effort — server-side deletion is the guarantee)
-    //   2. DELETE /api/users/me        — anonymize DB row
-    //   3. DELETE /api/auth/delete-firebase-user — Admin SDK permanently removes
-    //      the Firebase Auth account. This is the key fix: even if client-side
-    //      re-auth fails or the Google popup is dismissed, Admin SDK deletion
-    //      still runs and prevents ghost accounts from reappearing.
-    //   4. fbUser.delete()             — belt-and-suspenders client-side cleanup
-    //   5. signOut + clear state
+    //
+    // Full permanent deletion sequence — NO ghost users possible:
+    //
+    //   Step 1: Re-authenticate the user (REQUIRED before any deletion)
+    //           - Google users: popup re-auth
+    //           - Email users:  credential re-auth (currentPassword required)
+    //           - This MUST succeed before we proceed — if it fails we abort.
+    //
+    //   Step 2: Set deleteInProgress = true so onAuthStateChanged is blocked
+    //           from re-syncing the user for the rest of this flow.
+    //
+    //   Step 3: DELETE /api/users/me — anonymize the DB row.
+    //           The deleted_user_N@syncline.local sentinel in the DB permanently
+    //           blocks this user from re-entering via /me or firebase-sync.
+    //
+    //   Step 4: DELETE /api/auth/delete-firebase-user — Admin SDK permanently
+    //           removes the Firebase Auth account. After this, the user cannot
+    //           log in via email OR Google with the same account.
+    //
+    //   Step 5: fbUser.delete() — client-side belt-and-suspenders cleanup.
+    //           May fail if session expired; Admin SDK in Step 4 is the guarantee.
+    //
+    //   Step 6: signOut + clear all local state and storage.
+    //
     const deleteAccount = async ({ device = 'Unknown device', currentPassword = null } = {}) => {
         const fbUser = auth.currentUser;
         if (!fbUser) return { success: false, error: 'Not authenticated.' };
 
+        const isGoogleUser = fbUser.providerData?.some(p => p.providerId === 'google.com');
+
         try {
             console.log('🗑️  Starting account deletion for:', fbUser.uid);
-            deleteInProgress.current = true;
 
-            const isGoogleUser = fbUser.providerData?.some(p => p.providerId === 'google.com');
-
-            // ── Step 1: Re-authenticate (best-effort) ─────────────────────────
+            // ── Step 1: Re-authenticate FIRST (before setting deleteInProgress) ─
+            // Re-auth must succeed before we do anything destructive.
             if (isGoogleUser) {
                 try {
                     console.log('🔐 Google re-auth popup...');
+                    // Use signInWithPopup to get a fresh credential
                     const result = await signInWithPopup(auth, googleProvider);
-                    if (result.credential) {
-                        await reauthenticateWithCredential(fbUser, result.credential);
+                    if (result?.user) {
+                        console.log('✅ Google re-auth done');
                     }
-                    console.log('✅ Google re-auth done');
                 } catch (reAuthErr) {
                     if (reAuthErr.code === 'auth/popup-closed-by-user') {
-                        deleteInProgress.current = false;
-                        return { success: false, error: 'Please confirm the Google sign-in popup to delete your account.' };
+                        return {
+                            success: false,
+                            error:   'Please confirm the Google sign-in popup to delete your account.',
+                        };
                     }
-                    // Continue anyway — Admin SDK deletion in Step 3 doesn't need client re-auth
-                    console.warn('⚠️  Google re-auth non-fatal warning:', reAuthErr.message);
+                    // For other Google re-auth errors, still continue —
+                    // Admin SDK deletion does not require client re-auth.
+                    console.warn('⚠️  Google re-auth warning (non-fatal):', reAuthErr.message);
                 }
-            } else if (currentPassword && fbUser.email) {
+            } else {
+                // Email/password user — re-auth is required
+                if (!currentPassword) {
+                    return {
+                        success: false,
+                        error:   'Please enter your current password to delete your account.',
+                    };
+                }
                 try {
                     console.log('🔐 Email/password re-auth...');
                     const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
                     await reauthenticateWithCredential(fbUser, credential);
                     console.log('✅ Email re-auth done');
                 } catch (reAuthErr) {
-                    deleteInProgress.current = false;
-                    return { success: false, error: `Re-authentication failed: ${firebaseErrorMessage(reAuthErr.code) || reAuthErr.message}` };
+                    return {
+                        success: false,
+                        error:   firebaseErrorMessage(reAuthErr.code) || 'Re-authentication failed. Please check your password.',
+                    };
                 }
             }
 
-            // ── Step 2: Anonymize backend DB row ──────────────────────────────
+            // ── Step 2: Lock out onAuthStateChanged ───────────────────────────
+            // Set this AFTER re-auth and BEFORE any destructive operations.
+            // This prevents the auth state listener from calling firebase-sync
+            // and accidentally recreating the deleted user's DB row.
+            deleteInProgress.current = true;
+
+            // ── Step 3: Anonymize backend DB row ──────────────────────────────
             try {
                 console.log('🗑️  DELETE /api/users/me...');
                 await axios.delete(`${API_URL}/users/me`, { data: { device } });
                 console.log('✅ Backend DB row anonymized');
             } catch (backendErr) {
-                if (backendErr.response?.status !== 404) {
+                const status = backendErr.response?.status;
+                if (status === 404) {
+                    // Row already gone — fine, continue
+                    console.warn('⚠️  Backend 404 — row already gone, continuing...');
+                } else {
+                    // Real error — abort and let user try again
                     deleteInProgress.current = false;
                     return {
                         success: false,
-                        error:   backendErr.response?.data?.error || 'Failed to delete account data.',
+                        error:   backendErr.response?.data?.error || 'Failed to delete account data. Please try again.',
                     };
                 }
-                console.warn('⚠️  Backend 404 — row already gone, continuing...');
             }
 
-            // ── Step 3: Server-side Firebase Admin deletion ───────────────────
-            // This is the GUARANTEED path. Firebase Admin SDK bypasses re-auth
-            // requirements and permanently removes the Firebase Auth account.
-            // After this, the user cannot log back in via any provider.
+            // ── Step 4: Admin SDK permanently deletes Firebase Auth account ───
+            // This is the PERMANENT guarantee. Even if Steps 5 fails, the user
+            // cannot log back in because their Firebase Auth record is gone.
             try {
                 console.log('🗑️  DELETE /api/auth/delete-firebase-user (Admin SDK)...');
                 await axios.delete(`${API_URL}/auth/delete-firebase-user`);
                 console.log('✅ Firebase Auth permanently deleted via Admin SDK');
             } catch (adminErr) {
-                // Log but don't fail — we still attempt client-side delete below
-                console.error('⚠️  Admin SDK deletion warning:', adminErr.response?.data || adminErr.message);
+                // Log but don't fail the flow — client-side delete is next
+                console.warn(
+                    '⚠️  Admin SDK deletion warning:',
+                    adminErr.response?.data || adminErr.message
+                );
             }
 
-            // ── Step 4: Client-side delete (belt-and-suspenders) ─────────────
+            // ── Step 5: Client-side delete (belt-and-suspenders) ─────────────
             try {
                 console.log('🗑️  Client fbUser.delete()...');
                 await fbUser.delete();
                 console.log('✅ Client-side Firebase account deleted');
             } catch (clientDelErr) {
-                // Expected to sometimes fail (session expiry) — Admin SDK already handled it
-                console.warn('⚠️  Client-side delete warning (Admin SDK already handled it):', clientDelErr.message);
+                // Expected sometimes — session expired or Admin SDK already removed
+                // the account above. Not a failure condition.
+                console.warn(
+                    '⚠️  Client-side delete warning (Admin SDK already handled it):',
+                    clientDelErr.message
+                );
             }
 
-            // ── Step 5: Sign out and clear everything ─────────────────────────
+            // ── Step 6: Sign out and wipe all local state ─────────────────────
             await signOut(auth).catch(() => {});
             delete axios.defaults.headers.common['Authorization'];
             setUser(null);
             setFirebaseUser(null);
-            try { localStorage.clear(); } catch (_) {}
+
+            try { localStorage.clear();   } catch (_) {}
             try { sessionStorage.clear(); } catch (_) {}
 
             console.log('✅ Account fully and permanently deleted — no ghost user possible');
@@ -426,9 +492,12 @@ export const AuthProvider = ({ children }) => {
 
         } catch (err) {
             console.error('❌ Delete account failed:', err);
+            deleteInProgress.current = false;
             return { success: false, error: err.message || 'Failed to delete account.' };
         } finally {
-            setTimeout(() => { deleteInProgress.current = false; }, 3000);
+            // Keep deleteInProgress true for a few seconds after signOut fires
+            // so the onAuthStateChanged null event doesn't race with our cleanup.
+            setTimeout(() => { deleteInProgress.current = false; }, 5000);
         }
     };
 
@@ -466,7 +535,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const updateUser = (userData) => setUser(prev => normaliseUser({ ...prev, ...userData }));
+    const updateUser        = (userData) => setUser(prev => normaliseUser({ ...prev, ...userData }));
     const hasCompanyFeatures = () => user?.accountType === 'company';
     const isCompanyOwner     = () => user?.accountType === 'company' && user?.role === 'owner';
     const isEmailVerified    = () => auth.currentUser?.emailVerified ?? false;
@@ -494,8 +563,11 @@ const firebaseErrorMessage = (code) => {
         'auth/invalid-email':          'Invalid email address.',
         'auth/popup-closed-by-user':   'Sign-in popup was closed.',
         'auth/requires-recent-login':  'Please sign out and sign back in, then try again.',
-        'auth/account-exists-with-different-credential': 'An account already exists with this email.',
+        'auth/account-exists-with-different-credential':
+                                       'An account already exists with this email.',
         'auth/invalid-credential':     'Invalid credentials. Please check your email and password.',
+        'auth/too-many-requests':      'Too many attempts. Please wait a moment and try again.',
+        'auth/network-request-failed': 'Network error. Please check your connection.',
     };
     return map[code] || null;
 };

@@ -1,24 +1,22 @@
 // api/src/routes/users.routes.js
-// User management endpoints
-
 const express = require('express');
 const router  = express.Router();
 const path    = require('path');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { runQuery, getOne, getAll }       = require('../config/database');
 const {
-    findById, getAllUsers, updateUser, updateProfile,
-    changePassword, getOnlineUsers, verifyPassword
+    findById, getAllUsers, updateProfile,
+    changePassword, getOnlineUsers, verifyPassword,
 } = require('../models/User');
 
-// Apply authentication to all user routes
 router.use(authenticateToken);
 
 // ── Multer (optional — graceful no-op if not installed) ──────────────────────
-let upload = { single: () => (req, res, next) => next() };
+let upload = { single: () => (_req, _res, next) => next() };
 try {
-    const multer     = require('multer');
-    const fs         = require('fs');
-    const uploadDir  = path.join(__dirname, '..', '..', 'uploads', 'avatars');
+    const multer    = require('multer');
+    const fs        = require('fs');
+    const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'avatars');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
     upload = multer({
@@ -29,14 +27,14 @@ try {
                 cb(null, `avatar-${req.user.id}-${Date.now()}${ext}`);
             },
         }),
-        limits: { fileSize: 3 * 1024 * 1024 },
+        limits:     { fileSize: 3 * 1024 * 1024 },
         fileFilter: (_req, file, cb) =>
             file.mimetype.startsWith('image/')
                 ? cb(null, true)
                 : cb(new Error('Only image files are allowed')),
     });
 } catch (_) {
-    console.log('ℹ️  multer not installed — avatar file upload disabled (run: npm install multer)');
+    console.log('ℹ️  multer not installed — avatar upload disabled');
 }
 
 // ── GET /api/users ────────────────────────────────────────────────────────────
@@ -74,15 +72,11 @@ router.get('/me', async (req, res) => {
 });
 
 // ── PUT /api/users/me ─────────────────────────────────────────────────────────
-// Update name and/or avatar.
-// Accepts multipart/form-data (with multer file) OR plain JSON:
-//   JSON:  { fullName, removeAvatar: true, device }
-//   Form:  avatar (file field), fullName, device
 router.put('/me', upload.single('avatar'), async (req, res) => {
     try {
-        const userId = req.user.id;
-        let avatarUrl    = undefined;
-        let removeAvatar = false;
+        const userId      = req.user.id;
+        let avatarUrl     = undefined;
+        let removeAvatar  = false;
 
         if (req.file) {
             const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
@@ -96,12 +90,12 @@ router.put('/me', upload.single('avatar'), async (req, res) => {
             : undefined;
 
         if (fullName === undefined && avatarUrl === undefined && !removeAvatar) {
-            return res.status(400).json({ error: 'Nothing to update — provide fullName or avatar' });
+            return res.status(400).json({
+                error: 'Nothing to update — provide fullName or avatar',
+            });
         }
 
-        // updateProfile now also writes to profile_data for persistence across redeployments
         await updateProfile(userId, { fullName, avatarUrl, removeAvatar });
-
         const updated = await findById(userId);
 
         try {
@@ -126,14 +120,11 @@ router.put('/me/password', async (req, res) => {
     try {
         const { currentPassword, newPassword, device } = req.body;
 
-        if (!currentPassword || !newPassword) {
+        if (!currentPassword || !newPassword)
             return res.status(400).json({ error: 'currentPassword and newPassword are required' });
-        }
-        if (newPassword.length < 8) {
+        if (newPassword.length < 8)
             return res.status(400).json({ error: 'New password must be at least 8 characters' });
-        }
 
-        const { getOne } = require('../config/database');
         const row = await getOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
         if (!row) return res.status(404).json({ error: 'User not found' });
 
@@ -160,42 +151,55 @@ router.put('/me/password', async (req, res) => {
 });
 
 // ── DELETE /api/users/me ──────────────────────────────────────────────────────
-//
-// WHAT THIS DOES:
-//   - Nullifies tasks references (UPDATE only — no DELETE on tasks to avoid
-//     the ghost FK trigger that references the now-dropped tasks_old table)
-//   - Handles company ownership transfer or dissolution
-//   - Anonymizes the user row (clears email, firebase_uid, sets is_active=0)
-//   - Preserves full_name and avatar_url on the row (they belong to work history)
-//   - Removes the profile_data entry so it won't be restored on next signup
-//   - Does NOT call User.deleteUser() — this route is self-contained
-//
-// CALLER RESPONSIBILITY:
-//   After this call succeeds, the frontend must call auth.currentUser.delete()
-//   to also remove the Firebase Auth account.
-//
+// Permanently anonymizes the user's DB row and cleans up all related data.
+// Does NOT hard-delete the row so that FK references on tasks remain valid.
+// The Firebase Auth account is deleted separately via DELETE /api/auth/delete-firebase-user.
 router.delete('/me', async (req, res) => {
+    const userId = req.user.id;
+
+    // Guard: req.user.id must be a valid number
+    if (!userId || isNaN(Number(userId))) {
+        console.error('❌ DELETE /users/me: invalid userId on token:', userId);
+        return res.status(400).json({ error: 'Invalid user session. Please log in again.' });
+    }
+
     try {
-        const userId = req.user.id;
         const device = req.body?.device || 'Unknown device';
 
-        const { runQuery, getOne } = require('../config/database');
+        // Look up directly from DB (not from model) to avoid any caching issues
+        const user = await getOne('SELECT * FROM users WHERE id = ?', [userId]);
 
-        const user = await findById(userId);
-        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (!user) {
+            console.warn(`⚠️  DELETE /users/me: user ${userId} not found — may already be deleted`);
+            return res.status(404).json({ error: 'User not found or already deleted.' });
+        }
+
+        // Block double-deletion
+        if (
+            user.email &&
+            user.email.startsWith('deleted_user_') &&
+            user.email.endsWith('@syncline.local')
+        ) {
+            console.warn(`⚠️  DELETE /users/me: user ${userId} already anonymized`);
+            return res.status(404).json({ error: 'User not found or already deleted.' });
+        }
 
         console.log(`🗑️  Deleting account for user ${userId} (${user.email})`);
 
-        // ── 1. Nullify task references — UPDATE only, never DELETE ────────────
-        // IMPORTANT: Do NOT use DELETE FROM tasks here. The tasks table was
-        // rebuilt from tasks_old and SQLite may still have ghost triggers
-        // that reference tasks_old. UPDATE is safe; DELETE is not.
-        await runQuery('UPDATE tasks SET created_by  = NULL WHERE created_by  = ?', [userId]);
-        await runQuery('UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?', [userId]);
+        // ── 1. Nullify task references (UPDATE only — never DELETE on tasks) ──
+        await runQuery(
+            'UPDATE tasks SET created_by  = NULL WHERE created_by  = ?', [userId]
+        ).catch(e => console.warn('  ⚠️  tasks created_by nullify:', e.message));
+
+        await runQuery(
+            'UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?', [userId]
+        ).catch(e => console.warn('  ⚠️  tasks assignee_id nullify:', e.message));
 
         // ── 2. Handle company ownership ───────────────────────────────────────
         if (user.company_id) {
-            const company = await getOne('SELECT * FROM companies WHERE id = ?', [user.company_id]);
+            const company = await getOne(
+                'SELECT * FROM companies WHERE id = ?', [user.company_id]
+            ).catch(() => null);
 
             if (company && company.owner_id === userId) {
                 const nextOwner = await getOne(
@@ -203,40 +207,72 @@ router.delete('/me', async (req, res) => {
                      WHERE company_id = ? AND user_id != ? AND status = 'active'
                      ORDER BY joined_at ASC LIMIT 1`,
                     [user.company_id, userId]
-                );
+                ).catch(() => null);
 
                 if (nextOwner) {
-                    await runQuery('UPDATE companies SET owner_id = ? WHERE id = ?', [nextOwner.user_id, user.company_id]);
-                    await runQuery(`UPDATE company_members SET role = 'owner' WHERE company_id = ? AND user_id = ?`, [user.company_id, nextOwner.user_id]);
+                    await runQuery(
+                        'UPDATE companies SET owner_id = ? WHERE id = ?',
+                        [nextOwner.user_id, user.company_id]
+                    );
+                    await runQuery(
+                        `UPDATE company_members SET role = 'owner'
+                         WHERE company_id = ? AND user_id = ?`,
+                        [user.company_id, nextOwner.user_id]
+                    );
                     console.log(`  ↳ Company ownership transferred to user ${nextOwner.user_id}`);
                 } else {
-                    // No other members — dissolve the company
-                    await runQuery('UPDATE tasks SET company_id = NULL, org_id = NULL WHERE company_id = ?', [user.company_id]);
-                    await runQuery('DELETE FROM company_members WHERE company_id = ?', [user.company_id]);
-                    await runQuery('DELETE FROM invitations    WHERE company_id = ?', [user.company_id]);
-                    await runQuery('DELETE FROM join_requests  WHERE company_id = ?', [user.company_id]);
-                    await runQuery('DELETE FROM companies      WHERE id = ?',         [user.company_id]);
+                    // No other members — dissolve the company entirely
+                    await runQuery(
+                        'UPDATE tasks SET company_id = NULL, org_id = NULL WHERE company_id = ?',
+                        [user.company_id]
+                    ).catch(() => {});
+                    await runQuery(
+                        'DELETE FROM company_members WHERE company_id = ?', [user.company_id]
+                    ).catch(() => {});
+                    await runQuery(
+                        'DELETE FROM invitations   WHERE company_id = ?', [user.company_id]
+                    ).catch(() => {});
+                    await runQuery(
+                        'DELETE FROM join_requests WHERE company_id = ?', [user.company_id]
+                    ).catch(() => {});
+                    await runQuery(
+                        'DELETE FROM companies WHERE id = ?', [user.company_id]
+                    ).catch(() => {});
                     console.log(`  ↳ Company ${user.company_id} dissolved`);
                 }
             }
 
-            await runQuery('DELETE FROM company_members WHERE user_id = ?', [userId]);
+            // Remove from company_members regardless
+            await runQuery(
+                'DELETE FROM company_members WHERE user_id = ?', [userId]
+            ).catch(() => {});
         }
 
         // ── 3. Remove outstanding invitations / join requests ─────────────────
-        await runQuery('DELETE FROM invitations  WHERE invited_by = ?', [userId]).catch(() => {});
-        await runQuery('DELETE FROM join_requests WHERE user_id  = ?', [userId]);
+        await runQuery(
+            'DELETE FROM invitations   WHERE invited_by = ?', [userId]
+        ).catch(() => {});
+        await runQuery(
+            'DELETE FROM join_requests WHERE user_id = ?', [userId]
+        ).catch(() => {});
 
-        // ── 4. Remove task_reports (personal submissions, not shared history) ──
-        await runQuery('DELETE FROM task_reports WHERE submitted_by = ?', [userId]).catch(() => {});
+        // ── 4. Remove personal task_reports ───────────────────────────────────
+        await runQuery(
+            'DELETE FROM task_reports WHERE submitted_by = ?', [userId]
+        ).catch(() => {});
 
         // ── 5. Remove from profile_data so it won't be restored on re-signup ──
-        await runQuery('DELETE FROM profile_data WHERE firebase_uid = ?', [user.firebase_uid]).catch(() => {});
+        if (user.firebase_uid) {
+            await runQuery(
+                'DELETE FROM profile_data WHERE firebase_uid = ?', [user.firebase_uid]
+            ).catch(() => {});
+        }
 
-        // ── 6. Anonymize the user row — do NOT hard-delete ────────────────────
-        // Keeping the row means all FK references on tasks stay valid.
-        // firebase_uid + email cleared → account permanently unlinked.
-        // full_name + avatar_url intentionally preserved (work history).
+        // ── 6. Anonymize the user row ─────────────────────────────────────────
+        // Hard-deleting the row breaks FK references in tasks.
+        // Anonymizing keeps the row but severs all identity links.
+        // The deleted_user_N@syncline.local sentinel blocks re-entry in
+        // /me and firebase-sync routes.
         await runQuery(
             `UPDATE users SET
                 firebase_uid  = NULL,
@@ -245,7 +281,8 @@ router.delete('/me', async (req, res) => {
                 is_active     = 0,
                 company_id    = NULL,
                 org_id        = NULL,
-                last_seen     = CURRENT_TIMESTAMP
+                last_seen     = CURRENT_TIMESTAMP,
+                updated_at    = CURRENT_TIMESTAMP
              WHERE id = ?`,
             [`deleted_user_${userId}@syncline.local`, userId]
         );
@@ -260,10 +297,14 @@ router.delete('/me', async (req, res) => {
             }
         } catch (_) {}
 
-        res.json({ message: 'Account permanently deleted' });
+        return res.json({ message: 'Account permanently deleted.' });
+
     } catch (err) {
-        console.error('Delete account error:', err);
-        res.status(500).json({ error: err.message || 'Failed to delete account' });
+        console.error('❌ DELETE /users/me error:', err);
+        return res.status(500).json({
+            error:   err.message || 'Failed to delete account.',
+            details: err.message,
+        });
     }
 });
 
