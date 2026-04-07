@@ -11,7 +11,7 @@ const {
 
 router.use(authenticateToken);
 
-// ── Multer (optional — graceful no-op if not installed) ──────────────────────
+// ── Multer (graceful no-op if not installed) ──────────────────────────────────
 let upload = { single: () => (_req, _res, next) => next() };
 try {
     const multer    = require('multer');
@@ -33,8 +33,33 @@ try {
                 ? cb(null, true)
                 : cb(new Error('Only image files are allowed')),
     });
+    console.log('✅ Avatar uploads enabled');
 } catch (_) {
     console.log('ℹ️  multer not installed — avatar upload disabled');
+}
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+function sanitizeUser(user) {
+    if (!user) return null;
+    const accountType = user.account_type === 'company' ? 'company' : 'personal';
+    return {
+        id:           user.id,
+        email:        user.email,
+        fullName:     user.full_name,
+        full_name:    user.full_name,
+        role:         user.role || 'member',
+        accountType,
+        account_type: accountType,
+        companyId:    user.company_id || null,
+        company_id:   user.company_id || null,
+        orgId:        user.org_id     || null,
+        org_id:       user.org_id     || null,
+        avatar:       user.avatar_url || null,
+        avatar_url:   user.avatar_url || null,
+        isActive:     user.is_active !== 0,
+        lastSeen:     user.last_seen,
+        createdAt:    user.created_at,
+    };
 }
 
 // ── GET /api/users ────────────────────────────────────────────────────────────
@@ -44,7 +69,7 @@ router.get('/', requireRole('admin', 'manager'), async (req, res) => {
         res.json({ users: users.map(sanitizeUser), count: users.length });
     } catch (err) {
         console.error('Get users error:', err);
-        res.status(500).json({ error: 'Failed to get users', details: err.message });
+        res.status(500).json({ error: 'Failed to get users.' });
     }
 });
 
@@ -55,7 +80,7 @@ router.get('/online', async (req, res) => {
         res.json({ users: users.map(sanitizeUser), count: users.length });
     } catch (err) {
         console.error('Get online users error:', err);
-        res.status(500).json({ error: 'Failed to get online users', details: err.message });
+        res.status(500).json({ error: 'Failed to get online users.' });
     }
 });
 
@@ -63,20 +88,20 @@ router.get('/online', async (req, res) => {
 router.get('/me', async (req, res) => {
     try {
         const user = await findById(req.user.id);
-        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (!user) return res.status(404).json({ error: 'User not found.' });
         res.json({ user: sanitizeUser(user) });
     } catch (err) {
         console.error('Get me error:', err);
-        res.status(500).json({ error: 'Failed to get profile', details: err.message });
+        res.status(500).json({ error: 'Failed to get profile.' });
     }
 });
 
-// ── PUT /api/users/me ─────────────────────────────────────────────────────────
-router.put('/me', upload.single('avatar'), async (req, res) => {
+// ── Profile update handler (shared between PUT and PATCH) ─────────────────────
+async function handleProfileUpdate(req, res) {
     try {
-        const userId      = req.user.id;
-        let avatarUrl     = undefined;
-        let removeAvatar  = false;
+        const userId     = req.user.id;
+        let avatarUrl    = undefined;
+        let removeAvatar = false;
 
         if (req.file) {
             const BASE_URL = process.env.BASE_URL || 'https://syncline-1.onrender.com';
@@ -90,30 +115,51 @@ router.put('/me', upload.single('avatar'), async (req, res) => {
             : undefined;
 
         if (fullName === undefined && avatarUrl === undefined && !removeAvatar) {
-            return res.status(400).json({
-                error: 'Nothing to update — provide fullName or avatar',
-            });
+            return res.status(400).json({ error: 'Nothing to update — provide fullName or avatar.' });
         }
 
         await updateProfile(userId, { fullName, avatarUrl, removeAvatar });
+
+        // Also persist to profile_data so name/avatar survive DB wipes on Render
+        if (fullName !== undefined || avatarUrl !== undefined || removeAvatar) {
+            const nameToSave   = fullName   !== undefined ? fullName   : undefined;
+            const avatarToSave = removeAvatar ? null : (avatarUrl !== undefined ? avatarUrl : undefined);
+            const updates = [];
+            const vals    = [];
+            if (nameToSave   !== undefined) { updates.push('full_name = ?');   vals.push(nameToSave); }
+            if (avatarToSave !== undefined) { updates.push('avatar_url = ?');  vals.push(avatarToSave); }
+            if (updates.length > 0 && req.user.firebaseUid) {
+                updates.push('updated_at = CURRENT_TIMESTAMP');
+                vals.push(req.user.firebaseUid);
+                await runQuery(
+                    `UPDATE profile_data SET ${updates.join(', ')} WHERE firebase_uid = ?`, vals
+                ).catch(() => {});
+            }
+        }
+
         const updated = await findById(userId);
 
         try {
             const { broadcastToUser } = require('../config/websocket');
             if (typeof broadcastToUser === 'function') {
                 broadcastToUser(userId, 'user:profile_updated', {
-                    userId,
-                    device: req.body.device || 'Unknown device',
+                    userId, device: req.body.device || 'Unknown device',
                 });
             }
         } catch (_) {}
 
-        res.json({ message: 'Profile updated successfully', user: sanitizeUser(updated) });
+        res.json({ message: 'Profile updated successfully.', user: sanitizeUser(updated) });
     } catch (err) {
         console.error('Update profile error:', err);
-        res.status(500).json({ error: err.message || 'Failed to update profile' });
+        res.status(500).json({ error: err.message || 'Failed to update profile.' });
     }
-});
+}
+
+// ── PUT /api/users/me  (original) ────────────────────────────────────────────
+router.put('/me', upload.single('avatar'), handleProfileUpdate);
+
+// ── PATCH /api/users/me  (alias — frontend may call either) ──────────────────
+router.patch('/me', upload.single('avatar'), handleProfileUpdate);
 
 // ── PUT /api/users/me/password ────────────────────────────────────────────────
 router.put('/me/password', async (req, res) => {
@@ -121,15 +167,17 @@ router.put('/me/password', async (req, res) => {
         const { currentPassword, newPassword, device } = req.body;
 
         if (!currentPassword || !newPassword)
-            return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+            return res.status(400).json({ error: 'currentPassword and newPassword are required.' });
         if (newPassword.length < 8)
-            return res.status(400).json({ error: 'New password must be at least 8 characters' });
+            return res.status(400).json({ error: 'New password must be at least 8 characters.' });
 
         const row = await getOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
-        if (!row) return res.status(404).json({ error: 'User not found' });
+        if (!row) return res.status(404).json({ error: 'User not found.' });
 
-        const valid = await verifyPassword(currentPassword, row.password_hash);
-        if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+        if (row.password_hash) {
+            const valid = await verifyPassword(currentPassword, row.password_hash);
+            if (!valid) return res.status(401).json({ error: 'Current password is incorrect.' });
+        }
 
         await changePassword(req.user.id, newPassword);
 
@@ -137,142 +185,114 @@ router.put('/me/password', async (req, res) => {
             const { broadcastToUser } = require('../config/websocket');
             if (typeof broadcastToUser === 'function') {
                 broadcastToUser(req.user.id, 'user:password_changed', {
-                    userId: req.user.id,
-                    device: device || 'Unknown device',
+                    userId: req.user.id, device: device || 'Unknown device',
                 });
             }
         } catch (_) {}
 
-        res.json({ message: 'Password changed successfully' });
+        res.json({ message: 'Password changed successfully.' });
     } catch (err) {
         console.error('Change password error:', err);
-        res.status(500).json({ error: err.message || 'Failed to change password' });
+        res.status(500).json({ error: err.message || 'Failed to change password.' });
+    }
+});
+
+// ── PATCH /api/users/me/password (alias) ─────────────────────────────────────
+router.patch('/me/password', async (req, res) => {
+    try {
+        const { currentPassword, newPassword, device } = req.body;
+        if (!currentPassword || !newPassword)
+            return res.status(400).json({ error: 'currentPassword and newPassword are required.' });
+        if (newPassword.length < 8)
+            return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+
+        const row = await getOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
+        if (!row) return res.status(404).json({ error: 'User not found.' });
+
+        if (row.password_hash) {
+            const valid = await verifyPassword(currentPassword, row.password_hash);
+            if (!valid) return res.status(401).json({ error: 'Current password is incorrect.' });
+        }
+
+        await changePassword(req.user.id, newPassword);
+
+        try {
+            const { broadcastToUser } = require('../config/websocket');
+            if (typeof broadcastToUser === 'function') {
+                broadcastToUser(req.user.id, 'user:password_changed', { userId: req.user.id, device: device || 'Unknown' });
+            }
+        } catch (_) {}
+
+        res.json({ message: 'Password changed successfully.' });
+    } catch (err) {
+        console.error('Change password error:', err);
+        res.status(500).json({ error: err.message || 'Failed to change password.' });
     }
 });
 
 // ── DELETE /api/users/me ──────────────────────────────────────────────────────
-// Permanently anonymizes the user's DB row and cleans up all related data.
-// Does NOT hard-delete the row so that FK references on tasks remain valid.
-// The Firebase Auth account is deleted separately via DELETE /api/auth/delete-firebase-user.
+// Anonymizes the DB row (does NOT hard-delete to preserve FK refs on tasks).
+// The Firebase Auth account is deleted via DELETE /api/auth/delete-firebase-user.
 router.delete('/me', async (req, res) => {
     const userId = req.user.id;
-
-    // Guard: req.user.id must be a valid number
     if (!userId || isNaN(Number(userId))) {
-        console.error('❌ DELETE /users/me: invalid userId on token:', userId);
         return res.status(400).json({ error: 'Invalid user session. Please log in again.' });
     }
 
     try {
         const device = req.body?.device || 'Unknown device';
-
-        // Look up directly from DB (not from model) to avoid any caching issues
-        const user = await getOne('SELECT * FROM users WHERE id = ?', [userId]);
+        const user   = await getOne('SELECT * FROM users WHERE id = ?', [userId]);
 
         if (!user) {
-            console.warn(`⚠️  DELETE /users/me: user ${userId} not found — may already be deleted`);
             return res.status(404).json({ error: 'User not found or already deleted.' });
         }
-
-        // Block double-deletion
-        if (
-            user.email &&
-            user.email.startsWith('deleted_user_') &&
-            user.email.endsWith('@syncline.local')
-        ) {
-            console.warn(`⚠️  DELETE /users/me: user ${userId} already anonymized`);
+        if (user.email?.startsWith('deleted_user_') && user.email?.endsWith('@syncline.local')) {
             return res.status(404).json({ error: 'User not found or already deleted.' });
         }
 
         console.log(`🗑️  Deleting account for user ${userId} (${user.email})`);
 
-        // ── 1. Nullify task references (UPDATE only — never DELETE on tasks) ──
-        await runQuery(
-            'UPDATE tasks SET created_by  = NULL WHERE created_by  = ?', [userId]
-        ).catch(e => console.warn('  ⚠️  tasks created_by nullify:', e.message));
+        // Nullify task references (do NOT delete tasks — preserve work history)
+        await runQuery('UPDATE tasks SET created_by  = NULL WHERE created_by  = ?', [userId]).catch(() => {});
+        await runQuery('UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?', [userId]).catch(() => {});
 
-        await runQuery(
-            'UPDATE tasks SET assignee_id = NULL WHERE assignee_id = ?', [userId]
-        ).catch(e => console.warn('  ⚠️  tasks assignee_id nullify:', e.message));
-
-        // ── 2. Handle company ownership ───────────────────────────────────────
+        // Handle company ownership transfer
         if (user.company_id) {
-            const company = await getOne(
-                'SELECT * FROM companies WHERE id = ?', [user.company_id]
-            ).catch(() => null);
-
+            const company = await getOne('SELECT * FROM companies WHERE id = ?', [user.company_id]).catch(() => null);
             if (company && company.owner_id === userId) {
-                const nextOwner = await getOne(
+                const next = await getOne(
                     `SELECT user_id FROM company_members
                      WHERE company_id = ? AND user_id != ? AND status = 'active'
                      ORDER BY joined_at ASC LIMIT 1`,
                     [user.company_id, userId]
                 ).catch(() => null);
 
-                if (nextOwner) {
-                    await runQuery(
-                        'UPDATE companies SET owner_id = ? WHERE id = ?',
-                        [nextOwner.user_id, user.company_id]
-                    );
-                    await runQuery(
-                        `UPDATE company_members SET role = 'owner'
-                         WHERE company_id = ? AND user_id = ?`,
-                        [user.company_id, nextOwner.user_id]
-                    );
-                    console.log(`  ↳ Company ownership transferred to user ${nextOwner.user_id}`);
+                if (next) {
+                    await runQuery('UPDATE companies SET owner_id = ? WHERE id = ?', [next.user_id, user.company_id]);
+                    await runQuery(`UPDATE company_members SET role = 'owner' WHERE company_id = ? AND user_id = ?`, [user.company_id, next.user_id]);
+                    console.log(`  ↳ Company ownership transferred to user ${next.user_id}`);
                 } else {
-                    // No other members — dissolve the company entirely
-                    await runQuery(
-                        'UPDATE tasks SET company_id = NULL, org_id = NULL WHERE company_id = ?',
-                        [user.company_id]
-                    ).catch(() => {});
-                    await runQuery(
-                        'DELETE FROM company_members WHERE company_id = ?', [user.company_id]
-                    ).catch(() => {});
-                    await runQuery(
-                        'DELETE FROM invitations   WHERE company_id = ?', [user.company_id]
-                    ).catch(() => {});
-                    await runQuery(
-                        'DELETE FROM join_requests WHERE company_id = ?', [user.company_id]
-                    ).catch(() => {});
-                    await runQuery(
-                        'DELETE FROM companies WHERE id = ?', [user.company_id]
-                    ).catch(() => {});
+                    // No other members — dissolve company
+                    await runQuery('UPDATE tasks SET company_id = NULL, org_id = NULL WHERE company_id = ?', [user.company_id]).catch(() => {});
+                    await runQuery('DELETE FROM company_members WHERE company_id = ?', [user.company_id]).catch(() => {});
+                    await runQuery('DELETE FROM join_requests   WHERE company_id = ?', [user.company_id]).catch(() => {});
+                    await runQuery('DELETE FROM team_invitations WHERE company_id = ?', [user.company_id]).catch(() => {});
+                    await runQuery('DELETE FROM companies        WHERE id = ?',         [user.company_id]).catch(() => {});
                     console.log(`  ↳ Company ${user.company_id} dissolved`);
                 }
             }
-
-            // Remove from company_members regardless
-            await runQuery(
-                'DELETE FROM company_members WHERE user_id = ?', [userId]
-            ).catch(() => {});
+            await runQuery('DELETE FROM company_members WHERE user_id = ?', [userId]).catch(() => {});
         }
 
-        // ── 3. Remove outstanding invitations / join requests ─────────────────
-        await runQuery(
-            'DELETE FROM invitations   WHERE invited_by = ?', [userId]
-        ).catch(() => {});
-        await runQuery(
-            'DELETE FROM join_requests WHERE user_id = ?', [userId]
-        ).catch(() => {});
+        await runQuery('DELETE FROM join_requests   WHERE user_id   = ?', [userId]).catch(() => {});
+        await runQuery('DELETE FROM team_invitations WHERE invited_by = ?', [userId]).catch(() => {});
+        await runQuery('DELETE FROM task_reports    WHERE submitted_by = ?', [userId]).catch(() => {});
 
-        // ── 4. Remove personal task_reports ───────────────────────────────────
-        await runQuery(
-            'DELETE FROM task_reports WHERE submitted_by = ?', [userId]
-        ).catch(() => {});
-
-        // ── 5. Remove from profile_data so it won't be restored on re-signup ──
         if (user.firebase_uid) {
-            await runQuery(
-                'DELETE FROM profile_data WHERE firebase_uid = ?', [user.firebase_uid]
-            ).catch(() => {});
+            await runQuery('DELETE FROM profile_data WHERE firebase_uid = ?', [user.firebase_uid]).catch(() => {});
         }
 
-        // ── 6. Anonymize the user row ─────────────────────────────────────────
-        // Hard-deleting the row breaks FK references in tasks.
-        // Anonymizing keeps the row but severs all identity links.
-        // The deleted_user_N@syncline.local sentinel blocks re-entry in
-        // /me and firebase-sync routes.
+        // Anonymize — preserves the row for FK integrity on tasks
         await runQuery(
             `UPDATE users SET
                 firebase_uid  = NULL,
@@ -289,7 +309,6 @@ router.delete('/me', async (req, res) => {
 
         console.log(`  ✅ User ${userId} anonymized successfully`);
 
-        // ── 7. Broadcast (best-effort) ────────────────────────────────────────
         try {
             const { broadcastToUser } = require('../config/websocket');
             if (typeof broadcastToUser === 'function') {
@@ -301,10 +320,7 @@ router.delete('/me', async (req, res) => {
 
     } catch (err) {
         console.error('❌ DELETE /users/me error:', err);
-        return res.status(500).json({
-            error:   err.message || 'Failed to delete account.',
-            details: err.message,
-        });
+        return res.status(500).json({ error: err.message || 'Failed to delete account.' });
     }
 });
 
@@ -312,27 +328,12 @@ router.delete('/me', async (req, res) => {
 router.get('/:id', requireRole('admin', 'manager'), async (req, res) => {
     try {
         const user = await findById(req.params.id);
-        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (!user) return res.status(404).json({ error: 'User not found.' });
         res.json({ user: sanitizeUser(user) });
     } catch (err) {
         console.error('Get user error:', err);
-        res.status(500).json({ error: 'Failed to get user', details: err.message });
+        res.status(500).json({ error: 'Failed to get user.' });
     }
 });
-
-// ── Helper ────────────────────────────────────────────────────────────────────
-function sanitizeUser(user) {
-    if (!user) return null;
-    return {
-        id:        user.id,
-        email:     user.email,
-        fullName:  user.full_name,
-        role:      user.role,
-        isActive:  user.is_active,
-        avatar:    user.avatar_url || null,
-        lastSeen:  user.last_seen,
-        createdAt: user.created_at,
-    };
-}
 
 module.exports = router;
