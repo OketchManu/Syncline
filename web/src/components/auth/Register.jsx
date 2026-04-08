@@ -515,12 +515,12 @@ const Register = () => {
                                     </button>
                                 )}
 
-                                <p style={{ ...styles.terms, color: t.iconColor }}>
-                                    By signing up you agree to our{' '}
-                                    <span style={styles.termsLink}>Terms of Service</span>
-                                    {' '}and{' '}
-                                    <span style={styles.termsLink}>Privacy Policy</span>
-                                </p>
+                                <p style={{ fontSize: '11px', color: '#3d4f6e', textAlign: 'center', marginTop: '12px' }}>
+  By registering you agree to our{' '}
+  <a href="/terms.html" target="_blank" style={{ color: '#a78bfa' }}>Terms of Service</a>
+  {' '}and{' '}
+  <a href="/privacy.html" target="_blank" style={{ color: '#a78bfa' }}>Privacy Policy</a>.
+</p>
                             </form>
 
                             <div style={styles.footer}>

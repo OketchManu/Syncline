@@ -1,6 +1,9 @@
 # Syncline
 
-A real-time collaborative task management system built with a modern multi-service architecture. Syncline features live updates via WebSocket, offline-capable PWA support, JWT authentication, and a polyglot backend spanning Node.js, Python, and Java.
+A real-time collaborative task management platform for teams and individuals. Syncline features live updates via WebSocket, Firebase authentication, company workspace management, role-based access control, and a fully responsive Progressive Web App frontend.
+
+**Live:** [https://syncline-8010e.web.app](https://syncline-8010e.web.app)  
+**API:** [https://syncline-1.onrender.com](https://syncline-1.onrender.com)
 
 ---
 
@@ -16,22 +19,27 @@ A real-time collaborative task management system built with a modern multi-servi
 - [WebSocket Events](#websocket-events)
 - [Database Schema](#database-schema)
 - [Environment Variables](#environment-variables)
-- [Running Tests](#running-tests)
 - [Roadmap](#roadmap)
+- [Legal](#legal)
+- [Author](#author)
 
 ---
 
 ## Overview
 
-Syncline is a team task management platform designed for real-time collaboration. Users can create, assign, update, and flag tasks — and every action is broadcast instantly to all connected clients via WebSocket. The system is built to support offline usage with automatic sync when connectivity is restored.
+Syncline is a team operations platform built for real-time collaboration. Users can register as individuals or create a company workspace, manage tasks, invite teammates, assign roles, and track progress — all updated live across all connected clients via WebSocket.
 
 Key capabilities:
-- **Real-time updates** — task changes are broadcast to all connected users instantly
-- **JWT authentication** — secure access and refresh token system
-- **Role-based access control** — `admin`, `manager`, and `member` roles
-- **Task flagging & overdue detection** — automated and manual task monitoring
-- **Offline sync** — IndexedDB-backed local storage with conflict resolution (PWA)
-- **Activity feed** — live log of all team actions
+
+- **Real-time updates** — task changes are broadcast instantly to all connected users
+- **Firebase authentication** — secure sign-in with email/password or Google
+- **Company workspaces** — create a company, invite members by email or invite code, manage roles
+- **Role-based access control** — `owner`, `admin`, `manager`, and `member` roles
+- **Task management** — create, assign, update, flag, and delete tasks with priority and deadlines
+- **Progress reports** — team members submit reports; managers review and approve
+- **Overdue detection** — automatic overdue flagging with visual indicators
+- **Responsive PWA** — works on desktop, tablet, and mobile with offline awareness
+- **Profile persistence** — name and avatar survive server redeployments via `profile_data` table
 
 ---
 
@@ -39,26 +47,23 @@ Key capabilities:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    Client (React PWA)                │
-│    IndexedDB • Service Worker • Sync Manager         │
+│            Client (React PWA)                        │
+│   Firebase Auth • Axios • WebSocket • DM Sans UI     │
+│   Hosted on Firebase Hosting                         │
 └───────────────────────┬─────────────────────────────┘
-                        │ HTTP + WebSocket
+                        │ HTTPS + WebSocket (WSS)
 ┌───────────────────────▼─────────────────────────────┐
-│              Node.js API  (port 3001)                │
-│      Express • JWT • WebSocket (ws)                  │
-│      REST Endpoints + Real-time Broadcast            │
-└──────────┬────────────────────────┬──────────────────┘
-           │                        │
-┌──────────▼──────────┐  ┌─────────▼─────────────────┐
-│   Python Worker     │  │     Java Notifier          │
-│  APScheduler jobs   │  │  Email / Webhook / SMS     │
-│  Overdue detection  │  │  Enterprise notifications  │
-└──────────┬──────────┘  └────────────────────────────┘
-           │
-┌──────────▼──────────┐
-│   SQLite / PostgreSQL│
-│   (syncline.db)     │
-└─────────────────────┘
+│          Node.js / Express API  (port 3001)          │
+│   Firebase Admin SDK • WebSocket (ws)                │
+│   REST Endpoints + Real-time Broadcast               │
+│   Hosted on Render                                   │
+└──────────────────────┬──────────────────────────────┘
+                       │
+              ┌────────▼────────┐
+              │  SQLite DB      │
+              │  (Render disk)  │
+              │  syncline.db    │
+              └─────────────────┘
 ```
 
 ---
@@ -67,13 +72,16 @@ Key capabilities:
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, React Router v6, Axios, Recharts, Lucide React |
-| API Server | Node.js 20+, Express 5, `ws`, `jsonwebtoken`, `bcrypt` |
-| Database | SQLite (dev) / PostgreSQL (prod) |
-| Background Worker | Python 3.10+, APScheduler |
-| Notification Service | Java 17+, Spring Boot (Maven) |
-| Real-time | WebSocket (`ws` library) |
-| Auth | JWT (access + refresh tokens) |
+| Frontend | React 18, React Router v6, Axios, Lucide React |
+| API Server | Node.js 20+, Express, `ws` WebSocket library |
+| Database | SQLite (`better-sqlite3` / `sqlite3`) |
+| Authentication | Firebase Auth (email/password + Google OAuth) |
+| Auth Middleware | Firebase Admin SDK (token verification) |
+| File Uploads | Multer (avatars + company logos) |
+| Email Invites | Nodemailer (SMTP) |
+| Hosting — Frontend | Firebase Hosting |
+| Hosting — API | Render (Node.js web service) |
+| Real-time | WebSocket (`ws` library, server-side broadcast) |
 
 ---
 
@@ -81,72 +89,75 @@ Key capabilities:
 
 ```
 syncline/
-├── api/                        # Node.js REST + WebSocket server
+├── api/                              # Node.js REST + WebSocket server
 │   ├── src/
 │   │   ├── config/
-│   │   │   ├── database.js     # SQLite connection & helpers
-│   │   │   ├── jwt.js          # Token generation & verification
-│   │   │   └── websocket.js    # WebSocket server initialisation
+│   │   │   ├── database.js           # SQLite connection, helpers, minimal schema
+│   │   │   ├── firebase.js           # Firebase Admin SDK initialisation
+│   │   │   ├── migrate.js            # Idempotent schema migrations (runs on boot)
+│   │   │   ├── backfill.js           # Data backfills (invite codes etc.)
+│   │   │   └── websocket.js          # WebSocket server + broadcast helpers
 │   │   ├── middleware/
-│   │   │   └── auth.js         # JWT auth middleware & role guards
+│   │   │   └── auth.js               # Firebase token verification + role guards
 │   │   ├── models/
-│   │   │   ├── User.js         # User DB operations
-│   │   │   └── Task.js         # Task DB operations
+│   │   │   ├── User.js               # User DB operations
+│   │   │   └── Task.js               # Task DB operations
 │   │   ├── routes/
-│   │   │   ├── auth.routes.js  # /api/auth endpoints
-│   │   │   └── task.routes.js  # /api/tasks endpoints
-│   │   ├── websocket/
-│   │   │   └── events.js       # WebSocket event handlers
-│   │   └── server.js           # App entry point
+│   │   │   ├── auth.routes.js        # /api/auth — register, sync, me, delete
+│   │   │   ├── task.routes.js        # /api/tasks — CRUD + flag/unflag
+│   │   │   ├── users.routes.js       # /api/users — profile, password, delete
+│   │   │   ├── company.routes.js     # /api/company — team, invites, join
+│   │   │   └── task-reports.routes.js# /api/task-reports — reports + progress
+│   │   └── server.js                 # App entry point + startup sequence
+│   ├── uploads/
+│   │   ├── avatars/                  # User avatar images
+│   │   └── logos/                    # Company logo images
 │   ├── .env
-│   ├── package.json
-│   └── websocket-test.html     # Browser WebSocket tester
+│   └── package.json
 │
-├── web/                        # React PWA frontend
+├── web/                              # React PWA frontend
+│   ├── public/
+│   │   ├── index.html                # App shell + favicon + meta tags
+│   │   ├── favicon.svg               # Syncline lightning bolt favicon
+│   │   └── manifest.json             # PWA manifest
 │   └── src/
 │       ├── components/
-│       │   ├── auth/           # Login, Register
-│       │   ├── dashboard/      # Dashboard, Stats, Charts
-│       │   ├── tasks/          # TaskList, TaskCard, TaskForm
-│       │   ├── activity/       # ActivityFeed
-│       │   ├── users/          # OnlineUsers
-│       │   └── common/         # Header, Sidebar, SyncIndicator
+│       │   ├── auth/
+│       │   │   ├── Login.jsx          # Email/password + Google login
+│       │   │   ├── Register.jsx       # Registration (personal or company)
+│       │   │   ├── ForgotPassword.jsx
+│       │   │   ├── ResetPassword.jsx
+│       │   │   └── JoinCompany.jsx    # Invite code / invite link join flow
+│       │   ├── dashboard/
+│       │   │   └── Dashboard.jsx      # Main dashboard (personal + company views)
+│       │   └── company/
+│       │       ├── CompanyOnboarding.jsx  # Company setup, team, invitations
+│       │       ├── TeamManagement.jsx
+│       │       ├── ProgressMonitor.jsx
+│       │       ├── ReportManagement.jsx
+│       │       └── TaskAssignment.jsx
 │       ├── context/
-│       │   └── AuthContext.jsx
+│       │   └── AuthContext.jsx        # Firebase auth state + backend sync
 │       ├── services/
-│       │   ├── api.js          # Axios API client
-│       │   └── websocket.js    # WebSocket client service
-│       └── App.js
-│
-├── worker/                     # Python background jobs
-│   └── src/
-│       ├── config/
-│       ├── tasks/              # Scheduled job definitions
-│       ├── services/
-│       └── utils/
-│
-├── notifier/                   # Java notification service
-│   └── src/main/java/com/syncline/notifier/
+│       │   ├── api.js                 # Axios API client
+│       │   └── websocket.js           # WebSocket client service
+│       ├── firebase.js                # Firebase app + provider config
+│       └── App.js                     # Routes + protected route guards
 │
 └── database/
-    ├── migrations/
-    └── schema.sql
+    └── schema.sql                     # Base schema (applied on first boot)
 ```
 
 ---
 
 ## Prerequisites
 
-Install the following before running Syncline locally:
-
-| Tool | Version | Download |
-|---|---|---|
-| Node.js | 20 LTS or 22 LTS | https://nodejs.org |
-| Python | 3.10+ | https://www.python.org |
-| Java JDK | 17 or 21 | https://adoptium.net |
-| Git | Latest | https://git-scm.com |
-
-> **Windows users:** Run PowerShell as Administrator and execute `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` before using npm.
+| Tool | Version |
+|---|---|
+| Node.js | 20 LTS or 22 LTS |
+| npm | 9+ |
+| Git | Latest |
+| Firebase project | With Auth enabled (email + Google) |
 
 ---
 
@@ -155,11 +166,34 @@ Install the following before running Syncline locally:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/syncline.git
+git clone https://github.com/OketchManu/syncline.git
 cd syncline
 ```
 
-### 2. Start the API server
+### 2. Configure environment variables
+
+Create `api/.env`:
+
+```env
+PORT=3001
+NODE_ENV=development
+BASE_URL=http://localhost:3001
+FRONTEND_URL=http://localhost:3000
+
+# Firebase Admin SDK — paste the JSON as a single line, or use a file path
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+
+# Optional — email invitations via SMTP
+EMAIL_HOST=smtp.yourprovider.com
+EMAIL_PORT=587
+EMAIL_USER=noreply@yourapp.com
+EMAIL_PASS=yourpassword
+EMAIL_FROM="Syncline" <noreply@yourapp.com>
+```
+
+Create `web/src/firebase.js` with your Firebase project config (from the Firebase Console → Project Settings → Your Apps).
+
+### 3. Start the API server
 
 ```bash
 cd api
@@ -168,19 +202,20 @@ npm run dev
 ```
 
 The API will be available at `http://localhost:3001`.  
-The WebSocket endpoint will be available at `ws://localhost:3001/ws`.
+WebSocket endpoint: `ws://localhost:3001/ws`
 
 On startup you should see:
 
 ```
+✅ Firebase Admin initialised
 ✅ Connected to SQLite database
 ✅ Database initialized successfully
+✅ Migrations done
 ✅ WebSocket server initialized on /ws
 🚀 HTTP Server: http://localhost:3001
-⚡ WebSocket: ws://localhost:3001/ws
 ```
 
-### 3. Start the React frontend
+### 4. Start the React frontend
 
 Open a second terminal:
 
@@ -190,88 +225,44 @@ npm install
 npm start
 ```
 
-The app opens automatically at `http://localhost:3000`.
-
-### 4. Start the Python worker (optional)
-
-```bash
-cd worker
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS/Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
-python src/main.py
-```
+The app opens at `http://localhost:3000`.
 
 ---
 
 ## API Reference
 
-All protected routes require the header:
+All protected routes require:
 
 ```
-Authorization: Bearer <accessToken>
+Authorization: Bearer <Firebase ID Token>
 ```
 
-### Auth
+### Auth — `/api/auth`
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/auth/register` | Register a new user |
-| POST | `/api/auth/login` | Login and receive tokens |
-| POST | `/api/auth/refresh` | Refresh access token |
+| POST | `/api/auth/register` | Register a new user (with optional company) |
+| POST | `/api/auth/firebase-sync` | Sync Firebase user to backend DB |
 | GET | `/api/auth/me` | Get current user profile |
-| POST | `/api/auth/logout` | Invalidate session |
+| POST | `/api/auth/logout` | Server-side logout |
+| DELETE | `/api/auth/delete-firebase-user` | Permanently delete Firebase Auth account |
 
-**Register request body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "password123",
-  "fullName": "Jane Doe"
-}
-```
+### Tasks — `/api/tasks`
 
-**Login response:**
-```json
-{
-  "message": "Login successful",
-  "user": { "id": 1, "email": "...", "role": "member" },
-  "accessToken": "eyJ...",
-  "refreshToken": "eyJ..."
-}
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/tasks` | Get all tasks (scoped by user or company) |
+| GET | `/api/tasks/my` | Get tasks assigned to or created by me |
+| GET | `/api/tasks/stats` | Get task statistics |
+| GET | `/api/tasks/overdue` | Get overdue tasks |
+| GET | `/api/tasks/:id` | Get a single task |
+| POST | `/api/tasks` | Create a task |
+| PUT | `/api/tasks/:id` | Update a task |
+| PATCH | `/api/tasks/:id/flag` | Flag a task with a reason |
+| PATCH | `/api/tasks/:id/unflag` | Remove flag from task |
+| DELETE | `/api/tasks/:id` | Delete a task |
 
-### Tasks
-
-| Method | Endpoint | Description | Roles |
-|---|---|---|---|
-| GET | `/api/tasks` | Get all tasks (filterable) | All |
-| GET | `/api/tasks/my` | Get tasks assigned to me | All |
-| GET | `/api/tasks/stats` | Get task statistics | All |
-| GET | `/api/tasks/overdue` | Get overdue tasks | All |
-| GET | `/api/tasks/:id` | Get a single task | All |
-| POST | `/api/tasks` | Create a task | All |
-| PUT | `/api/tasks/:id` | Update a task | All |
-| PATCH | `/api/tasks/:id/flag` | Flag a task | All |
-| PATCH | `/api/tasks/:id/unflag` | Unflag a task | All |
-| DELETE | `/api/tasks/:id` | Delete a task | admin, manager |
-
-**Query parameters for GET `/api/tasks`:**
-
-| Parameter | Values |
-|---|---|
-| `status` | `pending`, `in_progress`, `completed`, `blocked` |
-| `priority` | `low`, `medium`, `high`, `urgent` |
-| `assigneeId` | User ID |
-| `flagged` | `true` / `false` |
-
-**Create task request body:**
+**Create task body:**
 ```json
 {
   "title": "Design login screen",
@@ -283,61 +274,95 @@ Authorization: Bearer <accessToken>
 }
 ```
 
+### Users — `/api/users`
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/users/me` | Get my profile |
+| PUT / PATCH | `/api/users/me` | Update profile (name, avatar) |
+| PUT / PATCH | `/api/users/me/password` | Change password |
+| DELETE | `/api/users/me` | Delete and anonymize account |
+
+### Company — `/api/company`
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/company/team` | Get team members + company info |
+| GET | `/api/company/details` | Get company details |
+| PATCH | `/api/company/details` | Update company details + logo |
+| GET | `/api/company/invitations` | List pending email invitations |
+| POST | `/api/company/team/invite` | Send email invitation |
+| DELETE | `/api/company/invitations/:id` | Revoke invitation |
+| POST | `/api/company/join/:code` | Join via invite code or email link |
+| GET | `/api/company/join-requests` | List join requests |
+| PATCH | `/api/company/join-requests/:id/accept` | Accept a join request |
+| PATCH | `/api/company/join-requests/:id/decline` | Decline a join request |
+| PATCH | `/api/company/team/:userId/role` | Change member role |
+| DELETE | `/api/company/team/:userId` | Remove member |
+
+### Task Reports — `/api/task-reports`
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/task-reports` | List all reports |
+| POST | `/api/task-reports` | Submit a report |
+| POST | `/api/task-reports/:taskId/assign` | Assign a task to user(s) |
+| POST | `/api/task-reports/:taskId/progress` | Log progress update |
+| GET | `/api/task-reports/:taskId/progress` | Get progress history |
+| PATCH | `/api/task-reports/:id/approve` | Approve a report |
+| PATCH | `/api/task-reports/:id/reject` | Reject a report |
+| DELETE | `/api/task-reports/:id` | Delete a report |
+
 ---
 
 ## WebSocket Events
 
-Connect to `ws://localhost:3001/ws` and authenticate immediately after connection:
+Connect to `ws://localhost:3001/ws` (or `wss://syncline-1.onrender.com/ws` in production).
 
-```json
-{ "type": "auth", "token": "<accessToken>" }
-```
+### Events broadcast from server
 
-### Events received from server
-
-| Event type | Triggered when |
+| Event | Triggered when |
 |---|---|
-| `task:created` | A new task is created |
+| `task:created` | A task is created |
 | `task:updated` | A task is modified |
 | `task:deleted` | A task is deleted |
 | `task:flagged` | A task is flagged |
-| `task:unflagged` | A task flag is removed |
-| `user:connected` | A user comes online |
-| `user:disconnected` | A user goes offline |
-| `pong` | Response to a client ping |
+| `task:assigned` | A task is assigned |
+| `task:progress_updated` | Progress is logged |
+| `report:submitted` | A report is submitted |
+| `report:requested` | A manager requests a report |
+| `user:profile_updated` | A user updates their profile |
+| `user:account_deleted` | A user deletes their account |
 
-**Example event payload:**
+**Example payload:**
 ```json
 {
   "type": "task:created",
-  "task": { "id": 12, "title": "...", "status": "pending", ... },
-  "user": { "id": 8, "fullName": "Jane Doe" },
-  "timestamp": "2026-03-02T10:00:00.000Z"
+  "task": { "id": 12, "title": "...", "status": "pending" },
+  "creator": { "id": 8, "fullName": "Jane Doe" },
+  "timestamp": "2026-04-06T10:00:00.000Z"
 }
-```
-
-### Sending a ping
-
-```json
-{ "type": "ping" }
 ```
 
 ---
 
 ## Database Schema
 
-Core tables (SQLite / PostgreSQL):
-
 | Table | Description |
 |---|---|
-| `users` | Registered users with roles and online status |
-| `tasks` | Tasks with status, priority, versioning, and flag support |
-| `activities` | Audit log of all task and user actions |
-| `notifications` | Queued notifications for the Java notifier service |
-| `refresh_tokens` | Stored refresh tokens for session management |
-| `sync_queue` | Offline changes awaiting server sync |
-
-The full schema is in `database/schema.sql`.
+| `users` | All registered users with roles, company membership, and Firebase UID |
+| `companies` | Company workspaces with invite code and logo |
+| `company_members` | Company membership records |
+| `tasks` | Tasks with status, priority, deadline, and flag support |
+| `task_assignments` | Many-to-many task assignment records |
+| `task_reports` | Progress reports submitted by members |
+| `task_progress` | Per-task progress update log |
+| `report_requests` | Manager-initiated report requests |
+| `join_requests` | Pending requests to join a company |
+| `team_invitations` | Email-based invite records with expiry |
+| `profile_data` | Persisted name/avatar by Firebase UID (survives DB wipes) |
+| `notifications` | In-app notifications |
+| `activities` | Audit log of team actions |
 
 ---
 
@@ -345,68 +370,74 @@ The full schema is in `database/schema.sql`.
 
 ### `api/.env`
 
-```env
-PORT=3001
-DATABASE_URL=../database/syncline.db
-JWT_SECRET= 31f6c5b25e63cbd9939d39885e338aa02b2434ca7191f23b0d25ce4ef56777f2
-NODE_ENV=development
-```
-
-### `worker/.env`
-
-```env
-DATABASE_URL=../database/syncline.db
-NOTIFIER_URL=http://localhost:8080
-```
-
----
-
-## Running Tests
-
-API manual tests are available in `api/test.http` (requires the VS Code **REST Client** extension) and `api/websocket-test.html` for WebSocket testing in the browser.
-
-To run a quick smoke test via PowerShell:
-
-```powershell
-# Login
-$body = '{"email":"test@example.com","password":"password123"}'
-$res = Invoke-RestMethod -Uri "http://localhost:3001/api/auth/login" -Method POST -Body $body -ContentType "application/json"
-$token = $res.accessToken
-
-# Get tasks
-$headers = @{ Authorization = "Bearer $token" }
-Invoke-RestMethod -Uri "http://localhost:3001/api/tasks" -Method GET -Headers $headers
-```
+| Variable | Description |
+|---|---|
+| `PORT` | API server port (default: `3001`) |
+| `NODE_ENV` | `development` or `production` |
+| `BASE_URL` | Public URL of the API (used for file URL construction) |
+| `FRONTEND_URL` | Public URL of the frontend (used in invite emails) |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin SDK service account JSON (single-line) |
+| `RESET_DB` | Set to `true` to wipe the DB on next deploy (Render only) |
+| `EMAIL_HOST` | SMTP host for invite emails |
+| `EMAIL_PORT` | SMTP port (default: `587`) |
+| `EMAIL_USER` | SMTP username |
+| `EMAIL_PASS` | SMTP password |
+| `EMAIL_FROM` | Sender display name and address |
 
 ---
 
 ## Roadmap
 
-- [x] JWT authentication (register, login, refresh, logout)
-- [x] Task CRUD with filtering and statistics
-- [x] WebSocket real-time broadcast
-- [x] Role-based access control
+- [x] Firebase authentication (email/password + Google)
+- [x] Personal and company account types
+- [x] Company workspace creation and management
+- [x] Email + invite code team invitations
+- [x] Role-based access control (owner, admin, manager, member)
+- [x] Task CRUD with priority, deadline, and assignment
 - [x] Task flagging and overdue detection
-- [ ] Activity logging and live feed
-- [ ] User management routes
-- [ ] Python worker — automated overdue flagging
-- [ ] Java notifier — email and webhook notifications
-- [ ] React PWA frontend with offline sync
-- [ ] Conflict resolution UI
-- [ ] Docker Compose setup for full-stack deployment
+- [x] Progress reports — submit, review, approve, reject
+- [x] WebSocket real-time broadcast
+- [x] Responsive PWA (mobile, tablet, desktop)
+- [x] Profile persistence across server redeployments
+- [x] Account deletion (full anonymization + Firebase Auth removal)
+- [ ] Python worker — automated scheduled overdue flagging
+- [ ] Java notifier — email and webhook notifications for enterprise
+- [ ] Docker Compose for full-stack local development
+- [ ] Conflict resolution UI for offline sync
 
 ---
 
-## 👤 Author
+## Legal
 
-**OketchManu**
-- GitHub: [@OketchManu](https://github.com/OketchManu)
+**Terms of Service and Privacy Policy** are located at:
+
+```
+web/public/terms.html
+web/public/privacy.html
+```
+
+Link to them from:
+1. **Register page** (`web/src/components/auth/Register.jsx`) — add a line below the sign-up button:
+   ```jsx
+   <p>By registering you agree to our <a href="/terms.html">Terms of Service</a> and <a href="/privacy.html">Privacy Policy</a>.</p>
+   ```
+2. **Login page footer** — same links, smaller text
+3. **Dashboard footer** — optional, keeps them discoverable after login
+4. **`index.html`** — add to the `<head>` for SEO:
+   ```html
+   <link rel="canonical" href="https://syncline-8010e.web.app" />
+   ```
 
 ---
 
-**⭐ Star this repository if you found it helpful!**
+## Author
 
-Built with ❤️ to demonstrate distributed systems architecture and full-stack development skills.
+**OketchManu**  
+GitHub: [@OketchManu](https://github.com/OketchManu)
+
+---
+
+Built with ❤️ to demonstrate real-time full-stack architecture, Firebase integration, and modern React UI design.
 
 ---
 

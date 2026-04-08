@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — Syncline</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #05080f;
+      color: #94a3b8;
+      line-height: 1.8;
+      padding: 40px 20px 80px;
+    }
+    .container { max-width: 760px; margin: 0 auto; }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 48px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #fff;
+    }
+    .logo-name {
+      font-size: 20px; font-weight: 800; color: #f0f4ff; letter-spacing: -0.3px;
+    }
+    h1 {
+      font-size: clamp(24px, 5vw, 36px); font-weight: 800;
+      color: #f0f4ff; letter-spacing: -0.5px; margin-bottom: 8px;
+    }
+    .meta {
+      font-size: 13px; color: #3d4f6e; margin-bottom: 40px;
+    }
+    h2 {
+      font-size: 17px; font-weight: 700; color: #e2e8f0;
+      margin: 36px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    p { margin-bottom: 14px; font-size: 14px; }
+    ul { padding-left: 20px; margin-bottom: 14px; }
+    li { font-size: 14px; margin-bottom: 6px; }
+    a { color: #a78bfa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .back {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 48px; padding: 10px 18px;
+      background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25);
+      border-radius: 9px; color: #a78bfa; font-size: 13px; font-weight: 600;
+      text-decoration: none; transition: background 0.15s;
+    }
+    .back:hover { background: rgba(124,58,237,0.2); text-decoration: none; }
+    .highlight {
+      background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 10px; padding: 14px 18px; margin-bottom: 14px;
+      font-size: 13px; color: #a78bfa;
+    }
+    table {
+      width: 100%; border-collapse: collapse; margin-bottom: 18px;
+      font-size: 13px;
+    }
+    th {
+      text-align: left; padding: 10px 12px; font-weight: 600; color: #e2e8f0;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    }
+    td {
+      padding: 10px 12px; color: #94a3b8;
+      border: 1px solid rgba(255,255,255,0.06); vertical-align: top;
+    }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-name">Syncline</span>
+    </div>
+
+    <h1>Privacy Policy</h1>
+    <p class="meta">Last updated: April 2026 &nbsp;·&nbsp; Effective immediately upon registration</p>
+
+    <div class="highlight">
+      Your privacy matters. This policy explains what data we collect, why we collect it, and how you can control it. Syncline does not sell your personal data.
+    </div>
+
+    <h2>1. Who We Are</h2>
+    <p>Syncline is a real-time collaborative task management platform operated by OketchManu. The platform is accessible at <a href="https://syncline-8010e.web.app">syncline-8010e.web.app</a> and the API is hosted at <a href="https://syncline-1.onrender.com">syncline-1.onrender.com</a>.</p>
+    <p>For privacy-related questions, contact us via GitHub: <a href="https://github.com/OketchManu">@OketchManu</a>.</p>
+
+    <h2>2. Data We Collect</h2>
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Data</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Account identity</td><td>Email address, full name, profile photo, password hash</td><td>Registration form or Google OAuth</td></tr>
+        <tr><td>Authentication</td><td>Firebase UID, ID tokens (short-lived)</td><td>Firebase Authentication</td></tr>
+        <tr><td>Company workspace</td><td>Company name, logo, industry, team size, website, description</td><td>Entered by you</td></tr>
+        <tr><td>Task data</td><td>Task titles, descriptions, status, priority, deadlines, assignments</td><td>Entered by you and your team</td></tr>
+        <tr><td>Reports</td><td>Progress reports, hours logged, blockers, outcomes</td><td>Entered by you</td></tr>
+        <tr><td>Usage</td><td>Server access logs (IP address, endpoint, timestamp)</td><td>Render hosting infrastructure</td></tr>
+        <tr><td>Device info</td><td>Browser and OS name (used for security notifications)</td><td>Detected from User-Agent string</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. How We Use Your Data</h2>
+    <p>We use the data we collect solely to operate and improve Syncline:</p>
+    <ul>
+      <li><strong>Provide the service</strong> — authenticate you, display your tasks, team, and reports.</li>
+      <li><strong>Company features</strong> — manage invitations, join requests, roles, and team membership.</li>
+      <li><strong>Real-time updates</strong> — broadcast task changes to connected team members via WebSocket.</li>
+      <li><strong>Security notifications</strong> — notify you when your password changes or account is accessed from a new device.</li>
+      <li><strong>Invite emails</strong> — send invitation emails to colleagues you invite via email (only sent once per invitation).</li>
+      <li><strong>Profile persistence</strong> — store your name and avatar in a separate table so they survive server redeployments.</li>
+    </ul>
+    <p>We do <strong>not</strong> use your data for advertising, profiling, or sale to third parties.</p>
+
+    <h2>4. Third-Party Services</h2>
+    <table>
+      <thead>
+        <tr><th>Service</th><th>Purpose</th><th>Data shared</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Google Firebase Authentication</td><td>User identity, login, Google OAuth</td><td>Email, display name, Google account ID</td></tr>
+        <tr><td>Render</td><td>API server hosting</td><td>Server logs (IP, endpoint)</td></tr>
+        <tr><td>Firebase Hosting</td><td>Frontend hosting</td><td>Server access logs</td></tr>
+        <tr><td>SMTP provider (optional)</td><td>Invitation emails</td><td>Recipient email address only</td></tr>
+      </tbody>
+    </table>
+    <p>Each third-party service has its own privacy policy. We encourage you to review them.</p>
+
+    <h2>5. Cookies and Local Storage</h2>
+    <p>Syncline does not use advertising cookies. We use:</p>
+    <ul>
+      <li><strong>localStorage</strong> — to remember your theme preference (dark/light) and last active dashboard view.</li>
+      <li><strong>sessionStorage</strong> — to remember your current navigation state within a session.</li>
+      <li><strong>Firebase session cookies</strong> — managed by Firebase Authentication for maintaining your login state.</li>
+    </ul>
+    <p>No third-party tracking cookies are used.</p>
+
+    <h2>6. Data Retention</h2>
+    <ul>
+      <li><strong>Active accounts</strong> — data is retained as long as your account exists.</li>
+      <li><strong>Deleted accounts</strong> — your email, Firebase UID, and password are permanently removed. Your display name may remain on historical task records to preserve team work history, but is no longer linked to any login.</li>
+      <li><strong>Server redeployments</strong> — Syncline uses SQLite on Render's ephemeral disk. Data may be lost on redeployment. Key profile data (name, avatar) is persisted in a separate table and restored automatically on next login.</li>
+      <li><strong>Invite emails</strong> — email addresses entered for invitations are stored only while the invitation is pending (maximum 7 days). After acceptance or expiry they are not retained.</li>
+    </ul>
+
+    <h2>7. Data Security</h2>
+    <ul>
+      <li>All communication between your browser and the API is encrypted via HTTPS/WSS.</li>
+      <li>Passwords are hashed with bcrypt and are never stored in plain text.</li>
+      <li>Authentication is handled by Firebase — we never store raw Google OAuth tokens.</li>
+      <li>File uploads (avatars, logos) are stored on the Render server filesystem and served over HTTPS.</li>
+    </ul>
+    <p>No security system is perfect. We recommend using a strong, unique password and enabling two-factor authentication on your Google account.</p>
+
+    <h2>8. Your Rights</h2>
+    <p>You have the right to:</p>
+    <ul>
+      <li><strong>Access</strong> — view all data associated with your account (available in your profile).</li>
+      <li><strong>Correction</strong> — update your name and avatar at any time from Account Settings.</li>
+      <li><strong>Deletion</strong> — permanently delete your account from Account Settings → Danger Zone. This removes your login credentials and Firebase Auth account immediately.</li>
+      <li><strong>Portability</strong> — contact us to request an export of your task and report data.</li>
+    </ul>
+
+    <h2>9. Children's Privacy</h2>
+    <p>Syncline is not intended for children under the age of 13. We do not knowingly collect personal data from children under 13. If you believe a child has registered, please contact us and we will delete the account promptly.</p>
+
+    <h2>10. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. We will notify you of material changes by updating the "Last updated" date. Continued use of Syncline after changes constitutes acceptance of the updated policy.</p>
+
+    <h2>11. Contact</h2>
+    <p>For any privacy-related requests or questions:</p>
+    <ul>
+      <li>GitHub: <a href="https://github.com/OketchManu">@OketchManu</a></li>
+      <li>Platform: <a href="https://syncline-8010e.web.app">syncline-8010e.web.app</a></li>
+    </ul>
+
+    <a class="back" href="/">← Back to Syncline</a>
+  </div>
+</body>
+</html>
