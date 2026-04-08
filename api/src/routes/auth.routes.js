@@ -1,4 +1,6 @@
 // api/src/routes/auth.routes.js
+// PRODUCTION VERSION - Fixes duplicate user bug
+
 const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
@@ -71,10 +73,11 @@ router.post('/register', async (req, res) => {
         const resolvedType = accountType === 'company' ? 'company' : 'personal';
         const role         = resolvedType === 'company' ? 'owner' : 'member';
 
-        const existing = await getOne(
-            'SELECT * FROM users WHERE email = ? OR (firebase_uid IS NOT NULL AND firebase_uid = ?)',
-            [email, firebaseUid || '']
-        );
+        // ✅ FIX: Check by email FIRST, then firebase_uid
+        let existing = await getOne('SELECT * FROM users WHERE email = ?', [email]);
+        if (!existing && firebaseUid) {
+            existing = await getOne('SELECT * FROM users WHERE firebase_uid = ?', [firebaseUid]);
+        }
 
         if (existing) {
             // Block deleted accounts
@@ -86,6 +89,7 @@ router.post('/register', async (req, res) => {
                 return res.status(403).json({ error: 'This account has been permanently deleted.' });
             }
 
+            // Link Firebase UID if missing
             if (firebaseUid && !existing.firebase_uid) {
                 await runQuery(
                     'UPDATE users SET firebase_uid = ? WHERE id = ?',
@@ -93,6 +97,7 @@ router.post('/register', async (req, res) => {
                 );
                 existing.firebase_uid = firebaseUid;
             }
+            
             let company = null;
             if (existing.company_id)
                 company = await getOne(
@@ -154,6 +159,7 @@ router.post('/register', async (req, res) => {
 });
 
 // ─── POST /api/auth/firebase-sync ─────────────────────────────────────────────
+// ✅ CRITICAL FIX: Always check by EMAIL first to prevent duplicate users
 router.post('/firebase-sync', async (req, res) => {
     try {
         const authHeader = req.headers.authorization || '';
@@ -178,16 +184,16 @@ router.post('/firebase-sync', async (req, res) => {
 
         console.log('🔄 firebase-sync for UID:', firebaseUid, '| email:', email);
 
-        // ── Check if this Firebase UID was deleted from Firebase Auth ─────────
-        // If Admin SDK already deleted the user, verifyIdToken above would have
-        // failed. But check the DB for a deleted/anonymized row just in case.
-        let existing = await getOne('SELECT * FROM users WHERE firebase_uid = ?', [firebaseUid]);
-        if (!existing && decoded.email) {
-            existing = await getOne('SELECT * FROM users WHERE email = ?', [decoded.email]);
+        // ✅ FIX: ALWAYS check by email FIRST (prevents duplicates across devices)
+        let existing = await getOne('SELECT * FROM users WHERE email = ?', [email]);
+        
+        // If not found by email, try firebase_uid
+        if (!existing && firebaseUid) {
+            existing = await getOne('SELECT * FROM users WHERE firebase_uid = ?', [firebaseUid]);
         }
 
         if (existing) {
-            // Block deleted/anonymized accounts permanently
+            // Block deleted/anonymized accounts
             if (
                 existing.email &&
                 existing.email.startsWith('deleted_user_') &&
@@ -200,27 +206,31 @@ router.post('/firebase-sync', async (req, res) => {
                 });
             }
 
-            if (!existing.firebase_uid) {
+            // Link Firebase UID if missing
+            if (firebaseUid && !existing.firebase_uid) {
                 await runQuery(
                     'UPDATE users SET firebase_uid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
                     [firebaseUid, existing.id]
                 );
                 existing.firebase_uid = firebaseUid;
+                console.log('✅ Linked Firebase UID to existing user:', email);
             }
+            
             let company = null;
             if (existing.company_id)
                 company = await getOne(
                     'SELECT id, name, invite_code FROM companies WHERE id = ?',
                     [existing.company_id]
                 );
-            console.log('✅ firebase-sync: existing user returned:', email);
+            
+            console.log('✅ firebase-sync: existing user found:', email);
             return res.json({
                 user:    { ...sanitizeUser(existing), company: company || undefined },
                 created: false,
             });
         }
 
-        // ── Restore from profile_data if available ────────────────────────────
+        // ─── Restore from profile_data if available ────────────────────────────
         let restoredName   = displayName;
         let restoredAvatar = avatarUrl;
         try {
@@ -235,6 +245,7 @@ router.post('/firebase-sync', async (req, res) => {
             }
         } catch (_) {}
 
+        // ─── Create new user ────────────────────────────────────────────────────
         let userResult;
         try {
             userResult = await runQuery(
@@ -245,12 +256,13 @@ router.post('/firebase-sync', async (req, res) => {
                 [email, restoredName, firebaseUid, restoredAvatar]
             );
         } catch (insertErr) {
-            if (insertErr.message.includes('UNIQUE constraint')) {
-                const raceUser = await getOne(
-                    'SELECT * FROM users WHERE firebase_uid = ? OR email = ?',
-                    [firebaseUid, email]
-                );
-                if (raceUser) return res.json({ user: sanitizeUser(raceUser), created: false });
+            if (insertErr.message.includes('UNIQUE constraint') || insertErr.message.includes('duplicate key')) {
+                // Race condition: another request created the user
+                const raceUser = await getOne('SELECT * FROM users WHERE email = ?', [email]);
+                if (raceUser) {
+                    console.log('ℹ️  firebase-sync: race condition, user created by another request');
+                    return res.json({ user: sanitizeUser(raceUser), created: false });
+                }
             }
             throw insertErr;
         }
@@ -272,12 +284,12 @@ router.post('/firebase-sync', async (req, res) => {
     }
 });
 
-// ─── GET /api/auth/me ─────────────────────────────────────────────────────────
+// ─── GET /api/auth/me ──────────────────────────────────────────────────────────
 router.get('/me', authenticateToken, async (req, res) => {
     try {
         let user = await getOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
 
-        // Fallback: look up by firebase_uid in case row id shifted after DB wipe
+        // Fallback: look up by firebase_uid
         if (!user && req.user.firebase_uid) {
             user = await getOne(
                 'SELECT * FROM users WHERE firebase_uid = ?',
@@ -320,12 +332,8 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 // ─── DELETE /api/auth/delete-firebase-user ────────────────────────────────────
-// Permanently removes the Firebase Auth account via Admin SDK.
-// Must be called AFTER DELETE /api/users/me has anonymized the DB row.
-// Admin SDK does not require client-side re-authentication.
 router.delete('/delete-firebase-user', authenticateToken, async (req, res) => {
     try {
-        // firebase_uid comes from the verified token attached by authenticateToken
         const firebaseUid = req.user.firebase_uid;
 
         if (!firebaseUid) {
@@ -344,7 +352,6 @@ router.delete('/delete-firebase-user', authenticateToken, async (req, res) => {
             console.log('✅ Firebase Auth user permanently deleted via Admin SDK:', uid);
         } catch (firebaseErr) {
             if (firebaseErr.code === 'auth/user-not-found') {
-                // Already deleted — treat as success so the client flow continues
                 console.log('ℹ️  Firebase user already deleted (not found):', uid);
             } else {
                 console.error('❌ Firebase Admin deleteUser failed:', firebaseErr.message);
@@ -355,7 +362,6 @@ router.delete('/delete-firebase-user', authenticateToken, async (req, res) => {
             }
         }
 
-        // Also wipe profile_data so it can't be restored on re-signup
         await runQuery(
             'DELETE FROM profile_data WHERE firebase_uid = ?',
             [uid]
@@ -368,10 +374,8 @@ router.delete('/delete-firebase-user', authenticateToken, async (req, res) => {
     }
 });
 
-// ─── POST /api/auth/logout ────────────────────────────────────────────────────
 router.post('/logout', (_req, res) => res.json({ message: 'Logged out successfully.' }));
 
-// ─── Backwards-compat stubs ───────────────────────────────────────────────────
 router.post('/refresh', (_req, res) =>
     res.status(410).json({ error: 'Token refresh is handled by Firebase.' })
 );
