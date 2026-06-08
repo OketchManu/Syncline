@@ -6,7 +6,9 @@ import { useAuth } from '../../context/AuthContext';
 import { companyAPI } from '../../services/api';
 import { Zap, CheckCircle2, XCircle, Loader, Building2 } from 'lucide-react';
 
-const API_BASE = 'https://syncline-1.onrender.com/api';
+import { API_BASE_URL } from '../../config.js';
+
+const API_BASE = API_BASE_URL;
 
 const roleConfig = {
     owner:   { label: 'Owner',   color: '#f59e0b', icon: '👑' },
@@ -79,9 +81,11 @@ const JoinCompany = () => {
             // user now belongs to a company without requiring a full reload.
             if (data.company) {
                 updateUser({
-                    company_id: data.company.id,
-                    companyId:  data.company.id,
-                    role:       data.role || 'member',
+                    company_id:   data.company.id,
+                    companyId:    data.company.id,
+                    accountType:  'company',
+                    account_type: 'company',
+                    role:         data.role || 'member',
                 });
             }
 

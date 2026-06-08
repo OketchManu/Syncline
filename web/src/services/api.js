@@ -1,8 +1,7 @@
 // web/src/services/api.js
 import axios from 'axios';
 import { auth } from '../firebase.js';
-
-const API_BASE_URL = 'https://syncline-1.onrender.com/api';
+import { API_BASE_URL } from '../config.js';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -85,6 +84,13 @@ export const companyAPI = {
     removeMember:     (id)         => api.delete(`/company/team/${id}`),
     getInvitations:   ()           => api.get('/company/invitations'),
     deleteInvitation: (id)         => api.delete(`/company/invitations/${id}`),
+};
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export const notificationAPI = {
+    getAll:   ()           => api.get('/notifications'),
+    markRead: (id)         => api.patch(`/notifications/${id}/read`),
+    markAll:  ()           => api.patch('/notifications/read-all'),
 };
 
 // ─── Reports ──────────────────────────────────────────────────────────────────

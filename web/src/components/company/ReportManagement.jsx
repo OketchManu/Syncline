@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../firebase.js';
+import { isCompanyAccount } from '../../utils/accountType.js';
+import { API_BASE_URL, API_ORIGIN } from '../../config.js';
 import {
     FileText, Plus, X, Send, CheckCircle2, AlertCircle, Clock,
     Search, RefreshCw, Download,
@@ -10,8 +12,7 @@ import {
     AlertTriangle, ClipboardList, MessageSquare, Building2
 } from 'lucide-react';
 
-const API_BASE   = 'https://syncline-1.onrender.com/api';
-const API_ORIGIN = 'https://syncline-1.onrender.com';
+const API_BASE = API_BASE_URL;
 
 // ─── Auth helper (plain async function — not a hook) ──────────────────────────
 async function getAuthHeaders() {
@@ -297,8 +298,8 @@ const ReportManagement = ({ dark = true }) => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [tab,          setTab]          = useState('all');
 
-    const isCompanyAccount = user?.account_type === 'company' || user?.accountType === 'company';
-    const canReview = isCompanyAccount && ['owner', 'admin', 'manager'].includes(user?.role);
+    const isCompany = isCompanyAccount(user);
+    const canReview = isCompany && ['owner', 'admin', 'manager'].includes(user?.role);
 
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 

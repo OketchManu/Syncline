@@ -282,8 +282,22 @@ const MIGRATIONS = [
             firebase_uid TEXT PRIMARY KEY,
             full_name    TEXT,
             avatar_url   TEXT,
+            account_type TEXT DEFAULT 'personal',
             updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
         )`,
+    },
+    {
+        name: 'profile_data — add account_type',
+        sql: `ALTER TABLE profile_data ADD COLUMN account_type TEXT DEFAULT 'personal'`,
+    },
+    {
+        name: 'fix company account_type drift',
+        custom: async () => {
+            await runQuery(
+                `UPDATE users SET account_type = 'company'
+                 WHERE company_id IS NOT NULL AND account_type != 'company'`
+            ).catch(() => {});
+        },
     },
 
     // ── Data fixes ─────────────────────────────────────────────────────────────

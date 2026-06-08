@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../firebase.js";
+import { isCompanyAccount } from "../../utils/accountType.js";
+import { API_BASE_URL, API_ORIGIN } from "../../config.js";
 import {
   Building2, CheckCircle2, AlertCircle,
   Globe, Users, Upload, X, Edit2,
@@ -10,8 +12,7 @@ import {
   Send, Clock, XCircle,
 } from "lucide-react";
 
-const API_BASE   = "https://syncline-1.onrender.com/api";
-const API_ORIGIN = "https://syncline-1.onrender.com";
+const API_BASE = API_BASE_URL;
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
 const DARK = {
@@ -761,7 +762,7 @@ const JoinView = ({ tk }) => {
         if (res.ok && data.status) {
           setJoinStatus(data.status);
           setJoinedCompany(data.company);
-          if (data.status==="accepted" && updateUser) updateUser({ company_id: data.company?.id });
+          if (data.status==="accepted" && updateUser) updateUser({ company_id: data.company?.id, companyId: data.company?.id, accountType: 'company', account_type: 'company' });
         }
       } catch(_) {}
       setChecking(false);
@@ -776,7 +777,7 @@ const JoinView = ({ tk }) => {
         const data = await res.json();
         if (res.ok && data.status && data.status !== joinStatus) {
           setJoinStatus(data.status); setJoinedCompany(data.company);
-          if (data.status==="accepted" && updateUser) updateUser({ company_id: data.company?.id });
+          if (data.status==="accepted" && updateUser) updateUser({ company_id: data.company?.id, companyId: data.company?.id, accountType: 'company', account_type: 'company' });
         }
       } catch(_) {}
     }, 8000);
@@ -792,7 +793,7 @@ const JoinView = ({ tk }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||"Invalid invite code.");
       setJoinStatus(data.status||"pending"); setJoinedCompany(data.company);
-      if (updateUser) updateUser({ company_id: data.company?.id });
+      if (updateUser) updateUser({ company_id: data.company?.id, companyId: data.company?.id, accountType: 'company', account_type: 'company' });
     } catch(err) { setError(err.message); }
     finally { setLoading(false); }
   };
@@ -879,11 +880,11 @@ export default function CompanyOnboarding({ dark: darkProp }) {
   const dark = darkProp !== undefined ? darkProp : darkLocal;
   const tk   = dark ? DARK : LIGHT;
 
-  const isCompanyAccount = user?.accountType==="company" || user?.account_type==="company";
+  const isCompany = isCompanyAccount(user);
   const companyName      = company?.name || user?.companyName || user?.company_name || "Your Company";
 
   // FIX: owner is now included in canEdit
-  const canEdit = isCompanyAccount && ["owner","admin","manager"].includes(user?.role);
+  const canEdit = isCompany && ["owner","admin","manager"].includes(user?.role);
 
   const showToast = (msg, type="success") => {
     setToast({ msg, type });
@@ -891,7 +892,7 @@ export default function CompanyOnboarding({ dark: darkProp }) {
   };
 
   const fetchTeam = useCallback(async () => {
-    if (!isCompanyAccount || !user?.company_id) { setLoading(false); return; }
+    if (!isCompany || !user?.company_id) { setLoading(false); return; }
     setLoading(true); setFetchErr(null);
     try {
       const res  = await fetch(`${API_BASE}/company/team`, { headers: await getAuthHeaders() });
@@ -907,14 +908,14 @@ export default function CompanyOnboarding({ dark: darkProp }) {
     } finally {
       setLoading(false);
     }
-  }, [isCompanyAccount, user?.company_id]);
+  }, [isCompany, user?.company_id]);
 
   useEffect(() => { fetchTeam(); }, [fetchTeam]);
 
   const handleEditComplete = async (updatedCompany) => {
     setCompany(updatedCompany);
     setEditing(false);
-    if (updateUser) updateUser({ company_id: updatedCompany.id });
+    if (updateUser) updateUser({ company_id: updatedCompany.id, companyId: updatedCompany.id, accountType: 'company', account_type: 'company' });
     showToast("Company details saved successfully!");
     // Re-fetch to get server-confirmed values including logo_url
     setTimeout(() => fetchTeam(), 800);
@@ -983,10 +984,10 @@ export default function CompanyOnboarding({ dark: darkProp }) {
             </div>
             <div>
               <h1 style={{ margin:"0 0 2px", fontSize:19, fontWeight:800, color:tk.text, letterSpacing:"-0.02em" }}>
-                {isCompanyAccount ? "Company Workspace" : "Join a Company"}
+                {isCompany ? "Company Workspace" : "Join a Company"}
               </h1>
               <p style={{ margin:0, fontSize:13, color:tk.subtle }}>
-                {isCompanyAccount
+                {isCompany
                   ? "Manage your company profile, team members and invitations."
                   : "Enter an invite code or open an invite link to join your team."}
               </p>
@@ -1009,7 +1010,7 @@ export default function CompanyOnboarding({ dark: darkProp }) {
         )}
 
         {/* Company account view */}
-        {isCompanyAccount && (
+        {isCompany && (
           <>
             {editing ? (
               <div style={{ background:tk.surface, border:`1px solid ${tk.border}`, borderRadius:18, padding:"22px 24px" }}>
@@ -1092,7 +1093,7 @@ export default function CompanyOnboarding({ dark: darkProp }) {
         )}
 
         {/* Personal account — join view */}
-        {!isCompanyAccount && <JoinView tk={tk}/>}
+        {!isCompany && <JoinView tk={tk}/>}
       </div>
     </div>
   );

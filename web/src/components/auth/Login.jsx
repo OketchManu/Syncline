@@ -1,7 +1,7 @@
 // web/src/components/auth/Login.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Zap } from 'lucide-react';
 
 const Login = () => {
@@ -13,7 +13,9 @@ const Login = () => {
     const [googleLoading, setGoogleLoading] = useState(false);
 
     const { login, loginWithGoogle } = useAuth();
-    const navigate = useNavigate();
+    const navigate  = useNavigate();
+    const location  = useLocation();
+    const redirectTo = location.state?.from?.pathname || '/dashboard';
 
     // ── Theme detection ──────────────────────────────────────────────────────
     const [dark, setDark] = useState(() => {
@@ -42,7 +44,7 @@ const Login = () => {
         const result = await login(email, password);
 
         if (result.success) {
-            navigate('/dashboard');
+            navigate(redirectTo, { replace: true });
         } else {
             setError(result.error || 'Sign in failed. Please try again.');
         }
@@ -57,7 +59,7 @@ const Login = () => {
         const result = await loginWithGoogle();
 
         if (result.success) {
-            navigate('/dashboard');
+            navigate(redirectTo, { replace: true });
         } else if (result.needsRegistration) {
             // Google account exists in Firebase but has no Syncline account —
             // redirect to /register and pre-fill the form with their Google profile.

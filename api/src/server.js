@@ -73,6 +73,7 @@ app.use('/api/tasks',        require('./routes/task.routes'));
 app.use('/api/users',        require('./routes/users.routes'));
 app.use('/api/company',      require('./routes/company.routes'));
 app.use('/api/task-reports', require('./routes/task-reports.routes'));
+app.use('/api/notifications', require('./routes/notifications.routes'));
 
 // 404 & error handler
 app.use((_req, res)       => res.status(404).json({ error: 'Not Found' }));

@@ -1,7 +1,8 @@
 // web/src/components/dashboard/Dashboard.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { taskAPI, userAPI } from '../../services/api';
+import { taskAPI, userAPI, notificationAPI } from '../../services/api';
+import { API_ORIGIN } from '../../config.js';
 import { auth } from '../../firebase.js';
 import wsService from '../../services/websocket';
 import CompanyOnboarding   from '../company/CompanyOnboarding';
@@ -9,6 +10,7 @@ import TeamManagement      from '../company/TeamManagement';
 import ProgressMonitor     from '../company/ProgressMonitor';
 import ReportManagement    from '../company/ReportManagement';
 import TaskAssignmentModal from '../company/TaskAssignment';
+import { isCompanyAccount } from '../../utils/accountType.js';
 import {
     Plus, Search, CheckCircle2, Clock, AlertCircle, Flag, Zap, LogOut,
     Activity, ListTodo, Sun, Moon, Trash2, Bell, X, Edit2, WifiOff, Wifi,
@@ -17,8 +19,6 @@ import {
     ChevronLeft, Lock, ArrowRight, Sparkles, Menu, ChevronDown, UserPlus,
     UserCircle,
 } from 'lucide-react';
-
-const API_ORIGIN = 'https://syncline-1.onrender.com';
 
 const resolveAvatar = (a) => {
     if (!a) return null;
@@ -318,7 +318,7 @@ const ProfileModal = ({ t, user, onClose, onSave, onDeleteAccount, isOnline }) =
 
     const resetDelState = () => { setDelStep(1); setDelConfirm(''); setDelPassword(''); setDelError(''); setShowDelPw(false); };
 
-    const accountTypeLabel = (user?.accountType || user?.account_type || 'personal') === 'company' ? 'Company' : 'Personal';
+    const accountTypeLabel = isCompanyAccount(user) ? 'Company' : 'Personal';
     const accountTypeIcon  = accountTypeLabel === 'Company' ? <Building2 size={11}/> : <UserCircle size={11}/>;
     const accountTypeColor = accountTypeLabel === 'Company' ? t.info : t.accent;
 
@@ -802,7 +802,8 @@ const Dashboard = () => {
     const { user, logout, updateUser, deleteAccount } = useAuth();
 
     const [dark,setDark]=useState(()=>{const s=localStorage.getItem('syncline_theme');if(s)return s==='dark';return window.matchMedia('(prefers-color-scheme: dark)').matches;});
-    const isCompany = user?.accountType==='company' || user?.account_type==='company';
+    const userCompanyId = user?.companyId || user?.company_id;
+    const isCompany = isCompanyAccount(user);
     const t = THEMES[dark?'dark':'light'][isCompany?'company':'personal'];
 
     const [currentView,setCurrentView]=useState(()=>{const s=sessionStorage.getItem('syncline_view');const v=['dashboard','company-setup','team','progress','reports'];return(s&&v.includes(s))?s:'dashboard';});
@@ -842,7 +843,24 @@ const Dashboard = () => {
         catch(err){console.error('fetchTasks:',err);}
     },[]);
 
-    useEffect(()=>{if(!isCompany||!user?.company_id)return;const load=async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const res=await fetch(`${API_ORIGIN}/api/company/team`,{headers:{Authorization:`Bearer ${token}`}});const data=await res.json();if(data.company?.name)setCompanyName(data.company.name);if(data.company?.logo_url)setCompanyLogo(data.company.logo_url);}catch(e){console.error('loadCompany:',e);}};load();},[isCompany,user?.company_id]);
+    useEffect(()=>{if(!isCompany||!userCompanyId)return;const load=async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const res=await fetch(`${API_ORIGIN}/api/company/team`,{headers:{Authorization:`Bearer ${token}`}});const data=await res.json();if(data.company?.name)setCompanyName(data.company.name);if(data.company?.logo_url)setCompanyLogo(data.company.logo_url);}catch(e){console.error('loadCompany:',e);}};load();},[isCompany,userCompanyId]);
+
+    useEffect(()=>{
+        const loadNotifications = async () => {
+            try {
+                const res = await notificationAPI.getAll();
+                const persisted = (res.data?.notifications || []).map(n => ({
+                    id:      n.id,
+                    title:   n.title,
+                    message: n.message,
+                    type:    n.type || 'info',
+                    read:    n.read,
+                }));
+                if (persisted.length) setNotifications(persisted);
+            } catch (e) { console.error('loadNotifications:', e); }
+        };
+        loadNotifications();
+    }, []);
 
     useEffect(()=>{const on=()=>{setIsOnline(true);addActivity('Connection restored');};const off=()=>{setIsOnline(false);addActivity('Lost connection');};window.addEventListener('online',on);window.addEventListener('offline',off);return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};},[addActivity]);
 
@@ -962,12 +980,12 @@ const Dashboard = () => {
                             <div style={{position:'fixed',top:'56px',right:'10px',width:'min(290px,calc(100vw - 20px))',background:t.modalBg,border:`1px solid ${t.borderMid}`,borderRadius:'13px',boxShadow:'0 20px 50px rgba(0,0,0,0.35)',zIndex:500,overflow:'hidden',animation:'slideDown 0.15s ease'}}>
                                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px',borderBottom:`1px solid ${t.border}`}}>
                                     <span style={{fontSize:'12px',fontWeight:'700',color:t.textPrimary}}>Notifications</span>
-                                    <button onClick={()=>setNotifications(p=>p.map(n=>({...n,read:true})))} style={{background:'none',border:'none',color:t.accentLight,fontSize:'11px',cursor:'pointer',fontWeight:'600',fontFamily:'inherit'}}>Mark all read</button>
+                                    <button onClick={()=>{setNotifications(p=>p.map(n=>({...n,read:true})));notificationAPI.markAll().catch(()=>{});}} style={{background:'none',border:'none',color:t.accentLight,fontSize:'11px',cursor:'pointer',fontWeight:'600',fontFamily:'inherit'}}>Mark all read</button>
                                 </div>
                                 <div style={{maxHeight:'250px',overflowY:'auto'}}>
                                     {notifications.length===0
                                         ?<p style={{fontSize:'12px',color:t.textMuted,textAlign:'center',padding:'18px',margin:0}}>No notifications</p>
-                                        :notifications.map(n=><div key={n.id} onClick={()=>setNotifications(p=>p.map(i=>i.id===n.id?{...i,read:true}:i))} style={{padding:'9px 13px',borderBottom:`1px solid ${t.border}`,background:n.read?'transparent':t.accentBg,cursor:'pointer'}}><p style={{margin:'0 0 2px',fontSize:'12px',fontWeight:n.read?'500':'700',color:t.textPrimary}}>{n.title}</p><p style={{margin:0,fontSize:'11px',color:t.textMuted,lineHeight:1.4}}>{n.message}</p></div>)
+                                        :notifications.map(n=><div key={n.id} onClick={()=>{setNotifications(p=>p.map(i=>i.id===n.id?{...i,read:true}:i));if(typeof n.id==='number')notificationAPI.markRead(n.id).catch(()=>{});}} style={{padding:'9px 13px',borderBottom:`1px solid ${t.border}`,background:n.read?'transparent':t.accentBg,cursor:'pointer'}}><p style={{margin:'0 0 2px',fontSize:'12px',fontWeight:n.read?'500':'700',color:t.textPrimary}}>{n.title}</p><p style={{margin:0,fontSize:'11px',color:t.textMuted,lineHeight:1.4}}>{n.message}</p></div>)
                                     }
                                 </div>
                             </div>

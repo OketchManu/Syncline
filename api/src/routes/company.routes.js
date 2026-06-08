@@ -324,7 +324,7 @@ router.post('/join/:code', authenticateToken, async (req, res) => {
             } else {
                 await runQuery(`INSERT INTO join_requests (company_id, user_id, status) VALUES (?, ?, 'pending')`, [company.id, req.user.id]);
             }
-            await runQuery(`UPDATE users SET company_id=?, join_status='pending', updated_at=CURRENT_TIMESTAMP WHERE id=?`, [company.id, req.user.id]);
+            await runQuery(`UPDATE users SET company_id=?, join_status='pending', account_type='company', updated_at=CURRENT_TIMESTAMP WHERE id=?`, [company.id, req.user.id]);
             return res.json({ message: 'Join request sent. An admin will review it.', status: 'pending', company: { id: company.id, name: company.name } });
         }
 
@@ -345,7 +345,7 @@ router.post('/join/:code', authenticateToken, async (req, res) => {
         }
 
         await runQuery(
-            `UPDATE users SET company_id = ?, role = ?, join_status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            `UPDATE users SET company_id = ?, role = ?, join_status = 'accepted', account_type = 'company', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
             [inv.company_id, inv.role, req.user.id]
         );
         await runQuery(`UPDATE team_invitations SET status = 'accepted', used_at = datetime('now') WHERE id = ?`, [inv.id]);
@@ -399,7 +399,7 @@ router.patch('/join-requests/:id/accept', authenticateToken, requireCompanyRole(
         if (request.status !== 'pending') return res.status(400).json({ error: 'This request has already been resolved.' });
 
         await runQuery(`UPDATE join_requests SET status='accepted', resolved_at=datetime('now'), resolved_by=? WHERE id=?`, [req.user.id, request.id]);
-        await runQuery(`UPDATE users SET role='member', join_status='accepted', updated_at=CURRENT_TIMESTAMP WHERE id=?`, [request.user_id]);
+        await runQuery(`UPDATE users SET role='member', join_status='accepted', account_type='company', updated_at=CURRENT_TIMESTAMP WHERE id=?`, [request.user_id]);
 
         const u = await getOne('SELECT full_name FROM users WHERE id = ?', [request.user_id]);
         res.json({ message: `${u?.full_name || 'User'} has been accepted.` });

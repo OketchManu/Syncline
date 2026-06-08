@@ -7,33 +7,10 @@ const crypto  = require('crypto');
 const { runQuery, getOne } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { admin }             = require('../config/firebase');
+const { resolveAccountType, repairAccountType, sanitizeUser } = require('../utils/accountType');
 
 function generateInviteCode() {
     return 'SYNC-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-}
-
-function sanitizeUser(user) {
-    if (!user) return null;
-    const accountType = user.account_type === 'company' ? 'company' : 'personal';
-    return {
-        id:           user.id,
-        email:        user.email,
-        fullName:     user.full_name || user.fullName,
-        full_name:    user.full_name || user.fullName,
-        role:         user.role         || 'member',
-        accountType,
-        account_type: accountType,
-        companyId:    user.company_id   || null,
-        company_id:   user.company_id   || null,
-        orgId:        user.org_id       || null,
-        org_id:       user.org_id       || null,
-        avatar:       user.avatar_url   || null,
-        avatar_url:   user.avatar_url   || null,
-        firebaseUid:  user.firebase_uid || null,
-        isActive:     user.is_active !== 0,
-        createdAt:    user.created_at,
-        lastSeen:     user.last_seen,
-    };
 }
 
 async function createCompany(userId, { companyName, industry, size, description, website }) {
@@ -97,7 +74,31 @@ router.post('/register', async (req, res) => {
                 );
                 existing.firebase_uid = firebaseUid;
             }
-            
+
+            // Upgrade to company account when registering a company workspace
+            if (resolvedType === 'company' && companyName && !existing.company_id) {
+                await runQuery(
+                    `UPDATE users SET account_type = 'company', role = 'owner', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                    [existing.id]
+                );
+                await createCompany(existing.id, { companyName, industry, size, description, website });
+                existing = await getOne('SELECT * FROM users WHERE id = ?', [existing.id]);
+            }
+
+            existing = await repairAccountType(existing);
+
+            if (firebaseUid) {
+                await runQuery(
+                    `INSERT INTO profile_data (firebase_uid, full_name, avatar_url, account_type, updated_at)
+                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     ON CONFLICT(firebase_uid) DO UPDATE SET
+                         full_name = excluded.full_name,
+                         account_type = excluded.account_type,
+                         updated_at = CURRENT_TIMESTAMP`,
+                    [firebaseUid, existing.full_name, existing.avatar_url || null, resolveAccountType(existing)]
+                ).catch(() => {});
+            }
+
             let company = null;
             if (existing.company_id)
                 company = await getOne(
@@ -124,13 +125,14 @@ router.post('/register', async (req, res) => {
 
         if (firebaseUid) {
             await runQuery(
-                `INSERT INTO profile_data (firebase_uid, full_name, avatar_url, updated_at)
-                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                `INSERT INTO profile_data (firebase_uid, full_name, avatar_url, account_type, updated_at)
+                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                  ON CONFLICT(firebase_uid) DO UPDATE
                  SET full_name=excluded.full_name,
                      avatar_url=excluded.avatar_url,
+                     account_type=excluded.account_type,
                      updated_at=CURRENT_TIMESTAMP`,
-                [firebaseUid, fullName, avatar || null]
+                [firebaseUid, fullName, avatar || null, resolvedType]
             ).catch(() => {});
         }
 
@@ -215,7 +217,9 @@ router.post('/firebase-sync', async (req, res) => {
                 existing.firebase_uid = firebaseUid;
                 console.log('✅ Linked Firebase UID to existing user:', email);
             }
-            
+
+            existing = await repairAccountType(existing);
+
             let company = null;
             if (existing.company_id)
                 company = await getOne(
@@ -231,16 +235,18 @@ router.post('/firebase-sync', async (req, res) => {
         }
 
         // ─── Restore from profile_data if available ────────────────────────────
-        let restoredName   = displayName;
-        let restoredAvatar = avatarUrl;
+        let restoredName        = displayName;
+        let restoredAvatar      = avatarUrl;
+        let restoredAccountType = 'personal';
         try {
             const saved = await getOne(
-                'SELECT full_name, avatar_url FROM profile_data WHERE firebase_uid = ?',
+                'SELECT full_name, avatar_url, account_type FROM profile_data WHERE firebase_uid = ?',
                 [firebaseUid]
             );
             if (saved) {
-                if (saved.full_name)  restoredName   = saved.full_name;
-                if (saved.avatar_url) restoredAvatar = saved.avatar_url;
+                if (saved.full_name)       restoredName        = saved.full_name;
+                if (saved.avatar_url)      restoredAvatar      = saved.avatar_url;
+                if (saved.account_type)    restoredAccountType = saved.account_type;
                 console.log('✅ firebase-sync: restored profile from profile_data');
             }
         } catch (_) {}
@@ -252,8 +258,8 @@ router.post('/firebase-sync', async (req, res) => {
                 `INSERT INTO users
                     (email, full_name, account_type, role,
                      firebase_uid, avatar_url, is_active, created_at)
-                 VALUES (?, ?, 'personal', 'member', ?, ?, 1, CURRENT_TIMESTAMP)`,
-                [email, restoredName, firebaseUid, restoredAvatar]
+                 VALUES (?, ?, ?, 'member', ?, ?, 1, CURRENT_TIMESTAMP)`,
+                [email, restoredName, restoredAccountType === 'company' ? 'company' : 'personal', firebaseUid, restoredAvatar]
             );
         } catch (insertErr) {
             if (insertErr.message.includes('UNIQUE constraint') || insertErr.message.includes('duplicate key')) {
@@ -268,10 +274,10 @@ router.post('/firebase-sync', async (req, res) => {
         }
 
         await runQuery(
-            `INSERT INTO profile_data (firebase_uid, full_name, avatar_url, updated_at)
-             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            `INSERT INTO profile_data (firebase_uid, full_name, avatar_url, account_type, updated_at)
+             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
              ON CONFLICT(firebase_uid) DO NOTHING`,
-            [firebaseUid, restoredName, restoredAvatar]
+            [firebaseUid, restoredName, restoredAvatar, restoredAccountType === 'company' ? 'company' : 'personal']
         ).catch(() => {});
 
         const newUser = await getOne('SELECT * FROM users WHERE id = ?', [userResult.id]);
@@ -301,6 +307,8 @@ router.get('/me', authenticateToken, async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: 'Account not found. Please register to continue.' });
         }
+
+        user = await repairAccountType(user);
 
         // Block deleted/anonymized accounts
         if (

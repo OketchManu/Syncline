@@ -38,29 +38,7 @@ try {
     console.log('ℹ️  multer not installed — avatar upload disabled');
 }
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-function sanitizeUser(user) {
-    if (!user) return null;
-    const accountType = user.account_type === 'company' ? 'company' : 'personal';
-    return {
-        id:           user.id,
-        email:        user.email,
-        fullName:     user.full_name,
-        full_name:    user.full_name,
-        role:         user.role || 'member',
-        accountType,
-        account_type: accountType,
-        companyId:    user.company_id || null,
-        company_id:   user.company_id || null,
-        orgId:        user.org_id     || null,
-        org_id:       user.org_id     || null,
-        avatar:       user.avatar_url || null,
-        avatar_url:   user.avatar_url || null,
-        isActive:     user.is_active !== 0,
-        lastSeen:     user.last_seen,
-        createdAt:    user.created_at,
-    };
-}
+const { sanitizeUser } = require('../utils/accountType');
 
 // ── GET /api/users ────────────────────────────────────────────────────────────
 router.get('/', requireRole('admin', 'manager'), async (req, res) => {

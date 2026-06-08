@@ -15,6 +15,8 @@ import {
     EmailAuthProvider,
     onAuthStateChanged,
 } from '../firebase.js';
+import { API_BASE_URL } from '../config.js';
+import { isCompanyAccount, normaliseAccountFields } from '../utils/accountType.js';
 
 const AuthContext = createContext();
 
@@ -24,22 +26,18 @@ export const useAuth = () => {
     return context;
 };
 
-const API_URL = 'https://syncline-1.onrender.com/api';
+const API_URL = API_BASE_URL;
 
 const normaliseUser = (raw) => {
     if (!raw) return null;
-    const rawType     = raw.accountType || raw.account_type || 'personal';
-    const accountType = rawType === 'company' ? 'company' : 'personal';
+    const fields = normaliseAccountFields(raw);
     return {
         ...raw,
-        accountType,
-        account_type: accountType,
-        fullName:   raw.fullName   ?? raw.full_name  ?? null,
-        full_name:  raw.full_name  ?? raw.fullName   ?? null,
-        companyId:  raw.companyId  ?? raw.company_id ?? null,
-        company_id: raw.company_id ?? raw.companyId  ?? null,
-        orgId:      raw.orgId      ?? raw.org_id     ?? null,
-        org_id:     raw.org_id     ?? raw.orgId      ?? null,
+        ...fields,
+        fullName:  raw.fullName  ?? raw.full_name  ?? null,
+        full_name: raw.full_name ?? raw.fullName   ?? null,
+        orgId:     raw.orgId     ?? raw.org_id     ?? null,
+        org_id:    raw.org_id    ?? raw.orgId      ?? null,
     };
 };
 
@@ -539,8 +537,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     const updateUser        = (userData) => setUser(prev => normaliseUser({ ...prev, ...userData }));
-    const hasCompanyFeatures = () => user?.accountType === 'company';
-    const isCompanyOwner     = () => user?.accountType === 'company' && user?.role === 'owner';
+    const hasCompanyFeatures = () => isCompanyAccount(user);
+    const isCompanyOwner     = () => !!user && user.role === 'owner' && isCompanyAccount(user);
     const isEmailVerified    = () => auth.currentUser?.emailVerified ?? false;
 
     return (

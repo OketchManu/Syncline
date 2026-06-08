@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Zap, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
-import { auth } from '../firebase.js';
+import { auth } from '../../firebase.js';
 import { verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
 
 const rules = [
