@@ -88,6 +88,7 @@ const Register = () => {
     // ── Email / password register ─────────────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (fromGoogleLogin) return;
         setError('');
 
         if (!fullName.trim()) {
@@ -127,6 +128,16 @@ const Register = () => {
     // Uses registerWithGoogle (not loginWithGoogle) so it always creates the account.
     const handleGoogleSignup = async () => {
         setError('');
+
+        if (!accountType) {
+            setError('Please select an account type first.');
+            return;
+        }
+        if (accountType === 'company' && !companyName.trim()) {
+            setError('Company name is required');
+            return;
+        }
+
         setGoogleLoading(true);
 
         const result = await registerWithGoogle(
@@ -441,7 +452,8 @@ const Register = () => {
                                             placeholder="name@company.com"
                                             style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
-                                            disabled={isDisabled}
+                                            disabled={isDisabled || fromGoogleLogin}
+                                            readOnly={fromGoogleLogin}
                                         />
                                     </div>
                                 </div>

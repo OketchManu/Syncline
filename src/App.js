@@ -7,7 +7,7 @@ import Register from './components/auth/Register';
 import Dashboard from './components/dashboard/Dashboard';
 import ForgotPassword from './components/auth/ForgotPassword.jsx';
 import ResetPassword from './components/auth/ResetPassword.jsx';
-import JoinCompany from './mponents/auth/JoinCompany.jsx';
+import JoinCompany from './components/auth/JoinCompany.jsx';
 // Company Management Components
 import CompanyOnboarding from './components/company/CompanyOnboarding';
 import TeamManagement from './components/company/TeamManagement';
@@ -114,7 +114,14 @@ function AppRoutes() {
             />
 
             {/* Auth Routes */}
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route
+                path="/forgot-password"
+                element={
+                    <PublicRoute>
+                        <ForgotPassword />
+                    </PublicRoute>
+                }
+            />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/join/:code" element={<JoinCompany />} />
 

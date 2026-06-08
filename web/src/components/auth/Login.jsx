@@ -58,13 +58,13 @@ const Login = () => {
 
         if (result.success) {
             navigate('/dashboard');
-        } else if (result.notRegistered) {
+        } else if (result.needsRegistration) {
             // Google account exists in Firebase but has no Syncline account —
             // redirect to /register and pre-fill the form with their Google profile.
             navigate('/register', {
                 state: {
                     fromGoogleLogin: true,
-                    googleProfile:   result.googleProfile,
+                    googleProfile:   result.googleUser,
                 },
             });
         } else if (result.error) {
@@ -189,7 +189,7 @@ const Login = () => {
                         </div>
 
                         {error && (
-                            <div style={styles.error}>
+                            <div style={{ ...styles.error, color: t.errorText }}>
                                 <span>⚠️</span>
                                 <span>{error}</span>
                             </div>
@@ -261,6 +261,7 @@ const tokens = {
         iconColor:   '#64748b',
         inputBg:     'rgba(255, 255, 255, 0.05)',
         placeholder: '#64748b',
+        errorText:   '#fca5a5',
     },
     light: {
         bg:          '#f0f4ff',
@@ -277,6 +278,7 @@ const tokens = {
         iconColor:   '#94a3b8',
         inputBg:     'rgba(241, 245, 249, 0.8)',
         placeholder: '#94a3b8',
+        errorText:   '#dc2626',
     },
 };
 

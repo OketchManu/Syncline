@@ -114,7 +114,14 @@ function AppRoutes() {
             />
 
             {/* Auth Routes */}
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route
+                path="/forgot-password"
+                element={
+                    <PublicRoute>
+                        <ForgotPassword />
+                    </PublicRoute>
+                }
+            />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/join/:code" element={<JoinCompany />} />
 

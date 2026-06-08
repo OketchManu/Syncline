@@ -504,7 +504,10 @@ export const AuthProvider = ({ children }) => {
     // ── Other helpers ─────────────────────────────────────────────────────────
     const resetPassword = async (email) => {
         try {
-            await sendPasswordResetEmail(auth, email);
+            await sendPasswordResetEmail(auth, email, {
+                url: `${window.location.origin}/reset-password`,
+                handleCodeInApp: true,
+            });
             return { success: true };
         } catch (err) {
             return { success: false, error: firebaseErrorMessage(err.code) || err.message };

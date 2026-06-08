@@ -153,7 +153,7 @@ const ForgotPasswordForm = ({ onBack }) => {
 
 // ─── Main AuthPage ────────────────────────────────────────────────────────────
 export default function AuthPage({ onAuthenticated }) {
-    const { login, register, loginWithGoogle } = useAuth();
+    const { login, register, loginWithGoogle, registerWithGoogle } = useAuth();
 
     const [mode,        setMode]        = useState('login');   // 'login' | 'register' | 'forgot'
     const [accountType, setAccountType] = useState('personal');
@@ -201,10 +201,28 @@ export default function AuthPage({ onAuthenticated }) {
     const handleGoogle = async () => {
         reset();
         setGoogleLoad(true);
-        const res = await loginWithGoogle(accountType, companyName.trim() || null);
+
+        const res = isRegister
+            ? await registerWithGoogle(
+                accountType || 'personal',
+                accountType === 'company' ? companyName.trim() || null : null,
+            )
+            : await loginWithGoogle();
+
         setGoogleLoad(false);
-        if (!res.success && res.error) { setError(res.error); return; }
-        if (res.success) onAuthenticated?.();
+
+        if (res.success) {
+            onAuthenticated?.();
+            return;
+        }
+        if (res.needsRegistration) {
+            setError('No Syncline account found for this Google account. Please register first.');
+            switchMode('register');
+            if (res.googleUser?.email) setEmail(res.googleUser.email);
+            if (res.googleUser?.fullName) setFullName(res.googleUser.fullName);
+            return;
+        }
+        if (res.error) setError(res.error);
     };
 
     return (

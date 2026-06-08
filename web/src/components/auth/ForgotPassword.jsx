@@ -1,43 +1,18 @@
-// web/src/components/auth/ResetPassword.jsx
-//
-// Firebase password-reset flow:
-//   1. User clicks the link in the email → lands on this page with ?oobCode=XXX
-//   2. We call Firebase confirmPasswordReset(auth, oobCode, newPassword)
-//   3. On success, show a "Password updated!" screen and redirect to /login
-//
-// The old approach of hitting a custom backend endpoint with a server-issued
-// token is replaced entirely by Firebase's built-in flow.
-
+// web/src/components/auth/ForgotPassword.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Zap, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
-import { auth } from "../firebase.js";
+import { useNavigate } from 'react-router-dom';
+import { Mail, Zap, ArrowLeft, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-const rules = [
-    { label: 'At least 8 characters', test: p => p.length >= 8 },
-    { label: 'One uppercase letter',   test: p => /[A-Z]/.test(p) },
-    { label: 'One number',             test: p => /\d/.test(p) },
-];
+const ForgotPassword = () => {
+    const [email,   setEmail]   = useState('');
+    const [error,   setError]   = useState('');
+    const [success, setSuccess] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-const ResetPassword = () => {
-    const [searchParams] = useSearchParams();
-    // Firebase uses `oobCode` as the query param in reset-password links.
-    // Support both `oobCode` (Firebase default) and legacy `token` param.
-    const oobCode = searchParams.get('oobCode') || searchParams.get('token');
+    const { resetPassword } = useAuth();
     const navigate = useNavigate();
 
-    const [email,       setEmail]       = useState('');      // resolved from oobCode
-    const [password,    setPassword]    = useState('');
-    const [confirm,     setConfirm]     = useState('');
-    const [showPw,      setShowPw]      = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [loading,     setLoading]     = useState(false);
-    const [verifying,   setVerifying]   = useState(true);   // checking the oobCode on mount
-    const [codeError,   setCodeError]   = useState('');      // invalid / expired link
-    const [done,        setDone]        = useState(false);
-    const [error,       setError]       = useState('');
-
-    // ── Theme detection ──────────────────────────────────────────────────────
     const [dark, setDark] = useState(() => {
         const saved = localStorage.getItem('syncline_theme');
         if (saved !== null) return saved === 'dark';
@@ -54,316 +29,385 @@ const ResetPassword = () => {
     }, []);
 
     const t = dark ? tokens.dark : tokens.light;
-    // ────────────────────────────────────────────────────────────────────────
-
-    // Validate the oobCode as soon as the page loads.
-    useEffect(() => {
-        if (!oobCode) {
-            navigate('/forgot-password');
-            return;
-        }
-
-        (async () => {
-            try {
-                // verifyPasswordResetCode resolves to the email linked to the code.
-                // eslint-disable-next-line no-undef
-                const resolvedEmail = await verifyPasswordResetCode(auth, oobCode);
-                setEmail(resolvedEmail);
-            } catch {
-                setCodeError('This reset link is invalid or has expired. Please request a new one.');
-            } finally {
-                setVerifying(false);
-            }
-        })();
-    }, [oobCode, navigate]);
-
-    const strength = rules.filter(r => r.test(password)).length;
-    const strengthColors = ['#ef4444', '#ef4444', '#f59e0b', '#10b981'];
-    const strengthLabels = ['', 'Weak', 'Fair', 'Strong'];
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setSuccess(false);
 
-        if (strength < 2) { setError('Please choose a stronger password.'); return; }
-        if (password !== confirm) { setError('Passwords do not match.'); return; }
+        if (!email.trim()) {
+            setError('Please enter your email address.');
+            return;
+        }
 
         setLoading(true);
-        try {
-            // eslint-disable-next-line no-undef
-            await confirmPasswordReset(auth, oobCode, password);
-            setDone(true);
-        } catch (err) {
-            setError(
-                err.code === 'auth/expired-action-code'
-                    ? 'This reset link has expired. Please request a new one.'
-                    : err.code === 'auth/invalid-action-code'
-                        ? 'This reset link is invalid. Please request a new one.'
-                        : 'Failed to reset password. Please try again.'
-            );
-        }
+        const result = await resetPassword(email.trim());
         setLoading(false);
+
+        if (result.success) {
+            setSuccess(true);
+        } else {
+            setError(result.error || 'Failed to send reset email. Please try again.');
+        }
     };
 
-    // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <div style={{ ...s.page, background: t.bg }}>
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
-                @keyframes spin   { to { transform:rotate(360deg); } }
-                @keyframes fadeUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
-                @keyframes drift  { 0%,100% { transform:translate(0,0); } 50% { transform:translate(20px,-15px); } }
-                @keyframes popIn  { 0% { transform:scale(0.6); opacity:0; } 100% { transform:scale(1); opacity:1; } }
-                .rp-input:focus   { border-color:#6366f1 !important; box-shadow:0 0 0 3px rgba(99,102,241,0.18) !important; outline:none; }
-                .rp-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 28px rgba(99,102,241,0.5) !important; }
-                .rp-input::placeholder { color: ${t.placeholder}; }
-                @media (max-width: 640px) {
-                    .rp-input { font-size: 16px !important; }
-                    .rp-rules { flex-direction: column; gap: 6px !important; align-items: flex-start !important; }
-                }
-            `}</style>
-
-            {/* Background blobs */}
-            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-                {[
-                    { w: 'min(600px, 90vw)', h: 'min(600px, 90vw)', top: '-200px', left: '-180px', c: t.blobColor1 },
-                    { w: 'min(450px, 70vw)', h: 'min(450px, 70vw)', bottom: '-160px', right: '-160px', c: t.blobColor2 },
-                ].map((b, i) => (
-                    <div key={i} style={{
-                        position: 'absolute', width: b.w, height: b.h, borderRadius: '50%',
-                        background: `radial-gradient(circle, ${b.c} 0%, transparent 70%)`,
-                        top: b.top, left: b.left, bottom: b.bottom, right: b.right,
-                        animation: `drift ${16 + i * 5}s infinite ease-in-out`,
-                    }} />
-                ))}
+        <div style={{ ...styles.container, background: t.bg }}>
+            <div style={styles.bgAnimation}>
+                <div style={{ ...styles.circle1, background: t.blob1 }} />
+                <div style={{ ...styles.circle2, background: t.blob2 }} />
+                <div style={{ ...styles.circle3, background: t.blob3 }} />
             </div>
 
-            <div style={{ ...s.wrap, animation: 'fadeUp 0.4s ease both' }}>
-                {/* Brand */}
-                <div style={s.brand}>
-                    <div style={s.brandIcon}><Zap size={26} color="#fff" strokeWidth={2.5} /></div>
-                    <span style={{ ...s.brandName, color: t.logoText }}>Syncline</span>
+            <div style={styles.content}>
+                <div style={styles.logoSection}>
+                    <div style={styles.logoIcon}>
+                        <Zap size={40} color="#fff" />
+                    </div>
+                    <h1 style={{ ...styles.logo, color: t.logoText }}>Syncline</h1>
+                    <p style={{ ...styles.tagline, color: t.muted }}>Real-Time Operations Platform</p>
                 </div>
 
-                <div style={{ ...s.card, background: t.cardBg, border: `1px solid ${t.border}`, boxShadow: t.cardShadow }}>
-
-                    {/* ── Verifying the code ── */}
-                    {verifying ? (
-                        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                            <div style={{ ...s.spinner, margin: '0 auto 16px', width: '28px', height: '28px', borderWidth: '3px' }} />
-                            <p style={{ color: t.muted, fontSize: '14px', margin: 0 }}>Verifying your reset link…</p>
-                        </div>
-                    ) : codeError ? (
-                        /* ── Invalid / expired link ── */
-                        <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                                <XCircle size={28} color="#ef4444" />
+                <div style={{ ...styles.card, background: t.cardBg, border: `1px solid ${t.border}`, boxShadow: t.cardShadow }}>
+                    {success ? (
+                        <div style={styles.successBlock}>
+                            <div style={styles.successIcon}>
+                                <CheckCircle size={32} color="#10b981" />
                             </div>
-                            <h2 style={{ ...s.title, color: t.text, marginBottom: '10px' }}>Link expired</h2>
-                            <p style={{ ...s.sub, color: t.muted, marginBottom: '28px' }}>{codeError}</p>
-                            <button className="rp-btn" onClick={() => navigate('/forgot-password')} style={{ ...s.submitBtn, width: '100%' }}>
-                                Request a new link
+                            <h2 style={{ ...styles.title, color: t.text }}>Check your inbox</h2>
+                            <p style={{ ...styles.subtitle, color: t.muted }}>
+                                We sent a password reset link to <strong style={{ color: t.text }}>{email}</strong>.
+                                Click the link in the email to set a new password.
+                            </p>
+                            <button
+                                type="button"
+                                style={styles.submitBtn}
+                                onClick={() => navigate('/login')}
+                            >
+                                <Zap size={20} />
+                                <span>Back to Sign In</span>
                             </button>
                         </div>
-                    ) : !done ? (
-                        /* ── Reset form ── */
+                    ) : (
                         <>
-                            <div style={{ marginBottom: '28px' }}>
-                                <div style={{ ...s.iconWrap, background: t.iconWrapBg, border: `1px solid ${t.iconWrapBorder}` }}>
-                                    <ShieldCheck size={22} color="#6366f1" />
-                                </div>
-                                <h2 style={{ ...s.title, color: t.text }}>Set a new password</h2>
-                                <p style={{ ...s.sub, color: t.muted }}>
-                                    Resetting password for <strong style={{ color: t.text }}>{email}</strong>
+                            <div style={styles.cardHeader}>
+                                <h2 style={{ ...styles.title, color: t.text }}>Reset your password</h2>
+                                <p style={{ ...styles.subtitle, color: t.muted }}>
+                                    Enter your email and we'll send you a reset link.
                                 </p>
                             </div>
 
-                            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {/* New password */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ ...s.label, color: t.label }}>New password</label>
-                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                                        <Lock size={16} style={{ position: 'absolute', left: '14px', color: t.iconColor, pointerEvents: 'none' }} />
+                            <form onSubmit={handleSubmit} style={styles.form}>
+                                <div style={styles.inputGroup}>
+                                    <label style={{ ...styles.label, color: t.label }}>Email Address</label>
+                                    <div style={styles.inputWrapper}>
+                                        <Mail size={20} style={{ ...styles.inputIcon, color: t.iconColor }} />
                                         <input
-                                            className="rp-input"
-                                            type={showPw ? 'text' : 'password'}
-                                            value={password}
-                                            onChange={e => setPassword(e.target.value)}
-                                            placeholder="Min. 8 characters"
-                                            style={{ ...s.input, paddingRight: '44px', background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="name@company.com"
+                                            style={{ ...styles.input, background: t.inputBg, border: `1px solid ${t.border}`, color: t.text }}
                                             required
                                             disabled={loading}
+                                            autoFocus
                                         />
-                                        <button type="button" onClick={() => setShowPw(!showPw)} style={s.eyeBtn}>
-                                            {showPw ? <EyeOff size={16} color={t.iconColor} /> : <Eye size={16} color={t.iconColor} />}
-                                        </button>
                                     </div>
-
-                                    {/* Strength bar */}
-                                    {password && (
-                                        <div>
-                                            <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-                                                {[1, 2, 3].map(i => (
-                                                    <div key={i} style={{ flex: 1, height: '3px', borderRadius: '2px', background: i <= strength ? strengthColors[strength] : t.strengthBarBg, transition: 'background 0.25s' }} />
-                                                ))}
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                                <span style={{ fontSize: '11px', color: strengthColors[strength], fontWeight: '600' }}>
-                                                    {strengthLabels[strength]}
-                                                </span>
-                                                <div className="rp-rules" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                    {rules.map((r, i) => (
-                                                        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', color: r.test(password) ? '#10b981' : t.ruleInactive }}>
-                                                            {r.test(password)
-                                                                ? <CheckCircle size={10} color="#10b981" />
-                                                                : <XCircle    size={10} color={t.ruleInactive} />}
-                                                            {r.label}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Confirm password */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ ...s.label, color: t.label }}>Confirm password</label>
-                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                                        <Lock size={16} style={{ position: 'absolute', left: '14px', color: t.iconColor, pointerEvents: 'none' }} />
-                                        <input
-                                            className="rp-input"
-                                            type={showConfirm ? 'text' : 'password'}
-                                            value={confirm}
-                                            onChange={e => setConfirm(e.target.value)}
-                                            placeholder="Re-enter your password"
-                                            style={{
-                                                ...s.input, paddingRight: '44px',
-                                                background: t.inputBg,
-                                                color: t.text,
-                                                ...(confirm && confirm !== password
-                                                    ? { border: '1px solid rgba(239,68,68,0.4)' }
-                                                    : confirm && confirm === password
-                                                        ? { border: '1px solid rgba(16,185,129,0.4)' }
-                                                        : { border: `1px solid ${t.border}` }
-                                                ),
-                                            }}
-                                            required
-                                            disabled={loading}
-                                        />
-                                        <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={s.eyeBtn}>
-                                            {showConfirm ? <EyeOff size={16} color={t.iconColor} /> : <Eye size={16} color={t.iconColor} />}
-                                        </button>
-                                    </div>
-                                    {confirm && confirm !== password && (
-                                        <span style={{ fontSize: '11px', color: '#f87171', marginTop: '2px' }}>Passwords don't match</span>
-                                    )}
-                                    {confirm && confirm === password && (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#10b981', marginTop: '2px' }}>
-                                            <CheckCircle size={11} /> Passwords match
-                                        </span>
-                                    )}
                                 </div>
 
                                 {error && (
-                                    <div style={s.errBox}>
-                                        <span>⚠️</span><span style={{ fontSize: '13px' }}>{error}</span>
+                                    <div style={{ ...styles.error, color: t.errorText }}>
+                                        <span>⚠️</span>
+                                        <span>{error}</span>
                                     </div>
                                 )}
 
                                 <button
-                                    className="rp-btn"
                                     type="submit"
+                                    style={{ ...styles.submitBtn, ...(loading ? styles.submitBtnDisabled : {}) }}
                                     disabled={loading}
-                                    style={{ ...s.submitBtn, ...(loading ? { opacity: 0.65, cursor: 'not-allowed', transform: 'none' } : {}) }}
                                 >
-                                    {loading
-                                        ? <><div style={s.spinner} /><span>Resetting…</span></>
-                                        : <><ShieldCheck size={16} /><span>Reset Password</span></>
-                                    }
+                                    {loading ? (
+                                        <>
+                                            <div style={styles.spinner} />
+                                            <span>Sending link…</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Mail size={20} />
+                                            <span>Send Reset Link</span>
+                                        </>
+                                    )}
                                 </button>
                             </form>
-                        </>
-                    ) : (
-                        /* ── Success ── */
-                        <div style={{ textAlign: 'center', padding: '8px 0', animation: 'fadeUp 0.4s ease both' }}>
-                            <div style={{ ...s.successIcon, animation: 'popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both' }}>
-                                <CheckCircle size={32} color="#10b981" strokeWidth={2} />
+
+                            <div style={styles.footer}>
+                                <button
+                                    type="button"
+                                    style={{ ...styles.backLink, color: t.muted }}
+                                    onClick={() => navigate('/login')}
+                                    disabled={loading}
+                                >
+                                    <ArrowLeft size={16} />
+                                    <span>Back to Sign In</span>
+                                </button>
                             </div>
-                            <h2 style={{ ...s.title, marginBottom: '10px', color: t.text }}>Password updated!</h2>
-                            <p style={{ ...s.sub, marginBottom: '28px', color: t.muted }}>
-                                Your password has been reset. You can now sign in with your new password.
-                            </p>
-                            <button className="rp-btn" onClick={() => navigate('/login')} style={{ ...s.submitBtn, width: '100%' }}>
-                                <Zap size={16} /> Sign in now
-                            </button>
-                        </div>
+                        </>
                     )}
                 </div>
             </div>
+
+            <style>{`
+                @keyframes float {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(20px); }
+                }
+                @keyframes pulse {
+                    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+                    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.3; }
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+                input::placeholder { color: ${t.placeholder}; }
+            `}</style>
         </div>
     );
 };
 
-// ── Theme tokens ──────────────────────────────────────────────────────────────
 const tokens = {
     dark: {
-        bg:             '#080c1a',
-        blobColor1:     'rgba(99,102,241,0.11)',
-        blobColor2:     'rgba(139,92,246,0.09)',
-        cardBg:         'rgba(15,23,42,0.88)',
-        cardShadow:     '0 24px 64px rgba(0,0,0,0.6)',
-        border:         'rgba(255,255,255,0.08)',
-        text:           '#f1f5f9',
-        logoText:       '#f1f5f9',
-        label:          '#94a3b8',
-        muted:          '#64748b',
-        iconColor:      '#64748b',
-        inputBg:        'rgba(255,255,255,0.05)',
-        placeholder:    '#475569',
-        iconWrapBg:     'rgba(99,102,241,0.12)',
-        iconWrapBorder: 'rgba(99,102,241,0.2)',
-        strengthBarBg:  'rgba(255,255,255,0.08)',
-        ruleInactive:   '#475569',
+        bg:          '#0a0e27',
+        blob1:       'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+        blob2:       'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
+        blob3:       'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+        cardBg:      'rgba(15, 23, 42, 0.8)',
+        cardShadow:  '0 20px 60px rgba(0, 0, 0, 0.5)',
+        border:      'rgba(255, 255, 255, 0.1)',
+        text:        '#fff',
+        logoText:    '#fff',
+        label:       '#e2e8f0',
+        muted:       '#94a3b8',
+        iconColor:   '#64748b',
+        inputBg:     'rgba(255, 255, 255, 0.05)',
+        placeholder: '#64748b',
+        errorText:   '#fca5a5',
     },
     light: {
-        bg:             '#f0f4ff',
-        blobColor1:     'rgba(99,102,241,0.10)',
-        blobColor2:     'rgba(139,92,246,0.08)',
-        cardBg:         'rgba(255,255,255,0.88)',
-        cardShadow:     '0 24px 64px rgba(99,102,241,0.12)',
-        border:         'rgba(99,102,241,0.15)',
-        text:           '#0f172a',
-        logoText:       '#0f172a',
-        label:          '#475569',
-        muted:          '#64748b',
-        iconColor:      '#94a3b8',
-        inputBg:        'rgba(241,245,249,0.8)',
-        placeholder:    '#94a3b8',
-        iconWrapBg:     'rgba(99,102,241,0.08)',
-        iconWrapBorder: 'rgba(99,102,241,0.15)',
-        strengthBarBg:  'rgba(99,102,241,0.08)',
-        ruleInactive:   '#94a3b8',
+        bg:          '#f0f4ff',
+        blob1:       'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)',
+        blob2:       'radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)',
+        blob3:       'radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%)',
+        cardBg:      'rgba(255, 255, 255, 0.85)',
+        cardShadow:  '0 20px 60px rgba(99, 102, 241, 0.12)',
+        border:      'rgba(99, 102, 241, 0.15)',
+        text:        '#0f172a',
+        logoText:    '#0f172a',
+        label:       '#1e293b',
+        muted:       '#64748b',
+        iconColor:   '#94a3b8',
+        inputBg:     'rgba(241, 245, 249, 0.8)',
+        placeholder: '#94a3b8',
+        errorText:   '#dc2626',
     },
 };
 
-const s = {
-    page: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', padding: 'clamp(16px,4vw,24px)', fontFamily: "'DM Sans', system-ui, sans-serif" },
-    wrap: { position: 'relative', zIndex: 1, width: '100%', maxWidth: '420px' },
-    brand: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: 'clamp(20px,5vw,28px)' },
-    brandIcon: { width: 'clamp(36px,8vw,40px)', height: 'clamp(36px,8vw,40px)', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 24px rgba(99,102,241,0.4)' },
-    brandName: { fontSize: 'clamp(18px,4vw,20px)', fontWeight: '800', letterSpacing: '-0.3px' },
-    card: { backdropFilter: 'blur(24px)', borderRadius: 'clamp(16px,4vw,22px)', padding: 'clamp(24px,6vw,32px)' },
-    iconWrap: { width: 'clamp(48px,10vw,52px)', height: 'clamp(48px,10vw,52px)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' },
-    title: { margin: '0 0 8px', fontSize: 'clamp(19px,4.5vw,21px)', fontWeight: '700', letterSpacing: '-0.3px' },
-    sub: { margin: 0, fontSize: 'clamp(12px,2.8vw,13px)', lineHeight: 1.6 },
-    label: { fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' },
-    input: { width: '100%', padding: 'clamp(10px,2.5vw,12px) clamp(12px,3vw,14px) clamp(10px,2.5vw,12px) clamp(36px,8vw,40px)', borderRadius: '10px', fontSize: 'clamp(13px,3vw,14px)', transition: 'border-color 0.2s, box-shadow 0.2s', boxSizing: 'border-box' },
-    eyeBtn: { position: 'absolute', right: '10px', background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', borderRadius: '6px' },
-    errBox: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', color: '#fca5a5' },
-    submitBtn: { width: '100%', padding: 'clamp(11px,2.8vw,13px)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: 'clamp(14px,3.2vw,15px)', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' },
-    spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.75s linear infinite' },
-    successIcon: { width: 'clamp(64px,14vw,72px)', height: 'clamp(64px,14vw,72px)', borderRadius: '50%', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px' },
+const styles = {
+    container: {
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        padding: '20px',
+    },
+    bgAnimation: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+    },
+    circle1: {
+        position: 'absolute',
+        width: '500px',
+        height: '500px',
+        borderRadius: '50%',
+        top: '-250px',
+        left: '-250px',
+        animation: 'float 20s infinite ease-in-out',
+    },
+    circle2: {
+        position: 'absolute',
+        width: '400px',
+        height: '400px',
+        borderRadius: '50%',
+        bottom: '-200px',
+        right: '-200px',
+        animation: 'float 15s infinite ease-in-out reverse',
+    },
+    circle3: {
+        position: 'absolute',
+        width: '300px',
+        height: '300px',
+        borderRadius: '50%',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        animation: 'pulse 10s infinite ease-in-out',
+    },
+    content: {
+        position: 'relative',
+        zIndex: 1,
+        width: '100%',
+        maxWidth: '480px',
+    },
+    logoSection: {
+        textAlign: 'center',
+        marginBottom: '40px',
+    },
+    logoIcon: {
+        width: '80px',
+        height: '80px',
+        margin: '0 auto 20px',
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        borderRadius: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 10px 40px rgba(99,102,241,0.4)',
+    },
+    logo: {
+        fontSize: '32px',
+        fontWeight: '700',
+        margin: '0 0 8px 0',
+        letterSpacing: '-0.5px',
+    },
+    tagline: {
+        fontSize: '14px',
+        margin: 0,
+    },
+    card: {
+        backdropFilter: 'blur(20px)',
+        borderRadius: '24px',
+        padding: '40px',
+    },
+    cardHeader: {
+        marginBottom: '30px',
+    },
+    title: {
+        fontSize: '24px',
+        fontWeight: '600',
+        margin: '0 0 8px 0',
+    },
+    subtitle: {
+        fontSize: '14px',
+        margin: 0,
+        lineHeight: 1.6,
+    },
+    form: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+    },
+    inputGroup: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+    },
+    label: {
+        fontSize: '14px',
+        fontWeight: '500',
+    },
+    inputWrapper: {
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+    },
+    inputIcon: {
+        position: 'absolute',
+        left: '16px',
+        pointerEvents: 'none',
+    },
+    input: {
+        width: '100%',
+        padding: '14px 16px 14px 48px',
+        borderRadius: '12px',
+        fontSize: '15px',
+        outline: 'none',
+        transition: 'all 0.3s',
+        boxSizing: 'border-box',
+        fontFamily: 'inherit',
+    },
+    error: {
+        background: 'rgba(239, 68, 68, 0.1)',
+        border: '1px solid rgba(239, 68, 68, 0.3)',
+        padding: '12px 16px',
+        borderRadius: '12px',
+        fontSize: '14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+    },
+    submitBtn: {
+        padding: '14px 24px',
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        border: 'none',
+        borderRadius: '12px',
+        color: '#fff',
+        fontSize: '15px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        transition: 'all 0.3s',
+        boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)',
+        width: '100%',
+    },
+    submitBtnDisabled: {
+        opacity: 0.6,
+        cursor: 'not-allowed',
+    },
+    spinner: {
+        width: '20px',
+        height: '20px',
+        border: '2px solid rgba(255,255,255,0.3)',
+        borderTop: '2px solid #fff',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+    },
+    footer: {
+        marginTop: '24px',
+        textAlign: 'center',
+    },
+    backLink: {
+        background: 'none',
+        border: 'none',
+        fontSize: '14px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: 0,
+        fontFamily: 'inherit',
+    },
+    successBlock: {
+        textAlign: 'center',
+    },
+    successIcon: {
+        width: '72px',
+        height: '72px',
+        borderRadius: '50%',
+        background: 'rgba(16, 185, 129, 0.1)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: '0 auto 20px',
+    },
 };
 
-export default ResetPassword;
+export default ForgotPassword;
