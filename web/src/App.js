@@ -18,13 +18,22 @@ import './App.css';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, firebaseUser, user } = useAuth();
 
     if (loading) {
         return (
             <div className="loading-container">
                 <div className="loading-spinner"></div>
                 <p>Loading Syncline...</p>
+            </div>
+        );
+    }
+
+    if (firebaseUser && !user) {
+        return (
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Connecting to your workspace…</p>
             </div>
         );
     }

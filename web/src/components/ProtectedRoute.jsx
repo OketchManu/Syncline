@@ -3,7 +3,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const LoadingScreen = () => (
+const LoadingScreen = ({ message = 'Loading...' }) => (
   <div style={{ 
     display: 'flex', 
     alignItems: 'center', 
@@ -23,7 +23,7 @@ const LoadingScreen = () => (
         animation: 'spin 1s linear infinite',
         margin: '0 auto 20px'
       }} />
-      <p>Loading...</p>
+      <p>{message}</p>
     </div>
     <style>{`
       @keyframes spin {
@@ -34,21 +34,21 @@ const LoadingScreen = () => (
 );
 
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, firebaseUser, loading } = useAuth();
   const location = useLocation();
 
-  // Show loading spinner while checking authentication
   if (loading) {
     return <LoadingScreen />;
   }
 
-  // If not authenticated, redirect to login
-  // Save the attempted location so we can redirect back after login
+  if (firebaseUser && !user) {
+    return <LoadingScreen message="Connecting to your workspace…" />;
+  }
+
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // User is authenticated, render the protected component
   return children;
 };
 

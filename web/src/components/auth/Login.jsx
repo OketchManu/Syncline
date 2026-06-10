@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Zap } from 'lucide-react';
+import { warmupApi } from '../../utils/apiWarmup.js';
 
 const Login = () => {
     const [email,         setEmail]         = useState('');
@@ -25,6 +26,7 @@ const Login = () => {
     });
 
     useEffect(() => {
+        warmupApi();
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
         const handler = (e) => {
             if (!localStorage.getItem('syncline_theme')) setDark(e.matches);
@@ -61,16 +63,15 @@ const Login = () => {
         if (result.success) {
             navigate(redirectTo, { replace: true });
         } else if (result.needsRegistration) {
-            // Google account exists in Firebase but has no Syncline account —
-            // redirect to /register and pre-fill the form with their Google profile.
             navigate('/register', {
                 state: {
                     fromGoogleLogin: true,
                     googleProfile:   result.googleUser,
                 },
             });
+        } else if (result.redirecting) {
+            // Full-page redirect to Google in progress
         } else if (result.error) {
-            // null error = popup closed, don't show anything
             setError(result.error);
         }
 

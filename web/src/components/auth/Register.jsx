@@ -6,6 +6,7 @@ import {
     Eye, EyeOff, Mail, Lock, User, Zap, CheckCircle2,
     Building2, UserCircle, ArrowLeft, Globe, FileText,
 } from 'lucide-react';
+import { warmupApi } from '../../utils/apiWarmup.js';
 
 const Register = () => {
     const navigate  = useNavigate();
@@ -47,6 +48,7 @@ const Register = () => {
     });
 
     useEffect(() => {
+        warmupApi();
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
         const handler = (e) => {
             if (!localStorage.getItem('syncline_theme')) setDark(e.matches);
@@ -148,6 +150,8 @@ const Register = () => {
 
         if (result.success) {
             navigate('/dashboard');
+        } else if (result.redirecting) {
+            // Full-page redirect to Google in progress
         } else if (result.error) {
             setError(result.error);
         }

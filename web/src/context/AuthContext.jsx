@@ -5,6 +5,8 @@ import {
     auth,
     googleProvider,
     signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     signOut,
@@ -27,6 +29,52 @@ export const useAuth = () => {
 };
 
 const API_URL = API_BASE_URL;
+axios.defaults.timeout = 60000;
+
+const apiErrorMessage = (err) => {
+    if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        return 'The server is waking up — please wait a moment and try again.';
+    }
+    if (!err.response) {
+        return 'Network error. Check your connection and try again.';
+    }
+    return err.response?.data?.error || err.message;
+};
+
+const apiRequest = async (fn, retries = 1) => {
+    try {
+        return await fn();
+    } catch (err) {
+        const retryable = !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500;
+        if (retries > 0 && retryable) {
+            await new Promise(r => setTimeout(r, 1500));
+            return apiRequest(fn, retries - 1);
+        }
+        throw err;
+    }
+};
+
+/** Popup first; fall back to full-page redirect when popups are blocked. */
+const googleSignIn = async () => {
+    if (auth.currentUser?.providerData?.some(p => p.providerId === 'google.com')) {
+        return auth.currentUser;
+    }
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        return result.user;
+    } catch (err) {
+        const useRedirect = [
+            'auth/popup-blocked',
+            'auth/cancelled-popup-request',
+            'auth/operation-not-supported-in-this-environment',
+        ].includes(err.code);
+        if (useRedirect) {
+            await signInWithRedirect(auth, googleProvider);
+            return null;
+        }
+        throw err;
+    }
+};
 
 const normaliseUser = (raw) => {
     if (!raw) return null;
@@ -47,7 +95,7 @@ const setAxiosToken = async (firebaseUser) => {
         return null;
     }
     try {
-        const token = await firebaseUser.getIdToken(true);
+        const token = await firebaseUser.getIdToken(false);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         console.log('🔐 Auth token set (length:', token.length, ')');
         return token;
@@ -74,16 +122,16 @@ export const AuthProvider = ({ children }) => {
         await setAxiosToken(fbUser);
 
         if (registrationPayload) {
-            const res = await axios.post(`${API_URL}/auth/register`, {
+            const res = await apiRequest(() => axios.post(`${API_URL}/auth/register`, {
                 ...registrationPayload,
                 firebaseUid: fbUser.uid,
                 email:       fbUser.email,
-            });
+            }));
             return normaliseUser(res.data.user);
         }
 
         try {
-            const res = await axios.get(`${API_URL}/auth/me`);
+            const res = await apiRequest(() => axios.get(`${API_URL}/auth/me`));
             console.log('✅ /api/auth/me ok, userId:', res.data.user?.id);
             return normaliseUser(res.data.user);
         } catch (err) {
@@ -102,12 +150,12 @@ export const AuthProvider = ({ children }) => {
                 console.log('📝 User not in DB — running firebase-sync...');
                 let syncRes;
                 try {
-                    syncRes = await axios.post(`${API_URL}/auth/firebase-sync`, {
+                    syncRes = await apiRequest(() => axios.post(`${API_URL}/auth/firebase-sync`, {
                         email:       fbUser.email,
                         fullName:    fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
                         firebaseUid: fbUser.uid,
                         avatar:      fbUser.photoURL || null,
-                    });
+                    }));
                 } catch (syncErr) {
                     if (syncErr.response?.status === 403) {
                         await signOut(auth).catch(() => {});
@@ -134,19 +182,36 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         console.log('🔌 Setting up Firebase auth listener...');
 
+        // Complete Google redirect sign-in when returning from Google
+        getRedirectResult(auth)
+            .then(async (result) => {
+                if (!result?.user || syncInProgress.current || deleteInProgress.current) return;
+                syncInProgress.current = true;
+                try {
+                    const backendUser = await syncBackendUser(result.user);
+                    setUser(backendUser);
+                    setFirebaseUser(result.user);
+                } catch (err) {
+                    console.error('❌ Redirect sign-in sync failed:', err.message);
+                } finally {
+                    syncInProgress.current = false;
+                }
+            })
+            .catch((err) => {
+                if (err.code !== 'auth/no-auth-event') {
+                    console.error('❌ getRedirectResult error:', err.message);
+                }
+            });
+
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             console.log('🔄 Auth state changed:', { uid: fbUser?.uid, email: fbUser?.email });
             setFirebaseUser(fbUser);
+            // Unblock the UI as soon as Firebase auth state is known
+            setLoading(false);
 
             if (fbUser) {
-                // CRITICAL: if deletion is in progress, do NOT sync.
-                // Without this guard, the Firebase sign-out event at the end of
-                // deleteAccount fires onAuthStateChanged again before the listener
-                // is aware the account is gone, which causes firebase-sync to
-                // recreate the deleted user row.
                 if (syncInProgress.current || deleteInProgress.current) {
                     console.log('⏭️  Skipping sync — handled by caller');
-                    setLoading(false);
                     return;
                 }
 
@@ -162,16 +227,12 @@ export const AuthProvider = ({ children }) => {
                     setUser(null);
                 }
             } else {
-                // Only clear state if we're not mid-deletion (deletion clears
-                // state itself at the end of deleteAccount).
                 if (!deleteInProgress.current) {
                     console.log('🚪 User signed out');
                     delete axios.defaults.headers.common['Authorization'];
                     setUser(null);
                 }
             }
-
-            setLoading(false);
         });
 
         // Refresh Firebase token every 55 minutes (tokens expire at 60 min)
@@ -247,12 +308,12 @@ export const AuthProvider = ({ children }) => {
         setAuthError(null);
         try {
             syncInProgress.current = true;
-            const result = await signInWithPopup(auth, googleProvider);
-            const fbUser = result.user;
+            const fbUser = await googleSignIn();
+            if (!fbUser) return { success: false, redirecting: true, error: null };
             await setAxiosToken(fbUser);
 
             try {
-                const res         = await axios.get(`${API_URL}/auth/me`);
+                const res         = await apiRequest(() => axios.get(`${API_URL}/auth/me`));
                 const backendUser = normaliseUser(res.data.user);
                 setUser(backendUser);
                 return { success: true };
@@ -264,9 +325,7 @@ export const AuthProvider = ({ children }) => {
                     return { success: false, error: 'This account has been permanently deleted.' };
                 }
                 if (status === 404) {
-                    // Google user not registered — send back to registration
-                    await signOut(auth).catch(() => {});
-                    delete axios.defaults.headers.common['Authorization'];
+                    // Keep Firebase session — Register will complete backend signup
                     return {
                         success:           false,
                         needsRegistration: true,
@@ -281,7 +340,7 @@ export const AuthProvider = ({ children }) => {
             }
         } catch (err) {
             if (err.code === 'auth/popup-closed-by-user') return { success: false, error: null };
-            const message = firebaseErrorMessage(err.code) || err.message;
+            const message = firebaseErrorMessage(err.code) || apiErrorMessage(err);
             setAuthError(message);
             return { success: false, error: message };
         } finally {
@@ -296,12 +355,12 @@ export const AuthProvider = ({ children }) => {
         setAuthError(null);
         try {
             syncInProgress.current = true;
-            const result = await signInWithPopup(auth, googleProvider);
-            const fbUser = result.user;
+            const fbUser = await googleSignIn();
+            if (!fbUser) return { success: false, redirecting: true, error: null };
             await setAxiosToken(fbUser);
 
             try {
-                const res         = await axios.get(`${API_URL}/auth/me`);
+                const res         = await apiRequest(() => axios.get(`${API_URL}/auth/me`));
                 const backendUser = normaliseUser(res.data.user);
                 setUser(backendUser);
                 return { success: true };
@@ -311,7 +370,6 @@ export const AuthProvider = ({ children }) => {
                     return { success: false, error: 'This account has been permanently deleted.' };
                 }
                 if (meErr.response?.status !== 404) throw meErr;
-                // 404 = continue to register below
             }
 
             const backendUser = await syncBackendUser(fbUser, {
@@ -327,7 +385,7 @@ export const AuthProvider = ({ children }) => {
 
         } catch (err) {
             if (err.code === 'auth/popup-closed-by-user') return { success: false, error: null };
-            const message = firebaseErrorMessage(err.code) || err.message;
+            const message = firebaseErrorMessage(err.code) || apiErrorMessage(err);
             setAuthError(message);
             return { success: false, error: message };
         } finally {
@@ -550,7 +608,7 @@ export const AuthProvider = ({ children }) => {
             resetPassword, changePassword, resendVerificationEmail,
             updateUser, hasCompanyFeatures, isCompanyOwner, isEmailVerified,
         }}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };
@@ -563,6 +621,9 @@ const firebaseErrorMessage = (code) => {
         'auth/email-already-in-use':   'Email is already registered.',
         'auth/invalid-email':          'Invalid email address.',
         'auth/popup-closed-by-user':   'Sign-in popup was closed.',
+        'auth/popup-blocked':          'Pop-up blocked. Allow pop-ups for Syncline or try again.',
+        'auth/unauthorized-domain':    'This domain is not authorized for Google sign-in.',
+        'auth/cancelled-popup-request':'Sign-in was interrupted. Please try again.',
         'auth/requires-recent-login':  'Please sign out and sign back in, then try again.',
         'auth/account-exists-with-different-credential':
                                        'An account already exists with this email.',
